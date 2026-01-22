@@ -1,8 +1,0 @@
-name = "test-worker"
-compatibility_date = "2023-12-01"
-compatibility_flags = ["nodejs_compat"]
-main = "file-1769081699905-689796819.js"
-
-[dev]
-port = 8001
-ip = "0.0.0.0"

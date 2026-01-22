@@ -1,8 +1,0 @@
-name = "11"
-compatibility_date = "2024-09-23"
-compatibility_flags = ["nodejs_compat"]
-main = "11-7728-worker.js"
-
-[dev]
-port = 8004
-ip = "0.0.0.0"

@@ -1,8 +1,0 @@
-name = "sprint3-test"
-compatibility_date = "2023-12-01"
-compatibility_flags = ["nodejs_compat"]
-main = "undefined"
-
-[dev]
-port = 8003
-ip = "0.0.0.0"
