@@ -22,5 +22,5 @@ services:
     # In a real dev env, we might want to run `npm install` inside.
     # For now, we assume user/script handles it, or we run it manually.
     # We'll use nodemon if available for dev, or just node.
-    command: sh -c "cd manager && npm install && node server.js"
+    command: sh -c "cd manager && npm install && cd client && npm install && npm run build && cd .. && node server.js"
     restart: unless-stopped
