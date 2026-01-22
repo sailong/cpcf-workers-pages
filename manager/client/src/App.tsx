@@ -31,12 +31,6 @@ function App() {
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'resources'>('list');
 
   // Form State
-  const [name, setName] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-
-  // Bindings State resourceId: string }>>([]); resourceId: string }>>([]);
-
-  // Resource Creation
   const [newKvName, setNewKvName] = useState('');
   const [newD1Name, setNewD1Name] = useState('');
 
@@ -46,16 +40,28 @@ function App() {
   // KV Manager
   const [managingKV, setManagingKV] = useState<{ id: string; name: string } | null>(null);
 
-  // Custom Port
-  const [customPort, setCustomPort] = useState<number | ''>('');
-
   // Code Editor
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+
+  // Confirm Deletion State
+  const [confirmingDeletion, setConfirmingDeletion] = useState<{
+    type: 'project' | 'kv' | 'd1';
+    id: string;
+    name: string;
+  } | null>(null);
+
+  // Toast State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
     fetchProjects();
     fetchResources();
   }, []);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const fetchProjects = async () => {
     try {
@@ -64,6 +70,7 @@ function App() {
       setProjects(data);
     } catch (e) {
       console.error("Failed to fetch projects");
+      showToast("获取项目列表失败", 'error');
     }
   };
 
@@ -77,11 +84,12 @@ function App() {
       setD1Resources(await d1Res.json());
     } catch (e) {
       console.error("Failed to fetch resources");
+      showToast("获取资源列表失败", 'error');
     }
   };
 
   const handleCreateKv = async () => {
-    if (!newKvName) return alert("请输入 KV Namespace 名称");
+    if (!newKvName) return showToast("请输入 KV Namespace 名称", 'error');
     try {
       const res = await fetch('/api/resources/kv', {
         method: 'POST',
@@ -91,17 +99,18 @@ function App() {
       if (res.ok) {
         setNewKvName('');
         fetchResources();
+        showToast("KV Namespace 创建成功");
       } else {
         const err = await res.json();
-        alert(err.error);
+        showToast(err.error || "创建失败", 'error');
       }
     } catch (e) {
-      alert("创建失败");
+      showToast("创建失败", 'error');
     }
   };
 
   const handleCreateD1 = async () => {
-    if (!newD1Name) return alert("请输入 D1 Database 名称");
+    if (!newD1Name) return showToast("请输入 D1 Database 名称", 'error');
     try {
       const res = await fetch('/api/resources/d1', {
         method: 'POST',
@@ -111,61 +120,99 @@ function App() {
       if (res.ok) {
         setNewD1Name('');
         fetchResources();
+        showToast("D1 Database 创建成功");
       } else {
         const err = await res.json();
-        alert(err.error);
+        showToast(err.error || "创建失败", 'error');
       }
     } catch (e) {
-      alert("创建失败");
+      showToast("创建失败", 'error');
     }
   };
-
-
 
   const toggleProject = async (id: string, currentStatus: string) => {
     const action = currentStatus === 'running' ? 'stop' : 'start';
-    await fetch(`/api/projects/${id}/${action}`, { method: 'POST' });
-    fetchProjects();
-  };
-
-  const deleteProject = async (id: string, name: string) => {
-    if (!confirm(`确定要删除项目 "${name}" 吗？正在运行的项目将被停止。`)) return;
     try {
-      const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchProjects();
-      }
+      const res = await fetch(`/api/projects/${id}/${action}`, { method: 'POST' });
+      if (!res.ok) throw new Error();
+      fetchProjects();
+      showToast(`项目已${action === 'start' ? '启动' : '停止'}`);
     } catch (e) {
-      alert('删除失败');
+      showToast(`操作失败`, 'error');
     }
   };
 
-  const deleteKVNamespace = async (id: string, name: string) => {
-    if (!confirm(`确定要删除 KV Namespace "${name}" 吗？所有数据将被删除。`)) return;
+  // Initiate Deletion
+  const handleDeleteClick = (type: 'project' | 'kv' | 'd1', id: string, name: string) => {
+    setConfirmingDeletion({ type, id, name });
+  };
+
+  // Execute Deletion
+  const executeDelete = async () => {
+    if (!confirmingDeletion) return;
+    const { type, id } = confirmingDeletion;
+
     try {
-      const res = await fetch(`/api/resources/kv/${id}`, { method: 'DELETE' });
+      let url = '';
+      if (type === 'project') url = `/api/projects/${id}`;
+      else if (type === 'kv') url = `/api/resources/kv/${id}`;
+      else if (type === 'd1') url = `/api/resources/d1/${id}`;
+
+      const res = await fetch(url, { method: 'DELETE' });
+
       if (res.ok) {
-        fetchResources();
+        if (type === 'project') fetchProjects();
+        else fetchResources();
+        showToast("删除成功");
+      } else {
+        throw new Error();
       }
     } catch (e) {
-      alert('删除失败');
+      showToast('删除失败', 'error');
+    } finally {
+      setConfirmingDeletion(null);
     }
   };
 
-  const deleteD1Database = async (id: string, name: string) => {
-    if (!confirm(`确定要删除 D1 Database "${name}" 吗？数据库文件将被永久删除。`)) return;
-    try {
-      const res = await fetch(`/api/resources/d1/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchResources();
-      }
-    } catch (e) {
-      alert('删除失败');
-    }
-
-  };
   return (
-    <div className="min-h-screen p-8 bg-gray-950 text-gray-100 font-sans">
+    <div className="min-h-screen p-8 bg-gray-950 text-gray-100 font-sans relative">
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-[60] px-6 py-4 rounded-lg shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${toast.type === 'success' ? 'bg-green-600/90 text-white' : 'bg-red-600/90 text-white'
+          }`}>
+          <span className="text-xl">{toast.type === 'success' ? '✅' : '⚠️'}</span>
+          <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+
+      {/* Confirm Deletion Modal */}
+      {confirmingDeletion && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[70] backdrop-blur-sm transition-all">
+          <div className="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-2xl w-full max-w-md transform scale-100 transition-transform">
+            <h3 className="text-xl font-bold text-white mb-2">确认删除</h3>
+            <p className="text-gray-300 mb-6">
+              确定要删除 <span className="font-bold text-white">{confirmingDeletion.name}</span> 吗？
+              {confirmingDeletion.type === 'project' && " 正在运行的项目将被停止。"}
+              {confirmingDeletion.type !== 'project' && " 此操作不可恢复，数据将永久丢失。"}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setConfirmingDeletion(null)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={executeDelete}
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors shadow-lg shadow-red-900/20"
+              >
+                🗑️ 确认删除
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto">
         <header className="flex justify-between items-center mb-10 border-b border-gray-800 pb-4">
           <div>
@@ -235,7 +282,7 @@ function App() {
                           管理
                         </button>
                         <button
-                          onClick={() => deleteKVNamespace(kv.id, kv.name)}
+                          onClick={() => handleDeleteClick('kv', kv.id, kv.name)}
                           className="bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1.5 rounded transition-all"
                         >
                           删除
@@ -284,7 +331,7 @@ function App() {
                           管理
                         </button>
                         <button
-                          onClick={() => deleteD1Database(db.id, db.name)}
+                          onClick={() => handleDeleteClick('d1', db.id, db.name)}
                           className="bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1.5 rounded transition-all"
                         >
                           删除
@@ -307,7 +354,10 @@ function App() {
               </h2>
               <p className="text-gray-500 text-sm mt-1">支持在线编写或上传文件</p>
             </div>
-            <CreateWorkerForm onSuccess={fetchProjects} />
+            <CreateWorkerForm onSuccess={() => {
+              fetchProjects();
+              setActiveTab('list');
+            }} />
           </div>
         )}
 
@@ -361,7 +411,7 @@ function App() {
                   </button>
 
                   <button
-                    onClick={() => deleteProject(p.id, p.name)}
+                    onClick={() => handleDeleteClick('project', p.id, p.name)}
                     className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-medium text-sm transition-colors"
                   >
                     删除
@@ -398,6 +448,7 @@ function App() {
           onSaved={() => {
             setEditingProject(null);
             fetchProjects();
+            showToast("配置已保存");
           }}
         />
       )}
