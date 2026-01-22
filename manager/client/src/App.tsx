@@ -56,6 +56,10 @@ function App() {
   useEffect(() => {
     fetchProjects();
     fetchResources();
+
+    // Real-time status polling
+    const interval = setInterval(fetchProjects, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -217,28 +221,27 @@ function App() {
         <header className="flex justify-between items-center mb-10 border-b border-gray-800 pb-4">
           <div>
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-yellow-500">
-              Cloudflare Platform
+              CCFWP 管理平台
             </h1>
-            <p className="text-gray-500 text-sm mt-1">本地容器化管理平台 · 参照真实工作流</p>
           </div>
           <div className="flex bg-gray-800 rounded-lg p-1">
             <button
               onClick={() => setActiveTab('list')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'list' ? 'bg-gray-700 text-white shadow' : 'text-gray-400 hover:text-white'}`}
             >
-              Dashboard
+              仪表盘
             </button>
             <button
               onClick={() => setActiveTab('create')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'create' ? 'bg-orange-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
             >
-              New Project
+              新建项目
             </button>
             <button
               onClick={() => setActiveTab('resources')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'resources' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
             >
-              Resources
+              资源管理
             </button>
           </div>
         </header>
@@ -249,7 +252,7 @@ function App() {
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-blue-500/10 text-blue-500 p-2 rounded-lg mr-3">📦</span>
-                KV Namespaces
+                KV 键值存储
               </h2>
 
               <div className="flex gap-2 mb-4">
@@ -260,13 +263,13 @@ function App() {
                   className="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-sm"
                 />
                 <button onClick={handleCreateKv} className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg text-sm font-medium">
-                  Create
+                  创建
                 </button>
               </div>
 
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {kvResources.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600 text-sm">暂无 KV Namespace</div>
+                  <div className="text-center py-8 text-gray-600 text-sm">暂无 KV 命名空间</div>
                 ) : kvResources.map(kv => (
                   <div key={kv.id} className="bg-gray-950/50 border border-gray-800 rounded-lg p-3">
                     <div className="flex justify-between items-center">
@@ -298,7 +301,7 @@ function App() {
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
               <h2 className="text-xl font-semibold mb-4 flex items-center">
                 <span className="bg-purple-500/10 text-purple-500 p-2 rounded-lg mr-3">🗄️</span>
-                D1 Databases
+                D1 数据库
               </h2>
 
               <div className="flex gap-2 mb-4">
@@ -309,13 +312,13 @@ function App() {
                   className="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-sm"
                 />
                 <button onClick={handleCreateD1} className="bg-purple-600 hover:bg-purple-500 px-4 py-2 rounded-lg text-sm font-medium">
-                  Create
+                  创建
                 </button>
               </div>
 
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {d1Resources.length === 0 ? (
-                  <div className="text-center py-8 text-gray-600 text-sm">暂无 D1 Database</div>
+                  <div className="text-center py-8 text-gray-600 text-sm">暂无 D1 数据库</div>
                 ) : d1Resources.map(db => (
                   <div key={db.id} className="bg-gray-950/50 border border-gray-800 rounded-lg p-3">
                     <div className="flex justify-between items-center">
@@ -350,9 +353,9 @@ function App() {
             <div className="border-b border-gray-800 p-4">
               <h2 className="text-xl font-semibold flex items-center">
                 <span className="bg-orange-500/10 text-orange-500 p-2 rounded-lg mr-3">🚀</span>
-                创建新 Worker
+                创建新项目
               </h2>
-              <p className="text-gray-500 text-sm mt-1">支持在线编写或上传文件</p>
+              <p className="text-gray-500 text-sm mt-1">支持在线编写 Worker 或上传 Pages 静态文件</p>
             </div>
             <CreateWorkerForm onSuccess={() => {
               fetchProjects();
@@ -375,7 +378,7 @@ function App() {
                     <h3 className="text-lg font-bold text-gray-200">{p.name}</h3>
                     <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                       <span className="uppercase text-xs font-bold px-2 py-0.5 rounded bg-gray-800 border border-gray-700">{p.type}</span>
-                      <span>Port: <span className="text-gray-300 font-mono">{p.port}</span></span>
+                      <span>端口: <span className="text-gray-300 font-mono">{p.port}</span></span>
                       {p.bindings?.kv && p.bindings.kv.length > 0 && <span className="text-blue-400">{p.bindings.kv.length} KV</span>}
                       {p.bindings?.d1 && p.bindings.d1.length > 0 && <span className="text-purple-400">{p.bindings.d1.length} D1</span>}
                     </div>
@@ -389,7 +392,7 @@ function App() {
                       target="_blank"
                       className="text-blue-400 hover:text-blue-300 text-sm underline underline-offset-4"
                     >
-                      Open App ↗
+                      打开应用 ↗
                     </a>
                   )}
 
@@ -400,7 +403,7 @@ function App() {
                       : 'bg-green-600 text-white hover:bg-green-500'
                       }`}
                   >
-                    {p.status === 'running' ? 'Stop' : 'Start'}
+                    {p.status === 'running' ? '停止' : '启动'}
                   </button>
 
                   <button

@@ -71,6 +71,10 @@ class ProjectRuntime {
             args.push('--config', configPath);
             args.push('--port', project.port.toString());
             args.push('--ip', '0.0.0.0');
+
+            // Force shared persistence so all workers supply the same DBs
+            const sharedStateDir = path.join(path.dirname(this.uploadsDir), 'wrangler-shared-state');
+            args.push('--persist-to', sharedStateDir);
         }
 
         // Spawn process
@@ -107,6 +111,14 @@ class ProjectRuntime {
             return true;
         }
         return false;
+    }
+    /**
+     * Check if a project is running
+     * @param {string} projectId 
+     * @returns {boolean}
+     */
+    isRunning(projectId) {
+        return this.processes.has(projectId);
     }
 }
 

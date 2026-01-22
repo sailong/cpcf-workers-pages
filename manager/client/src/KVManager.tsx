@@ -14,6 +14,9 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Confirmation Modal State
+    const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
+
     // 加载键列表
     const loadKeys = async () => {
         try {
@@ -73,24 +76,31 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
         }
     };
 
-    // 删除键
-    const deleteKey = async (key: string) => {
-        if (!confirm(`确定要删除键 "${key}" 吗？`)) return;
+    // 删除键 - 请求确认
+    const requestDelete = (key: string) => {
+        setKeyToDelete(key);
+    };
+
+    // 执行删除
+    const executeDelete = async () => {
+        if (!keyToDelete) return;
 
         try {
-            const res = await fetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(key)}`, {
+            const res = await fetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(keyToDelete)}`, {
                 method: 'DELETE'
             });
 
             if (res.ok) {
                 await loadKeys();
-                if (selectedKey === key) {
+                if (selectedKey === keyToDelete) {
                     setSelectedKey(null);
                     setValue('');
                 }
             }
         } catch (err) {
             setError('删除失败');
+        } finally {
+            setKeyToDelete(null);
         }
     };
 
@@ -100,7 +110,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden relative">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex justify-between items-center">
                     <div>
@@ -135,8 +145,9 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                                             {key.name}
                                         </button>
                                         <button
-                                            onClick={() => deleteKey(key.name)}
+                                            onClick={() => requestDelete(key.name)}
                                             className="ml-2 text-red-400 hover:text-red-300"
+                                            title="删除"
                                         >
                                             🗑️
                                         </button>
@@ -178,6 +189,32 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                         </button>
                     </div>
                 </div>
+
+                {/* Delete Confirmation Modal */}
+                {keyToDelete && (
+                    <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]">
+                        <div className="bg-gray-800 border border-gray-600 p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4">
+                            <h3 className="text-xl font-bold text-white mb-4">确认删除</h3>
+                            <p className="text-gray-300 mb-6">
+                                确定要永久删除键 <span className="text-red-400 font-mono bg-gray-900 px-1 rounded">{keyToDelete}</span> 吗？
+                            </p>
+                            <div className="flex justify-end gap-3">
+                                <button
+                                    onClick={() => setKeyToDelete(null)}
+                                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={executeDelete}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold"
+                                >
+                                    确认删除
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

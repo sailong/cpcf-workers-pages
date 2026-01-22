@@ -77,14 +77,24 @@ function updateRuntimeResources() {
     runtime.resources = resources;
 }
 
-// Restart running projects on boot (Optional, skipped for safe boot)
-// projects.forEach(p => { if(p.status === 'running') runtime.start(p); });
+// Restart running projects on boot
+projects.forEach(p => {
+    if (p.status === 'running') {
+        console.log(`[Auto-Start] Restoring project ${p.name}...`);
+        runtime.start(p);
+    }
+});
 
 // --- API ROUTES ---
 
-// 1. Get All Projects
+// 1. Get All Projects (with Real-time Status)
 app.get('/api/projects', (req, res) => {
-    res.json(projects);
+    // Merge runtime status
+    const projectsWithStatus = projects.map(p => ({
+        ...p,
+        status: runtime.isRunning(p.id) ? 'running' : 'stopped'
+    }));
+    res.json(projectsWithStatus);
 });
 
 // === PORT MANAGEMENT HELPERS ===
@@ -355,11 +365,60 @@ app.put('/api/projects/:id/code', (req, res) => {
 });
 
 // 9. Upload File to Replace Code
+// 9. Upload File to Replace Code/Site
 app.post('/api/projects/:id/upload-replace', upload.single('file'), (req, res) => {
     const project = projects.find(p => p.id === req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
+    // Handle Pages Project (Folder Replacement)
+    if (project.type === 'pages') {
+        const isZip = req.file.originalname.toLowerCase().endsWith('.zip');
+        if (!isZip) return res.status(400).json({ error: "Pages updates require a ZIP file" });
+
+        const targetDir = path.join(UPLOADS_DIR, project.mainFile); // mainFile is the directory name
+        const zipPath = req.file.path;
+
+        try {
+            const AdmZip = require('adm-zip');
+
+            // 1. Clean old directory
+            if (fs.existsSync(targetDir)) {
+                fs.rmSync(targetDir, { recursive: true, force: true });
+            }
+            fs.mkdirSync(targetDir, { recursive: true });
+
+            // 2. Extract new ZIP
+            const zip = new AdmZip(zipPath);
+            zip.extractAllTo(targetDir, true);
+
+            // 3. Cleanup ZIP
+            fs.unlinkSync(zipPath);
+
+            // 4. Restart if running
+            const wasRunning = project.status === 'running';
+            if (wasRunning) {
+                runtime.stop(project.id);
+                setTimeout(() => {
+                    runtime.start(project);
+                    project.status = 'running';
+                    saveProjects();
+                }, 1000);
+            }
+
+            res.json({
+                success: true,
+                message: "Site updated successfully",
+                restarted: wasRunning
+            });
+
+        } catch (e) {
+            res.status(500).json({ error: "Failed to update pages site: " + e.message });
+        }
+        return;
+    }
+
+    // Handle Workers Project (File Replacement)
     const oldFilePath = path.join(UPLOADS_DIR, project.mainFile);
     const newFilePath = req.file.path;
 
@@ -412,7 +471,12 @@ app.get('/api/projects/:id/full-config', (req, res) => {
     let code = '';
 
     if (fs.existsSync(filePath)) {
-        code = fs.readFileSync(filePath, 'utf8');
+        const stat = fs.statSync(filePath);
+        if (stat.isFile()) {
+            code = fs.readFileSync(filePath, 'utf8');
+        } else {
+            code = ''; // It's a directory (Pages project)
+        }
     }
 
     res.json({
@@ -481,6 +545,132 @@ app.put('/api/projects/:id/config', (req, res) => {
         restarted: wasRunning
     });
 });
+
+
+// === FILE MANAGEMENT API (For Pages) ===
+
+// glob removed
+
+
+// 12. List Project Files
+app.get('/api/projects/:id/files/list', async (req, res) => {
+    const project = projects.find(p => p.id === req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    // For Pages, mainFile is the directory. For Workers, it's a file (so list is just that file).
+    // Let's assume this is mostly for Pages.
+    const projectDir = path.join(UPLOADS_DIR, project.mainFile);
+
+    if (!fs.existsSync(projectDir)) {
+        return res.status(404).json({ error: "Project directory not found" });
+    }
+
+    if (!fs.statSync(projectDir).isDirectory()) {
+        // It's a file (Worker), just return the file itself
+        return res.json([project.mainFile]);
+    }
+
+    try {
+        // Find all files recursively
+        // We use 'glob' if available, otherwise manual recursion? 
+        // Let's implement a simple recursive walker since glob might not be installed in server package.json.
+        // Or check if I can use 'glob'. glob is common but not guaranteed.
+        // I'll write a simple recursive function to avoid dependency issues if glob isn't there.
+
+        const getFiles = (dir, baseDir) => {
+            let results = [];
+            const list = fs.readdirSync(dir);
+            list.forEach(file => {
+                const filePath = path.join(dir, file);
+                const stat = fs.statSync(filePath);
+                const relativePath = path.relative(baseDir, filePath);
+
+                if (stat && stat.isDirectory()) {
+                    results = results.concat(getFiles(filePath, baseDir));
+                } else {
+                    results.push(relativePath);
+                }
+            });
+            return results;
+        };
+
+        const files = getFiles(projectDir, projectDir);
+        res.json(files);
+    } catch (e) {
+        res.status(500).json({ error: "Failed to list files: " + e.message });
+    }
+});
+
+// 13. Read File Content
+app.get('/api/projects/:id/files/content', (req, res) => {
+    const project = projects.find(p => p.id === req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const filePathParam = req.query.path;
+    if (!filePathParam) return res.status(400).json({ error: "Path required" });
+
+    const projectDir = path.join(UPLOADS_DIR, project.mainFile);
+    // Security check: ensure target path is inside projectDir
+    const targetPath = path.resolve(projectDir, filePathParam);
+
+    // For Workers (single file), mainFile is the file. path.resolve treats it as dir base?
+    // If project.mainFile is 'worker.js', projectDir is '.../worker.js'.
+    // If we join 'worker.js' with 'foo', it resolves to '.../foo'. This is wrong.
+    // But this API is mainly for Pages (directories).
+    // If it is a Worker, we should probably handle differently or just restrict this API to Pages or Directory-based projects.
+    // Let's allow flexibility but check traversal.
+
+    if (!targetPath.startsWith(projectDir)) {
+        return res.status(403).json({ error: "Access denied: Path traversal detected" });
+    }
+
+    if (!fs.existsSync(targetPath)) {
+        return res.status(404).json({ error: "File not found" });
+    }
+
+    if (fs.statSync(targetPath).isDirectory()) {
+        return res.status(400).json({ error: "Cannot read directory content" });
+    }
+
+    try {
+        const content = fs.readFileSync(targetPath, 'utf8');
+        res.json({ content });
+    } catch (e) {
+        res.status(500).json({ error: "Failed to read file" });
+    }
+});
+
+// 14. Write File Content
+app.put('/api/projects/:id/files/content', (req, res) => {
+    const project = projects.find(p => p.id === req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const { path: filePathParam, content } = req.body;
+    if (!filePathParam || content === undefined) return res.status(400).json({ error: "Path and content required" });
+
+    const projectDir = path.join(UPLOADS_DIR, project.mainFile);
+    const targetPath = path.resolve(projectDir, filePathParam);
+
+    if (!targetPath.startsWith(projectDir)) {
+        return res.status(403).json({ error: "Access denied" });
+    }
+
+    try {
+        // Ensure parent dir exists (if creating new file)
+        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+        fs.writeFileSync(targetPath, content, 'utf8');
+
+        // For Pages, wrangler dev should auto-reload.
+        // For Workers, we might need to restart if it's the main file.
+        // But for Pages usually it's static assets or functions.
+        // We won't force restart here to allow quick edits.
+
+        res.json({ success: true, message: "File saved" });
+    } catch (e) {
+        res.status(500).json({ error: "Failed to save file: " + e.message });
+    }
+});
+
 
 
 // === RESOURCE MANAGEMENT API ===
@@ -700,6 +890,20 @@ app.get('/api/resources/d1/:id/query', (req, res) => {
     try {
         const data = d1Helper.queryTable(id, table, parseInt(limit));
         res.json(data);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get table structure
+app.get('/api/resources/d1/:id/schema/:table', (req, res) => {
+    const { id, table } = req.params;
+    const dbMeta = resources.d1.find(d => d.id === id);
+    if (!dbMeta) return res.status(404).json({ error: "D1 Database not found" });
+
+    try {
+        const structure = d1Helper.getTableStructure(id, table);
+        res.json(structure);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

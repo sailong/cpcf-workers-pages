@@ -42,6 +42,8 @@ function generateConfig(project, resources = { kv: [], d1: [] }) {
                 config.push(`binding = "${binding.varName}"`);
                 config.push(`database_name = "${d1Resource.name}"`);
                 config.push(`database_id = "${d1Resource.id}"`);
+                // 为本地开发添加 preview_database_id，通常与 database_id 相同即可
+                config.push(`preview_database_id = "${d1Resource.id}"`);
             }
         });
     }
