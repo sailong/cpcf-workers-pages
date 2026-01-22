@@ -1,15 +1,21 @@
+# ==========================================
 # Stage 1: Build Frontend
+# ==========================================
 FROM node:20-slim AS frontend-builder
+
+# 【关键】全局设置淘宝源
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+
 WORKDIR /app
 
 # Copy Frontend Dependencies
 COPY manager/client/package.json ./manager/client/
-# Copy lock file if exists
 COPY manager/client/package-lock.json* ./manager/client/
 
 # Install Frontend Dependencies
 WORKDIR /app/manager/client
-RUN npm install
+# 使用 --no-audit 加快速度
+RUN npm install --no-audit --no-fund
 
 # Copy Frontend Source
 COPY manager/client ./
@@ -18,15 +24,31 @@ COPY manager/client ./
 RUN npm run build
 
 
+# ==========================================
 # Stage 2: Production Runtime
+# ==========================================
 FROM node:20-slim
 
-# Install system dependencies
-# python3 and build-essential are required for building native modules like better-sqlite3 or pty.js
-RUN apt-get update && apt-get install -y python3 build-essential && rm -rf /var/lib/apt/lists/*
+# 【核心修复区】解决卡死问题的三大法宝
+# 1. CI=true: 告诉工具这是自动构建，绝对不要弹出交互式问答（防止Wrangler问"Send metrics?"时卡死）
+# 2. WRANGLER_SEND_METRICS=false: 显式禁止 Wrangler 发送统计
+# 3. 配置 npm 淘宝源和常见的二进制文件下载源
+ENV CI=true \
+    WRANGLER_SEND_METRICS=false \
+    NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
+    ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
+    PHANTOMJS_CDNURL=https://npmmirror.com/mirrors/phantomjs/
 
-# Install Wrangler globally
-RUN npm install -g wrangler
+# Install system dependencies
+# 更新 ca-certificates 防止 SSL 报错，安装编译工具
+RUN apt-get update && \
+    apt-get install -y ca-certificates python3 build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+# 【大招】安装 CNPM 并用它安装 Wrangler
+# cnpm 对二进制包（如 workerd, esbuild）的国内下载有特殊优化，比单纯换源更强
+RUN npm install -g cnpm --registry=https://registry.npmmirror.com && \
+    cnpm install -g wrangler
 
 WORKDIR /app
 
@@ -35,7 +57,8 @@ COPY manager/package.json manager/package-lock.json* ./manager/
 
 # Install Backend Dependencies
 WORKDIR /app/manager
-RUN npm install --production
+# 后端依赖也推荐用 cnpm 安装，速度极快
+RUN cnpm install --production
 
 # Copy Backend Code (server.js, utils/, etc.)
 COPY manager/ ./
