@@ -1,0 +1,22 @@
+services:
+  ccfwp:
+    # Build from the PARENT directory (project root) using the Dockerfile in deploy/ folder
+    build:
+      context: ../
+      dockerfile: deploy/Dockerfile
+    image: ccfwp:latest
+    container_name: ccfwp-container
+    ports:
+      - "3000:3000"
+      # Reserve ports for user projects
+      - "8000-8020:8000-8020"
+    volumes:
+      # Persistent Data Volume
+      # Maps local .platform-data folder to the container
+      - ../.platform-data:/app/.platform-data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - PORT_RANGE_START=8000
+      - PORT_RANGE_END=8020
+    restart: unless-stopped

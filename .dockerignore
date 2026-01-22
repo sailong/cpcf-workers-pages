@@ -1,0 +1,26 @@
+# Version Control
+.git
+.gitignore
+
+# Docker & Environment
+docker-compose.yml
+.env
+deploy/
+
+# Dependencies (Installed inside container)
+**/node_modules
+**/npm-debug.log
+
+# Build Artifacts
+**/dist
+**/build
+
+# Local Data & State (Auto-generated)
+.platform-data
+.wrangler
+**/.wrangler
+
+# System Files
+.DS_Store
+**/.DS_Store
+Thumbs.db
