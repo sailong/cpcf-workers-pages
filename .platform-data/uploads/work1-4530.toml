@@ -1,0 +1,7 @@
+name = "work1"
+compatibility_date = "2023-12-01"
+main = "file-1769057774498-868245433.js"
+
+[dev]
+port = 8000
+ip = "0.0.0.0"

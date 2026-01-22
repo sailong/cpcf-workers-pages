@@ -1,0 +1,29 @@
+import { T as L, E as B } from "./index.esm-Bna_jRUN.js";
+import { G as V, I as E, aQ as R, J as z, aL as I, aM as O, D as p, E as r, P as l, Q as n, F as g, ap as P, K as F, V as x, R as N, S as e, as as H, T as A, Z as D, _ as J, ab as f, ac as K, am as Q, ar as G, aw as Y, au as Z, l as $, a5 as q, M as W } from "./index-ex9E0DB9.js";
+const X = { class: "center" }, ee = { class: "left" }, te = ["innerHTML"], ae = { key: 1, style: { border: "1px solid #ccc" } }, le = { __name: "SendMail", setup(oe) {
+  const c = E(), m = $(false), _ = O(), t = R("sendMailByAdminModel", { fromName: "", fromMail: "", toName: "", toMail: "", subject: "", contentType: "text", content: "" }), { t: s } = z({ locale: "zh", messages: { en: { successSend: "Please check your sendbox. If failed, please try again later.", fromName: "Your Name and Address, leave Name blank to use email address", toName: "Recipient Name and Address, leave Name blank to use email address", subject: "Subject", options: "Options", edit: "Edit", preview: "Preview", content: "Content", send: "Send", text: "Text", html: "HTML", "rich text": "Rich Text", tooLarge: "Too large file, please upload file less than 1MB." }, zh: { successSend: "\u8BF7\u67E5\u770B\u60A8\u7684\u53D1\u4EF6\u7BB1, \u5982\u679C\u5931\u8D25, \u8BF7\u68C0\u67E5\u7A0D\u540E\u91CD\u8BD5\u3002", fromName: "\u4F60\u7684\u540D\u79F0\u548C\u5730\u5740\uFF0C\u540D\u79F0\u4E0D\u586B\u5199\u5219\u4F7F\u7528\u90AE\u7BB1\u5730\u5740", toName: "\u6536\u4EF6\u4EBA\u540D\u79F0\u548C\u5730\u5740\uFF0C\u540D\u79F0\u4E0D\u586B\u5199\u5219\u4F7F\u7528\u90AE\u7BB1\u5730\u5740", subject: "\u4E3B\u9898", options: "\u9009\u9879", edit: "\u7F16\u8F91", preview: "\u9884\u89C8", content: "\u5185\u5BB9", send: "\u53D1\u9001", text: "\u6587\u672C", html: "HTML", "rich text": "\u5BCC\u6587\u672C", tooLarge: "\u6587\u4EF6\u8FC7\u5927, \u8BF7\u4E0A\u4F20\u5C0F\u4E8E1MB\u7684\u6587\u4EF6\u3002" } } }), M = [{ label: s("text"), value: "text" }, { label: s("html"), value: "html" }, { label: s("rich text"), value: "rich" }], T = async () => {
+    try {
+      await W.fetch("/admin/send_mail", { method: "POST", body: JSON.stringify({ from_name: t.value.fromName, from_mail: t.value.fromMail, to_name: t.value.toName, to_mail: t.value.toMail, subject: t.value.subject, is_html: t.value.contentType != "text", content: t.value.content }) }), t.value = { fromName: "", fromMail: "", toName: "", toMail: "", subject: "", contentType: "text", content: "" };
+    } catch (u) {
+      c.error(u.message || "error");
+    } finally {
+      c.success(s("successSend"));
+    }
+  }, S = { excludeKeys: ["uploadVideo"] }, k = { MENU_CONF: { uploadImage: { async customUpload() {
+    c.error(s("tooLarge"));
+  }, maxFileSize: 1 * 1024 * 1024, base64LimitSize: 1 * 1024 * 1024 } } };
+  I(() => {
+    const u = _.value;
+    u == null ? void 0 : u.destroy();
+  });
+  const C = (u) => {
+    _.value = u;
+  };
+  return (u, o) => {
+    const v = F, h = P, d = J, b = D, i = A, j = Z, w = Q, y = q, U = H;
+    return r(), p("div", X, [l(y, { bordered: false, embedded: "" }, { default: n(() => [l(h, { justify: "end" }, { default: n(() => [l(v, { type: "primary", onClick: T }, { default: n(() => [x(N(e(s)("send")), 1)]), _: 1 })]), _: 1 }), g("div", ee, [l(U, { model: e(t) }, { default: n(() => [l(i, { label: e(s)("fromName"), "label-placement": "top" }, { default: n(() => [l(b, null, { default: n(() => [l(d, { value: e(t).fromName, "onUpdate:value": o[0] || (o[0] = (a) => e(t).fromName = a) }, null, 8, ["value"]), l(d, { value: e(t).fromMail, "onUpdate:value": o[1] || (o[1] = (a) => e(t).fromMail = a) }, null, 8, ["value"])]), _: 1 })]), _: 1 }, 8, ["label"]), l(i, { label: e(s)("toName"), "label-placement": "top" }, { default: n(() => [l(b, null, { default: n(() => [l(d, { value: e(t).toName, "onUpdate:value": o[2] || (o[2] = (a) => e(t).toName = a) }, null, 8, ["value"]), l(d, { value: e(t).toMail, "onUpdate:value": o[3] || (o[3] = (a) => e(t).toMail = a) }, null, 8, ["value"])]), _: 1 })]), _: 1 }, 8, ["label"]), l(i, { label: e(s)("subject"), "label-placement": "top" }, { default: n(() => [l(d, { value: e(t).subject, "onUpdate:value": o[4] || (o[4] = (a) => e(t).subject = a) }, null, 8, ["value"])]), _: 1 }, 8, ["label"]), l(i, { label: e(s)("options"), "label-placement": "top" }, { default: n(() => [l(w, { value: e(t).contentType, "onUpdate:value": o[5] || (o[5] = (a) => e(t).contentType = a) }, { default: n(() => [(r(), p(G, null, Y(M, (a) => l(j, { key: a.value, value: a.value, label: a.label }, null, 8, ["value", "label"])), 64))]), _: 1 }, 8, ["value"]), e(t).contentType != "text" ? (r(), f(v, { key: 0, onClick: o[6] || (o[6] = (a) => m.value = !m.value), style: { "margin-left": "10px" } }, { default: n(() => [x(N(m.value ? e(s)("edit") : e(s)("preview")), 1)]), _: 1 })) : K("", true)]), _: 1 }, 8, ["label"]), l(i, { label: e(s)("content"), "label-placement": "top" }, { default: n(() => [m.value ? (r(), f(y, { key: 0, bordered: false, embedded: "" }, { default: n(() => [g("div", { innerHTML: e(t).content }, null, 8, te)]), _: 1 })) : e(t).contentType == "rich" ? (r(), p("div", ae, [l(e(L), { style: { "border-bottom": "1px solid #ccc" }, defaultConfig: S, editor: _.value, mode: "default" }, null, 8, ["editor"]), l(e(B), { style: { height: "500px", "overflow-y": "hidden" }, modelValue: e(t).content, "onUpdate:modelValue": o[7] || (o[7] = (a) => e(t).content = a), defaultConfig: k, mode: "default", onOnCreated: C }, null, 8, ["modelValue"])])) : (r(), f(d, { key: 2, type: "textarea", value: e(t).content, "onUpdate:value": o[8] || (o[8] = (a) => e(t).content = a), autosize: { minRows: 3 } }, null, 8, ["value"]))]), _: 1 }, 8, ["label"])]), _: 1 }, 8, ["model"])])]), _: 1 })]);
+  };
+} }, ue = V(le, [["__scopeId", "data-v-9747bb0e"]]);
+export {
+  ue as default
+};

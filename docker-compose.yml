@@ -1,0 +1,26 @@
+services:
+  cloudflare-platform:
+    build: .
+    image: cloudflare-platform-dev
+    container_name: cf-platform
+    ports:
+      - "3000:3000"
+      - "8000-8020:8000-8020"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      # Persistent data for manager and user projects
+      - ./.platform-data:/app/.platform-data
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      # Range config for manager to know what to assign
+      - PORT_RANGE_START=8000
+      - PORT_RANGE_END=8020
+
+    # Override default command to ensure dependencies are installed if missing
+    # In a real dev env, we might want to run `npm install` inside.
+    # For now, we assume user/script handles it, or we run it manually.
+    # We'll use nodemon if available for dev, or just node.
+    command: sh -c "cd manager && npm install && node server.js"
+    restart: unless-stopped

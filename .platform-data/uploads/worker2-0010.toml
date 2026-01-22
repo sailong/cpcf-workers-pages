@@ -1,0 +1,16 @@
+name = "worker2"
+compatibility_date = "2023-12-01"
+main = "file-1769058969980-873830359.js"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "kv-mkp008xj"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "worker_test"
+database_id = "d1-mkp00i23"
+
+[dev]
+port = 8001
+ip = "0.0.0.0"

@@ -1,0 +1,28 @@
+name = "auto-port-test"
+compatibility_date = "2023-12-01"
+compatibility_flags = ["nodejs_compat"]
+main = "file-1769080171171-901323800.js"
+
+[[kv_namespaces]]
+binding = "MY_KV"
+id = "kv-mkp008xj"
+
+[vars]
+API_KEY = "my-plain-api-key"
+CONFIG = {"host":"localhost","port":8080}
+API_URL = "https://api.example.com"
+CONFIG_JSON = {"timeout":30,"retries":3}
+
+[[unsafe.bindings]]
+name = "SECRET_TOKEN"
+type = "secret_text"
+text = "super-secret-token-123"
+
+[[unsafe.bindings]]
+name = "SECRET_KEY"
+type = "secret_text"
+text = "my-super-secret-123"
+
+[dev]
+port = 8000
+ip = "0.0.0.0"

@@ -1,0 +1,104 @@
+[
+  {
+    "id": "test-5531",
+    "name": "test",
+    "type": "worker",
+    "port": 8000,
+    "status": "running",
+    "mainFile": "file-1769088855508-974617971.js",
+    "bindings": {
+      "kv": [
+        {
+          "varName": "KV",
+          "resourceId": "kv-mkphy1x3"
+        }
+      ],
+      "d1": [
+        {
+          "varName": "DB",
+          "resourceId": "d1-mkphy467"
+        }
+      ]
+    },
+    "envVars": {
+      "ADMIN_PASSWORDS": {
+        "type": "json",
+        "value": [
+          "Qawsed2.."
+        ]
+      },
+      "DOMAINS": {
+        "type": "json",
+        "value": [
+          "upig.qzz.io"
+        ]
+      },
+      "ENABLE_USER_CREATE_EMAIL": {
+        "type": "plain",
+        "value": "true"
+      },
+      "ENABLE_USER_DELETE_EMAIL": {
+        "type": "plain",
+        "value": "true"
+      },
+      "JWT_SECRET": {
+        "type": "plain",
+        "value": "a068e3b2150b144044d15cbcfea714d4a5134499d9e328e9dfe7ce0dd8e5023e"
+      }
+    },
+    "createdAt": "2026-01-22T13:34:15.531Z"
+  },
+  {
+    "id": "1-3202",
+    "name": "1",
+    "type": "worker",
+    "port": 8001,
+    "status": "running",
+    "bindings": {
+      "kv": [],
+      "d1": []
+    },
+    "envVars": {},
+    "createdAt": "2026-01-22T14:06:13.204Z"
+  },
+  {
+    "id": "test-worker-5871",
+    "name": "test-worker",
+    "type": "worker",
+    "port": 8002,
+    "status": "running",
+    "bindings": {
+      "kv": [],
+      "d1": []
+    },
+    "envVars": {},
+    "createdAt": "2026-01-22T14:16:35.874Z"
+  },
+  {
+    "id": "sprint3-test-3729",
+    "name": "sprint3-test",
+    "type": "worker",
+    "port": 8003,
+    "status": "running",
+    "bindings": {
+      "kv": [],
+      "d1": []
+    },
+    "envVars": {},
+    "createdAt": "2026-01-22T14:30:13.734Z"
+  },
+  {
+    "id": "11-7728",
+    "name": "11",
+    "type": "worker",
+    "port": 8004,
+    "status": "running",
+    "mainFile": "11-7728-worker.js",
+    "bindings": {
+      "kv": [],
+      "d1": []
+    },
+    "envVars": {},
+    "createdAt": "2026-01-22T15:03:57.728Z"
+  }
+]
