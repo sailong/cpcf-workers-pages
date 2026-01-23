@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
+import { authenticatedFetch } from './api';
 
 interface Binding {
     varName: string;
@@ -42,7 +43,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     // Config state
-    const [bindings, setBindings] = useState<{ kv: Binding[]; d1: Binding[] }>({ kv: [], d1: [] });
+    const [bindings, setBindings] = useState<{ kv: Binding[]; d1: Binding[]; r2: Binding[] }>({ kv: [], d1: [], r2: [] });
     const [envVars, setEnvVars] = useState<Record<string, EnvVar>>({});
     const [port, setPort] = useState<number>(0);
 
@@ -63,6 +64,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
     // Available resources (for bindings)
     const [kvResources, setKvResources] = useState<any[]>([]);
     const [d1Resources, setD1Resources] = useState<any[]>([]);
+    const [r2Resources, setR2Resources] = useState<any[]>([]);
 
     // Pages Update State (Bulk Upload)
     const [pagesFile, setPagesFile] = useState<File | null>(null);
@@ -79,7 +81,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
         setError('');
         try {
             // Load Config
-            const res = await fetch(`/api/projects/${project.id}/full-config`);
+            const res = await authenticatedFetch(`/api/projects/${project.id}/full-config`);
             if (!res.ok) throw new Error('加载配置失败');
             const data = await res.json();
 
@@ -93,7 +95,11 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                 // For Workers: Set Code & Bindings
                 setCode(data.code);
                 setLanguage(data.language);
-                setBindings(data.bindings || { kv: [], d1: [] });
+                setBindings({
+                    kv: data.bindings?.kv || [],
+                    d1: data.bindings?.d1 || [],
+                    r2: data.bindings?.r2 || []
+                });
                 setEnvVars(data.envVarsRaw || {});
                 loadResources();
             }
@@ -107,12 +113,14 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
 
     const loadResources = async () => {
         try {
-            const [kvRes, d1Res] = await Promise.all([
-                fetch('/api/resources/kv'),
-                fetch('/api/resources/d1')
+            const [kvRes, d1Res, r2Res] = await Promise.all([
+                authenticatedFetch('/api/resources/kv'),
+                authenticatedFetch('/api/resources/d1'),
+                authenticatedFetch('/api/resources/r2')
             ]);
             setKvResources(await kvRes.json());
             setD1Resources(await d1Res.json());
+            setR2Resources(await r2Res.json());
         } catch (err) {
             console.error('Failed to load resources:', err);
         }
@@ -122,7 +130,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
 
     const loadFileList = async () => {
         try {
-            const res = await fetch(`/api/projects/${project.id}/files/list`);
+            const res = await authenticatedFetch(`/api/projects/${project.id}/files/list`);
             if (res.ok) {
                 const files = await res.json(); // Array of strings or error
                 if (Array.isArray(files)) {
@@ -146,7 +154,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
     const loadFileContent = async (path: string) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/projects/${project.id}/files/content?path=${encodeURIComponent(path)}`);
+            const res = await authenticatedFetch(`/api/projects/${project.id}/files/content?path=${encodeURIComponent(path)}`);
             if (res.ok) {
                 const data = await res.json();
                 setCode(data.content);
@@ -171,7 +179,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
         if (!selectedFile) return;
         setSaving(true);
         try {
-            const res = await fetch(`/api/projects/${project.id}/files/content`, {
+            const res = await authenticatedFetch(`/api/projects/${project.id}/files/content`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: selectedFile, content: code })
@@ -242,7 +250,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
         formData.append('file', pagesFile);
 
         try {
-            const res = await fetch(`/api/projects/${project.id}/upload-replace`, {
+            const res = await authenticatedFetch(`/api/projects/${project.id}/upload-replace`, {
                 method: 'POST',
                 body: formData
             });
@@ -272,7 +280,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
         setSaving(true);
         setError('');
         try {
-            const res = await fetch(`/api/projects/${project.id}/code`, {
+            const res = await authenticatedFetch(`/api/projects/${project.id}/code`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ code })
@@ -297,7 +305,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
         setSaving(true);
         setError('');
         try {
-            const res = await fetch(`/api/projects/${project.id}/config`, {
+            const res = await authenticatedFetch(`/api/projects/${project.id}/config`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ bindings, envVars, port })
@@ -331,7 +339,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
         const formData = new FormData();
         formData.append('file', file);
         try {
-            const res = await fetch(`/api/projects/${project.id}/upload-replace`, { method: 'POST', body: formData });
+            const res = await authenticatedFetch(`/api/projects/${project.id}/upload-replace`, { method: 'POST', body: formData });
             if (!res.ok) throw new Error('上传失败');
             const data = await res.json();
             showToast(data.restarted ? '文件已替换，Worker 已重启' : '文件已替换');
@@ -486,7 +494,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                                 )
                             )}
 
-                            {activeTab === 'bindings' && !isPages && <BindingsTab bindings={bindings} kvResources={kvResources} d1Resources={d1Resources} onAddKv={() => { setBindings({ ...bindings, kv: [...bindings.kv, { varName: '', resourceId: '' }] }) }} onRemoveKv={(i: number) => setBindings({ ...bindings, kv: bindings.kv.filter((_, idx) => idx !== i) })} onUpdateKv={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.kv]; k[i][f] = v; setBindings({ ...bindings, kv: k }) }} onAddD1={() => { setBindings({ ...bindings, d1: [...bindings.d1, { varName: '', resourceId: '' }] }) }} onRemoveD1={(i: number) => setBindings({ ...bindings, d1: bindings.d1.filter((_, idx) => idx !== i) })} onUpdateD1={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.d1]; k[i][f] = v; setBindings({ ...bindings, d1: k }) }} onSave={handleSaveConfig} saving={saving} />}
+                            {activeTab === 'bindings' && !isPages && <BindingsTab bindings={bindings} kvResources={kvResources} d1Resources={d1Resources} r2Resources={r2Resources} onAddKv={() => { setBindings({ ...bindings, kv: [...bindings.kv, { varName: '', resourceId: '' }] }) }} onRemoveKv={(i: number) => setBindings({ ...bindings, kv: bindings.kv.filter((_, idx) => idx !== i) })} onUpdateKv={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.kv]; k[i][f] = v; setBindings({ ...bindings, kv: k }) }} onAddD1={() => { setBindings({ ...bindings, d1: [...bindings.d1, { varName: '', resourceId: '' }] }) }} onRemoveD1={(i: number) => setBindings({ ...bindings, d1: bindings.d1.filter((_, idx) => idx !== i) })} onUpdateD1={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.d1]; k[i][f] = v; setBindings({ ...bindings, d1: k }) }} onAddR2={() => { setBindings({ ...bindings, r2: [...bindings.r2, { varName: '', resourceId: '' }] }) }} onRemoveR2={(i: number) => setBindings({ ...bindings, r2: bindings.r2.filter((_, idx) => idx !== i) })} onUpdateR2={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.r2]; k[i][f] = v; setBindings({ ...bindings, r2: k }) }} onSave={handleSaveConfig} saving={saving} />}
 
                             {activeTab === 'envvars' && !isPages && <EnvVarsTab envVars={envVars} onAdd={(k: string, t: any, v: string) => setEnvVars({ ...envVars, [k]: { type: t, value: t === 'json' ? JSON.parse(v) : v } })} onRemove={(k: string) => { const e = { ...envVars }; delete e[k]; setEnvVars(e) }} onSave={handleSaveConfig} saving={saving} />}
 
@@ -542,7 +550,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
 };
 
 // Sub-components (Kept compact but typed)
-const BindingsTab: React.FC<any> = ({ bindings, kvResources, d1Resources, onAddKv, onRemoveKv, onUpdateKv, onAddD1, onRemoveD1, onUpdateD1, onSave, saving }) => (
+const BindingsTab: React.FC<any> = ({ bindings, kvResources, d1Resources, r2Resources, onAddKv, onRemoveKv, onUpdateKv, onAddD1, onRemoveD1, onUpdateD1, onAddR2, onRemoveR2, onUpdateR2, onSave, saving }) => (
     <div className="h-full overflow-y-auto p-6">
         <div className="max-w-5xl mx-auto space-y-8">
             {/* KV Section */}
@@ -679,6 +687,75 @@ const BindingsTab: React.FC<any> = ({ bindings, kvResources, d1Resources, onAddK
                 </div>
             </div>
 
+
+
+            {/* R2 Section */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-gray-800/50">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xl">🪣</span>
+                        <h3 className="text-lg font-bold text-gray-200">R2 对象存储绑定</h3>
+                    </div>
+                    <button
+                        onClick={onAddR2}
+                        className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+                    >
+                        <span>+</span> 添加绑定
+                    </button>
+                </div>
+
+                <div className="p-4">
+                    {bindings.r2 && bindings.r2.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 text-sm bg-gray-950/30 rounded-lg border border-dashed border-gray-800">
+                            暂无 R2 绑定，请点击右上角添加
+                        </div>
+                    ) : (
+                        <div className="grid gap-3">
+                            <div className="grid grid-cols-12 gap-4 px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                <div className="col-span-1"></div>
+                                <div className="col-span-5">变量名 (Variable)</div>
+                                <div className="col-span-5">绑定存储桶 (Bucket)</div>
+                                <div className="col-span-1 text-center">操作</div>
+                            </div>
+                            {bindings.r2 && bindings.r2.map((b: any, i: number) => (
+                                <div key={i} className="grid grid-cols-12 gap-4 items-center bg-gray-950/50 p-2 rounded-lg border border-gray-800 hover:border-gray-700 transition-colors">
+                                    <div className="col-span-1 text-center text-gray-600 font-mono text-sm">{i + 1}</div>
+                                    <div className="col-span-5">
+                                        <input
+                                            value={b.varName}
+                                            onChange={e => onUpdateR2(i, 'varName', e.target.value)}
+                                            className="w-full bg-gray-900 border border-gray-700 text-gray-200 rounded px-3 py-2 text-sm focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 outline-none transition-all placeholder-gray-600 font-mono"
+                                            placeholder="MY_BUCKET"
+                                        />
+                                    </div>
+                                    <div className="col-span-5">
+                                        <select
+                                            value={b.resourceId}
+                                            onChange={e => onUpdateR2(i, 'resourceId', e.target.value)}
+                                            className="w-full bg-gray-900 border border-gray-700 text-gray-200 rounded px-3 py-2 text-sm focus:border-yellow-500 outline-none transition-all cursor-pointer"
+                                        >
+                                            <option value="">-- 选择 R2 存储桶 --</option>
+                                            {r2Resources.map((k: any) => (
+                                                <option key={k.id} value={k.id}>{k.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="col-span-1 flex justify-center">
+                                        <button
+                                            onClick={() => onRemoveR2(i)}
+                                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                            title="删除绑定"
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+
             {/* Save Action */}
             <div className="pt-6 border-t border-gray-800 sticky bottom-0 bg-[#1e1e1e] pb-2">
                 <button
@@ -692,8 +769,8 @@ const BindingsTab: React.FC<any> = ({ bindings, kvResources, d1Resources, onAddK
                     修改绑定配置需要重启 Worker 进程才能生效
                 </p>
             </div>
-        </div>
-    </div>
+        </div >
+    </div >
 );
 const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving }) => {
     const [k, setK] = useState('');

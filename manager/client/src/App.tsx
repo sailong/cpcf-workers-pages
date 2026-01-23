@@ -3,6 +3,11 @@ import { D1Manager } from './D1Manager'
 import KVManager from './KVManager'
 import CodeEditorModal from './CodeEditorModal'
 import CreateWorkerForm from './CreateWorkerForm'
+import R2Manager from './R2Manager'
+import Login from './Login'
+import ChangePasswordModal from './ChangePasswordModal'
+import ErrorBoundary from './ErrorBoundary'
+import { authenticatedFetch, getToken, setToken, removeToken } from './api'
 
 interface Project {
   id: string;
@@ -14,6 +19,7 @@ interface Project {
   bindings: {
     kv?: Array<{ varName: string; resourceId: string }>;
     d1?: Array<{ varName: string; resourceId: string }>;
+    r2?: Array<{ varName: string; resourceId: string }>;
   };
   envVars?: Record<string, string>;
 }
@@ -25,67 +31,112 @@ interface Resource {
 }
 
 function App() {
+  const [token, setTokenState] = useState<string | null>(getToken());
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [kvResources, setKvResources] = useState<Resource[]>([]);
   const [d1Resources, setD1Resources] = useState<Resource[]>([]);
+  const [r2Resources, setR2Resources] = useState<Resource[]>([]);
   const [activeTab, setActiveTab] = useState<'list' | 'create' | 'resources'>('list');
+
+  // Modal State
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [managingKV, setManagingKV] = useState<{ id: string; name: string } | null>(null);
+  const [managingD1, setManagingD1] = useState<{ id: string; name: string } | null>(null);
+  const [managingR2, setManagingR2] = useState<{ id: string; name: string } | null>(null);
+  const [confirmingDeletion, setConfirmingDeletion] = useState<{ type: 'project' | 'kv' | 'd1' | 'r2'; id: string; name: string } | null>(null);
 
   // Form State
   const [newKvName, setNewKvName] = useState('');
   const [newD1Name, setNewD1Name] = useState('');
-
-  // D1 Manager
-  const [managingD1, setManagingD1] = useState<{ id: string; name: string } | null>(null);
-
-  // KV Manager
-  const [managingKV, setManagingKV] = useState<{ id: string; name: string } | null>(null);
-
-  // Code Editor
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-
-  // Confirm Deletion State
-  const [confirmingDeletion, setConfirmingDeletion] = useState<{
-    type: 'project' | 'kv' | 'd1';
-    id: string;
-    name: string;
-  } | null>(null);
+  const [newR2Name, setNewR2Name] = useState('');
 
   // Toast State
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  useEffect(() => {
-    fetchProjects();
-    fetchResources();
-
-    // Real-time status polling
-    const interval = setInterval(fetchProjects, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  // Server Health State
+  const [serverOnline, setServerOnline] = useState(false);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
+  // Health Check Effect (always runs)
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const res = await fetch('/api/health');
+        setServerOnline(res.ok);
+      } catch {
+        setServerOnline(false);
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auth and data fetching Effect (only when logged in)
+  useEffect(() => {
+    if (!token) return;
+    fetchProjects();
+    fetchResources();
+    const interval = setInterval(fetchProjects, 5000); // Polling status
+
+    // Auth expiry listener
+    const handleExpired = () => {
+      showToast("登录已过期，请重新登录", 'error');
+      // Small delay to let toast show
+      setTimeout(() => {
+        setTokenState(null);
+      }, 1500);
+    };
+    window.addEventListener('auth:expired', handleExpired);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('auth:expired', handleExpired);
+    };
+  }, [token]);
+
+  const handleLogin = (newToken: string) => {
+    setToken(newToken);
+    setTokenState(newToken);
+  };
+
+  const handleLogout = () => {
+    removeToken();
+    setTokenState(null);
+  };
+
+  // Early return AFTER all Hooks
+  if (!token) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   const fetchProjects = async () => {
     try {
-      const res = await fetch('/api/projects');
-      const data = await res.json();
-      setProjects(data);
+      const res = await authenticatedFetch('/api/projects');
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+      }
     } catch (e) {
       console.error("Failed to fetch projects");
-      showToast("获取项目列表失败", 'error');
     }
   };
 
   const fetchResources = async () => {
     try {
-      const [kvRes, d1Res] = await Promise.all([
-        fetch('/api/resources/kv'),
-        fetch('/api/resources/d1')
+      const [kvRes, d1Res, r2Res] = await Promise.all([
+        authenticatedFetch('/api/resources/kv'),
+        authenticatedFetch('/api/resources/d1'),
+        authenticatedFetch('/api/resources/r2')
       ]);
       setKvResources(await kvRes.json());
       setD1Resources(await d1Res.json());
+      setR2Resources(await r2Res.json());
     } catch (e) {
       console.error("Failed to fetch resources");
       showToast("获取资源列表失败", 'error');
@@ -94,8 +145,9 @@ function App() {
 
   const handleCreateKv = async () => {
     if (!newKvName) return showToast("请输入 KV Namespace 名称", 'error');
+    if (!newKvName) return showToast("请输入 KV Namespace 名称", 'error');
     try {
-      const res = await fetch('/api/resources/kv', {
+      const res = await authenticatedFetch('/api/resources/kv', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newKvName })
@@ -116,7 +168,7 @@ function App() {
   const handleCreateD1 = async () => {
     if (!newD1Name) return showToast("请输入 D1 Database 名称", 'error');
     try {
-      const res = await fetch('/api/resources/d1', {
+      const res = await authenticatedFetch('/api/resources/d1', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newD1Name })
@@ -134,10 +186,32 @@ function App() {
     }
   };
 
+  const handleCreateR2 = async () => {
+    if (!newR2Name) return showToast("请输入 R2 Bucket 名称", 'error');
+    try {
+      const res = await authenticatedFetch('/api/resources/r2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newR2Name })
+      });
+      if (res.ok) {
+        setNewR2Name('');
+        fetchResources();
+        showToast("R2 Bucket 创建成功");
+      } else {
+        const err = await res.json();
+        showToast(err.error || "创建失败", 'error');
+      }
+    } catch (e) {
+      showToast("创建失败", 'error');
+    }
+  };
+
+
   const toggleProject = async (id: string, currentStatus: string) => {
     const action = currentStatus === 'running' ? 'stop' : 'start';
     try {
-      const res = await fetch(`/api/projects/${id}/${action}`, { method: 'POST' });
+      const res = await authenticatedFetch(`/api/projects/${id}/${action}`, { method: 'POST' });
       if (!res.ok) throw new Error();
       fetchProjects();
       showToast(`项目已${action === 'start' ? '启动' : '停止'}`);
@@ -147,7 +221,7 @@ function App() {
   };
 
   // Initiate Deletion
-  const handleDeleteClick = (type: 'project' | 'kv' | 'd1', id: string, name: string) => {
+  const handleDeleteClick = (type: 'project' | 'kv' | 'd1' | 'r2', id: string, name: string) => {
     setConfirmingDeletion({ type, id, name });
   };
 
@@ -161,8 +235,9 @@ function App() {
       if (type === 'project') url = `/api/projects/${id}`;
       else if (type === 'kv') url = `/api/resources/kv/${id}`;
       else if (type === 'd1') url = `/api/resources/d1/${id}`;
+      else if (type === 'r2') url = `/api/resources/r2/${id}`;
 
-      const res = await fetch(url, { method: 'DELETE' });
+      const res = await authenticatedFetch(url, { method: 'DELETE' });
 
       if (res.ok) {
         if (type === 'project') fetchProjects();
@@ -190,6 +265,16 @@ function App() {
       )}
 
       {/* Confirm Deletion Modal */}
+      {showChangePassword && (
+        <ChangePasswordModal
+          onClose={() => setShowChangePassword(false)}
+          onSuccess={() => {
+            setShowChangePassword(false);
+            showToast("密码修改成功，请重新登录");
+            handleLogout();
+          }}
+        />
+      )}
       {confirmingDeletion && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[70] backdrop-blur-sm transition-all">
           <div className="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-2xl w-full max-w-md transform scale-100 transition-transform">
@@ -219,30 +304,36 @@ function App() {
 
       <div className="max-w-5xl mx-auto">
         <header className="flex justify-between items-center mb-10 border-b border-gray-800 pb-4">
-          <div>
+          <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-yellow-500">
               CCFWP 管理平台
             </h1>
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border ${serverOnline ? 'bg-green-900/30 border-green-800 text-green-400' : 'bg-red-900/30 border-red-800 text-red-400'}`}>
+              <div className={`w-2 h-2 rounded-full ${serverOnline ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              {serverOnline ? '服务在线' : '连接中断'}
+            </div>
           </div>
-          <div className="flex bg-gray-800 rounded-lg p-1">
-            <button
-              onClick={() => setActiveTab('list')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'list' ? 'bg-gray-700 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-            >
-              仪表盘
-            </button>
-            <button
-              onClick={() => setActiveTab('create')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'create' ? 'bg-orange-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-            >
-              新建项目
-            </button>
-            <button
-              onClick={() => setActiveTab('resources')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'resources' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-            >
-              资源管理
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="flex bg-gray-800 rounded-lg p-1">
+              <button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'list' ? 'bg-gray-700 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+                仪表盘
+              </button>
+              <button onClick={() => setActiveTab('create')} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'create' ? 'bg-orange-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+                新建项目
+              </button>
+              <button onClick={() => setActiveTab('resources')} className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${activeTab === 'resources' ? 'bg-purple-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}>
+                资源管理
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 pl-4 border-l border-gray-800">
+              <button onClick={() => setShowChangePassword(true)} className="text-gray-400 hover:text-white text-sm px-2">
+                🔑 改密
+              </button>
+              <button onClick={handleLogout} className="text-red-400 hover:text-red-300 text-sm px-2">
+                退出
+              </button>
+            </div>
           </div>
         </header>
 
@@ -345,6 +436,55 @@ function App() {
                 ))}
               </div>
             </div>
+            {/* R2 Buckets */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <span className="bg-yellow-500/10 text-yellow-500 p-2 rounded-lg mr-3">🪣</span>
+                R2 对象存储
+              </h2>
+
+              <div className="flex gap-2 mb-4">
+                <input
+                  value={newR2Name}
+                  onChange={e => setNewR2Name(e.target.value)}
+                  placeholder="MY_BUCKET"
+                  className="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-4 py-2 text-sm"
+                />
+                <button onClick={handleCreateR2} className="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded-lg text-sm font-medium">
+                  创建
+                </button>
+              </div>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {r2Resources.length === 0 ? (
+                  <div className="text-center py-8 text-gray-600 text-sm">暂无 R2 存储桶</div>
+                ) : r2Resources.map(bucket => (
+                  <div key={bucket.id} className="bg-gray-950/50 border border-gray-800 rounded-lg p-3">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-medium text-sm">{bucket.name}</div>
+                        <div className="text-xs text-gray-600 font-mono mt-1">ID: {bucket.id}</div>
+                      </div>
+                      <div className="flex gap-2">
+                        {/* R2 specific management */}
+                        <button
+                          onClick={() => setManagingR2({ id: bucket.id, name: bucket.name })}
+                          className="bg-yellow-600 hover:bg-yellow-500 text-black text-xs px-3 py-1.5 rounded transition-all font-medium"
+                        >
+                          管理
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick('r2', bucket.id, bucket.name)}
+                          className="bg-red-600 hover:bg-red-500 text-white text-xs px-3 py-1.5 rounded transition-all"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -381,6 +521,7 @@ function App() {
                       <span>端口: <span className="text-gray-300 font-mono">{p.port}</span></span>
                       {p.bindings?.kv && p.bindings.kv.length > 0 && <span className="text-blue-400">{p.bindings.kv.length} KV</span>}
                       {p.bindings?.d1 && p.bindings.d1.length > 0 && <span className="text-purple-400">{p.bindings.d1.length} D1</span>}
+                      {p.bindings?.r2 && p.bindings.r2.length > 0 && <span className="text-yellow-400">{p.bindings.r2.length} R2</span>}
                     </div>
                   </div>
                 </div>
@@ -440,6 +581,14 @@ function App() {
         <KVManager
           namespace={managingKV}
           onClose={() => setManagingKV(null)}
+        />
+      )}
+
+      {/* R2 Manager Modal */}
+      {managingR2 && (
+        <R2Manager
+          bucket={managingR2}
+          onClose={() => setManagingR2(null)}
         />
       )}
 

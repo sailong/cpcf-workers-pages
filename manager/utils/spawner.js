@@ -24,13 +24,13 @@ class ProjectRuntime {
         console.log(`Starting project ${project.name} on port ${project.port}...`);
 
         // Determine command and args based on project type
-        let cmd = 'wrangler';
-        let args = [];
+        let cmd = 'npx';
+        let args = ['wrangler'];
         let cwd = this.uploadsDir;
 
         if (project.type === 'pages') {
             // For Pages: wrangler pages dev <directory>
-            args = ['pages', 'dev', project.mainFile];
+            args.push('pages', 'dev', project.mainFile);
 
             // Add bindings via CLI for Pages (simpler than config file)
             // KV Bindings
@@ -53,6 +53,16 @@ class ProjectRuntime {
                 });
             }
 
+            // R2 Bindings
+            if (project.bindings && project.bindings.r2 && project.bindings.r2.length > 0) {
+                project.bindings.r2.forEach(binding => {
+                    const r2Resource = this.resources.r2.find(r => r.id === binding.resourceId);
+                    if (r2Resource) {
+                        args.push('--r2', `${binding.varName}=${r2Resource.name}`);
+                    }
+                });
+            }
+
             // Port and IP
             args.push('--port', project.port.toString());
             args.push('--ip', '0.0.0.0');
@@ -61,16 +71,22 @@ class ProjectRuntime {
             args.push('--compatibility-date', '2024-09-23');
             args.push('--compatibility-flags', 'nodejs_compat');
 
+            // Unique Inspector Port to avoid conflicts
+            args.push('--inspector-port', (project.port + 10000).toString());
+
         } else {
             // For Workers: wrangler dev <file> --config <toml>
             const configContent = generateConfig(project, this.resources);
             const configPath = path.join(this.uploadsDir, `${project.id}.toml`);
             fs.writeFileSync(configPath, configContent);
 
-            args = ['dev', project.mainFile];
+            args.push('dev', project.mainFile);
             args.push('--config', configPath);
             args.push('--port', project.port.toString());
             args.push('--ip', '0.0.0.0');
+
+            // Unique Inspector Port to avoid conflicts
+            args.push('--inspector-port', (project.port + 10000).toString());
 
             // Force shared persistence so all workers supply the same DBs
             const sharedStateDir = path.join(path.dirname(this.uploadsDir), 'wrangler-shared-state');

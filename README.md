@@ -58,7 +58,15 @@ docker-compose up -d --build
 ```
 
 启动完成后，访问管理控制台：
-👉 **http://localhost:3000**
+**http://localhost:8001**
+
+*   **默认密码**: `admin`
+*   登录成功后，即可开始管理您的 Worker 项目与资源。
+
+### 安全配置
+您可以在 `docker-compose.yml` 环境变量中修改默认密码：
+*   `AUTH_PASSWORD`: 管理后台登录密码 (默认 admin)
+*   `R2_ADMIN_PORT`: R2 管理服务端口 (默认 9100)
 
 ---
 

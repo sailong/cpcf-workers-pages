@@ -48,6 +48,19 @@ function generateConfig(project, resources = { kv: [], d1: [] }) {
         });
     }
 
+    // Bindings - R2
+    if (bindings && bindings.r2 && bindings.r2.length > 0) {
+        bindings.r2.forEach(binding => {
+            const r2Resource = resources.r2.find(r => r.id === binding.resourceId);
+            if (r2Resource) {
+                config.push("");
+                config.push("[[r2_buckets]]");
+                config.push(`binding = "${binding.varName}"`);
+                config.push(`bucket_name = "${r2Resource.name}"`);
+            }
+        });
+    }
+
     // Environment Variables (支持三种格式: plain, json, secret)
     if (envVars && Object.keys(envVars).length > 0) {
         // 普通变量（plain 和 json）

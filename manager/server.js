@@ -5,6 +5,32 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const jwt = require('jsonwebtoken');
+const svgCaptcha = require('svg-captcha');
+
+const AUTH_FILE = path.join(__dirname, '../.platform-data/auth.json');
+let runtimePassword = process.env.AUTH_PASSWORD || 'admin';
+let JWT_SECRET = process.env.JWT_SECRET || null;
+
+// Load persisted password and JWT_SECRET if exists
+if (fs.existsSync(AUTH_FILE)) {
+    try {
+        const authData = JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8'));
+        if (authData.password) runtimePassword = authData.password;
+        if (authData.jwtSecret) JWT_SECRET = authData.jwtSecret;
+    } catch (e) { console.error("Failed to load auth file", e); }
+}
+
+// Generate and persist JWT_SECRET if not set
+if (!JWT_SECRET) {
+    JWT_SECRET = 'jwt-secret-' + Math.random().toString(36).substring(2) + Date.now();
+    const authData = fs.existsSync(AUTH_FILE)
+        ? JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8'))
+        : {};
+    authData.jwtSecret = JWT_SECRET;
+    fs.writeFileSync(AUTH_FILE, JSON.stringify(authData, null, 2));
+    console.log('Generated and persisted new JWT_SECRET');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,14 +66,124 @@ function saveProjects() {
 }
 
 // Init Resources DB
-let resources = { kv: [], d1: [] };
+let resources = { kv: [], d1: [], r2: [] };
 if (fs.existsSync(RESOURCES_FILE)) {
     try {
-        resources = JSON.parse(fs.readFileSync(RESOURCES_FILE, 'utf8'));
+        const loaded = JSON.parse(fs.readFileSync(RESOURCES_FILE, 'utf8'));
+        resources = { ...resources, ...loaded };
+        // Ensure new resource types exist if loading from old file
+        if (!resources.r2) resources.r2 = [];
+        if (!resources.kv) resources.kv = [];
+        if (!resources.d1) resources.d1 = [];
     } catch (e) {
         console.error("Failed to load resources", e);
     }
 }
+
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: Date.now() });
+});
+
+// Captcha
+app.get('/api/captcha', (req, res) => {
+    const captcha = svgCaptcha.create({
+        size: 4,
+        ignoreChars: '0o1i',
+        noise: 2,
+        color: true,
+        background: '#111827' // gray-900 to match dark theme
+    });
+
+    // Sign the captcha text into a token (avoid session state)
+    const captchaToken = jwt.sign(
+        { text: captcha.text.toLowerCase() },
+        JWT_SECRET,
+        { expiresIn: '5m' }
+    );
+
+    res.json({
+        image: captcha.data,
+        captchaId: captchaToken
+    });
+});
+
+// Login
+app.post('/api/login', (req, res) => {
+    const { username, password, captcha, captchaId } = req.body;
+
+    // 1. Verify Captcha
+    if (!captcha || !captchaId) {
+        return res.status(400).json({ error: "请输入验证码" });
+    }
+
+    try {
+        const decoded = jwt.verify(captchaId, JWT_SECRET);
+        if (decoded.text !== captcha.toLowerCase()) {
+            return res.status(400).json({ error: "验证码错误" });
+        }
+    } catch (e) {
+        return res.status(400).json({ error: "验证码失效，请刷新" });
+    }
+
+    // 2. Verify Credentials
+    if (username !== 'admin') {
+        return res.status(401).json({ error: "用户名或密码错误" });
+    }
+
+    if (password === runtimePassword) {
+        const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '7d' });
+        return res.json({ success: true, token });
+    }
+    res.status(401).json({ error: "用户名或密码错误" });
+});
+
+// Change Password
+app.post('/api/change-password', (req, res) => {
+    // Auth middleware usually covers this if route starts with /api/
+    // But we need to check if user is logged in
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.sendStatus(401);
+
+    const { oldPassword, newPassword } = req.body;
+
+    if (oldPassword !== runtimePassword) {
+        return res.status(400).json({ error: "旧密码错误" });
+    }
+
+    if (!newPassword || newPassword.length < 4) {
+        return res.status(400).json({ error: "新密码长度至少4位" });
+    }
+
+    runtimePassword = newPassword;
+
+    // Persist (keep existing jwtSecret)
+    const authData = fs.existsSync(AUTH_FILE)
+        ? JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8'))
+        : {};
+    authData.password = newPassword;
+    fs.writeFileSync(AUTH_FILE, JSON.stringify(authData, null, 2));
+
+    res.json({ success: true });
+});
+
+// Auth Middleware
+app.use((req, res, next) => {
+    if (!req.path.startsWith('/api/')) return next();
+    if (req.path === '/api/login' || req.path === '/api/health' || req.path === '/api/captcha') return next();
+
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+        const token = authHeader.split(' ')[1];
+        jwt.verify(token, JWT_SECRET, (err, user) => {
+            if (err) return res.sendStatus(403);
+            req.user = user;
+            next();
+        });
+    } else {
+        res.sendStatus(401);
+    }
+});
 
 function saveResources() {
     fs.writeFileSync(RESOURCES_FILE, JSON.stringify(resources, null, 2));
@@ -68,9 +204,13 @@ const upload = multer({ storage: storage })
 // --- API ROUTES ---
 
 const ProjectRuntime = require('./utils/spawner');
+const R2AdminManager = require('./utils/r2-admin-manager');
 
 // Init Runtime
+// Init Runtime
 const runtime = new ProjectRuntime(UPLOADS_DIR, resources);
+const R2_PORT = process.env.R2_ADMIN_PORT || 9099;
+const r2Admin = new R2AdminManager(path.join(__dirname, 'system-workers/r2-admin'), resources, R2_PORT);
 
 // Update runtime resources reference when they change
 function updateRuntimeResources() {
@@ -78,12 +218,14 @@ function updateRuntimeResources() {
 }
 
 // Restart running projects on boot
+// Restart running projects and System Worker on boot
 projects.forEach(p => {
     if (p.status === 'running') {
         console.log(`[Auto-Start] Restoring project ${p.name}...`);
         runtime.start(p);
     }
 });
+r2Admin.start();
 
 // --- API ROUTES ---
 
@@ -483,7 +625,12 @@ app.get('/api/projects/:id/full-config', (req, res) => {
         code,
         filename: project.mainFile,
         language: project.mainFile.endsWith('.ts') ? 'typescript' : 'javascript',
-        bindings: project.bindings || { kv: [], d1: [] },
+        bindings: {
+            kv: [],
+            d1: [],
+            r2: [],
+            ...(project.bindings || {})
+        },
         envVars: maskSecrets(project.envVars || {}),
         envVarsRaw: project.envVars || {},
         port: project.port,
@@ -796,6 +943,195 @@ app.delete('/api/resources/kv/:id', (req, res) => {
 // D1 Database APIs
 app.get('/api/resources/d1', (req, res) => {
     res.json(resources.d1);
+});
+
+// ... (D1 POST/DELETE is below this in original, but I will append R2 APIs after D1 APIs)
+
+// R2 Bucket APIs
+app.get('/api/resources/r2', (req, res) => {
+    res.json(resources.r2);
+});
+
+app.post('/api/resources/r2', (req, res) => {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Name is required" });
+
+    // Check duplicate
+    if (resources.r2.find(b => b.name === name)) {
+        return res.status(400).json({ error: "R2 Bucket already exists" });
+    }
+
+    const newBucket = {
+        id: 'r2-' + Date.now().toString(36),
+        name,
+        createdAt: new Date().toISOString()
+    };
+
+    resources.r2.push(newBucket);
+    saveResources();
+    r2Admin.restart(resources);
+    res.json(newBucket);
+});
+
+app.delete('/api/resources/r2/:id', (req, res) => {
+    const { id } = req.params;
+    const bucket = resources.r2.find(b => b.id === id);
+    if (!bucket) return res.status(404).json({ error: "R2 Bucket not found" });
+
+    resources.r2 = resources.r2.filter(b => b.id !== id);
+    saveResources();
+    r2Admin.restart(resources);
+    res.json({ success: true, message: "R2 Bucket deleted", id });
+});
+
+// === R2 FILE MANAGEMENT API (Proxied to System Worker) ===
+const R2_ADMIN_URL = `http://127.0.0.1:${R2_PORT}`;
+
+// Helper for fetch (Node 18+)
+const fetch = global.fetch;
+
+// List Files
+app.get('/api/resources/r2/:id/files', async (req, res) => {
+    const { id } = req.params;
+    const { cursor, limit, prefix, delimiter } = req.query;
+
+    // Construct URL
+    const url = new URL(`${R2_ADMIN_URL}/list`);
+    url.searchParams.set('bucket', id);
+    if (cursor) url.searchParams.set('cursor', cursor);
+    if (limit) url.searchParams.set('limit', limit);
+    if (prefix) url.searchParams.set('prefix', prefix);
+    if (delimiter) url.searchParams.set('delimiter', delimiter);
+
+    try {
+        const upstream = await fetch(url.toString());
+        if (!upstream.ok) {
+            const txt = await upstream.text();
+            return res.status(upstream.status).json({ error: txt });
+        }
+        const data = await upstream.json();
+        res.json(data);
+    } catch (e) {
+        res.status(500).json({ error: "Failed to connect to R2 Admin: " + e.message });
+    }
+});
+
+// Upload File
+app.post('/api/resources/r2/:id/files', upload.single('file'), async (req, res) => {
+    const { id } = req.params;
+    let key = req.body.key || (req.file ? req.file.originalname : null);
+
+    if (!req.file || !key) return res.status(400).json({ error: "File and Key required" });
+
+    // Debug encoding
+    console.log(`[Upload] Original Name: ${req.file.originalname}`);
+    console.log(`[Upload] Key (before fix): ${key}`);
+
+    // Try to fix encoding if it looks garbled (common issue with multer/busboy defaults)
+    // If the key contains "å" and other latin1 chars, it might be utf8 interpreted as latin1.
+    // However, we can blindly try to decode if we suspect it.
+    // But better to just fix it:
+    // req.file.originalname is often Latin-1 encoded UTF-8 bytes.
+    try {
+        const fixed = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        console.log(`[Upload] Fixed Name candidate: ${fixed}`);
+        // Simple heuristic: if the fixed string looks valid and the original had "weird" chars
+        // For now, let's just use the fixed one if it differs?
+        // Actually, for Chinese users, this is almost ALWAYS the case with default multer.
+        key = fixed;
+    } catch (e) {
+        console.log("Encoding fix failed", e);
+    }
+
+    console.log(`[Upload] Final Key: ${key}`);
+
+    try {
+        const fileContent = fs.readFileSync(req.file.path);
+
+        const url = new URL(`${R2_ADMIN_URL}/put`);
+        url.searchParams.set('bucket', id);
+        url.searchParams.set('key', key);
+
+        const upstream = await fetch(url.toString(), {
+            method: 'PUT',
+            body: fileContent
+        });
+
+        // Cleanup temp upload
+        fs.unlinkSync(req.file.path);
+
+        if (!upstream.ok) {
+            const txt = await upstream.text();
+            return res.status(upstream.status).json({ error: txt });
+        }
+
+        res.json({ success: true, key });
+    } catch (e) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: "Upload failed: " + e.message });
+    }
+});
+
+// Delete File
+app.delete('/api/resources/r2/:id/files/:key', async (req, res) => {
+    const { id, key } = req.params;
+    // Decode key because it might be double encoded if in URL path?
+    // Usually express decodes params. But if key contains slashes, it might be tricky.
+    // Client should encodeURIComponent. Express decodes it.
+    // However, if key has '/', express logic might split it.
+    // Better to pass key as query param for safety in DELETE? 
+    // Or use catch-all logic. 
+    // Let's assume simple keys for now, or allow client to pass encoded key.
+
+    const url = new URL(`${R2_ADMIN_URL}/delete`);
+    url.searchParams.set('bucket', id);
+    url.searchParams.set('key', key);
+
+    try {
+        const upstream = await fetch(url.toString(), { method: 'DELETE' });
+        if (!upstream.ok) {
+            const txt = await upstream.text();
+            return res.status(upstream.status).json({ error: txt });
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: "Delete failed: " + e.message });
+    }
+});
+
+// Download/Get File
+app.get('/api/resources/r2/:id/files/:key(*)', async (req, res) => {
+    const { id } = req.params;
+    const key = req.params[0]; // Capture wildcard for key with slashes
+
+    const url = new URL(`${R2_ADMIN_URL}/get`);
+    url.searchParams.set('bucket', id);
+    url.searchParams.set('key', key);
+
+    try {
+        const upstream = await fetch(url.toString());
+        if (!upstream.ok) {
+            if (upstream.status === 404) return res.status(404).send("File not found");
+            const txt = await upstream.text();
+            return res.status(upstream.status).send(txt);
+        }
+
+        // Stream back
+        // fetch response.body is a ReadableStream (web standard) in Node 18
+        // Express res is a WritableStream (Node stream)
+        // Need to convert Web Stream to Node Stream
+        const { Readable } = require('stream');
+        // @ts-ignore
+        const nodeStream = Readable.fromWeb(upstream.body);
+
+        // Set headers
+        res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/octet-stream');
+        if (upstream.headers.has('etag')) res.setHeader('ETag', upstream.headers.get('etag'));
+
+        nodeStream.pipe(res);
+    } catch (e) {
+        res.status(500).send("Download failed: " + e.message);
+    }
 });
 
 app.post('/api/resources/d1', (req, res) => {

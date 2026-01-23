@@ -19,6 +19,9 @@ deploy/
 .platform-data
 .wrangler
 **/.wrangler
+*.log
+**/*.log
+**/.platform-data
 
 # System Files
 .DS_Store

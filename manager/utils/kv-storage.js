@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const KV_DATA_DIR = path.join(__dirname, '../.platform-data/kv-data');
+const KV_DATA_DIR = path.join(__dirname, '../../.platform-data/kv-data');
 
 // Ensure KV data directory exists
 if (!fs.existsSync(KV_DATA_DIR)) {

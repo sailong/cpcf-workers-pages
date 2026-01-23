@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { authenticatedFetch } from './api';
 
 interface KVManagerProps {
     namespace: { id: string; name: string };
@@ -20,7 +21,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
     // 加载键列表
     const loadKeys = async () => {
         try {
-            const res = await fetch(`/api/resources/kv/${namespace.id}/keys`);
+            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/keys`);
             const data = await res.json();
             setKeys(data.keys || []);
         } catch (err) {
@@ -31,7 +32,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
     // 获取键值
     const loadValue = async (key: string) => {
         try {
-            const res = await fetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(key)}`);
+            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(key)}`);
             if (res.ok) {
                 const data = await res.json();
                 setValue(typeof data.value === 'string' ? data.value : JSON.stringify(data.value, null, 2));
@@ -56,7 +57,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 // 保持字符串格式
             }
 
-            const res = await fetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(newKey)}`, {
+            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(newKey)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ value: parsedValue })
@@ -86,7 +87,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
         if (!keyToDelete) return;
 
         try {
-            const res = await fetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(keyToDelete)}`, {
+            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(keyToDelete)}`, {
                 method: 'DELETE'
             });
 

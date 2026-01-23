@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
+import { authenticatedFetch } from './api';
 
 interface CreateWorkerFormProps {
     onSuccess: () => void;
@@ -124,11 +125,11 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                     code,
                     filename,
                     port: customPort || undefined,
-                    bindings: { kv: [], d1: [] },
+                    bindings: { kv: [], d1: [], r2: [] },
                     envVars: {}
                 };
 
-                const res = await fetch('/api/projects', {
+                const res = await authenticatedFetch('/api/projects', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
@@ -147,7 +148,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                 if (!file) throw new Error('文件不存在');
                 formData.append('file', file);
 
-                const uploadRes = await fetch('/api/upload', {
+                const uploadRes = await authenticatedFetch('/api/upload', {
                     method: 'POST',
                     body: formData
                 });
@@ -163,11 +164,11 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                     type: projectType,
                     mainFile: uploadedFilename,
                     port: customPort || undefined,
-                    bindings: { kv: [], d1: [] },
+                    bindings: { kv: [], d1: [], r2: [] },
                     envVars: {}
                 };
 
-                const res = await fetch('/api/projects', {
+                const res = await authenticatedFetch('/api/projects', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)

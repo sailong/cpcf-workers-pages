@@ -1,2 +1,4 @@
 node_modules
 .platform-data
+.wrangler
+*.log

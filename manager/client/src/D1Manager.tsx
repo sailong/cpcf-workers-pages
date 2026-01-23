@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { authenticatedFetch } from './api';
 
 interface D1ManagerProps {
     dbId: string;
@@ -38,7 +39,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
 
     const fetchTables = async () => {
         try {
-            const res = await fetch(`/api/resources/d1/${dbId}/tables`);
+            const res = await authenticatedFetch(`/api/resources/d1/${dbId}/tables`);
             const data = await res.json();
             setTables(data);
         } catch (e) {
@@ -54,7 +55,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
         setQueryResult(null);
 
         try {
-            const res = await fetch(`/api/resources/d1/${dbId}/execute`, {
+            const res = await authenticatedFetch(`/api/resources/d1/${dbId}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sql: sqlInput })
@@ -85,7 +86,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
         setStructureData([]);
 
         try {
-            const res = await fetch(`/api/resources/d1/${dbId}/schema/${tableName}`);
+            const res = await authenticatedFetch(`/api/resources/d1/${dbId}/schema/${tableName}`);
             const data = await res.json();
             if (res.ok) {
                 setStructureData(data);
@@ -102,7 +103,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
         setTableData(null);
 
         try {
-            const res = await fetch(`/api/resources/d1/${dbId}/query?table=${encodeURIComponent(tableName)}`);
+            const res = await authenticatedFetch(`/api/resources/d1/${dbId}/query?table=${encodeURIComponent(tableName)}`);
             const data = await res.json();
 
             if (res.ok) {

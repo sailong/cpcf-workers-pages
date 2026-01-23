@@ -63,8 +63,8 @@ services:
     image: your-username/ccfwp:latest  # <--- 修改这里为你发布的镜像名
     container_name: ccfwp
     ports:
-      - "3000:3000"
-      - "8000-8020:8000-8020"
+      - "8001:8001"
+      - "8002-8020:8002-8020"
     volumes:
       - ./data:/app/.platform-data
     environment:
