@@ -23,7 +23,7 @@ docker-compose -f deploy/docker-compose.yml up -d --build
 
 ### 3. 访问
 启动完成后，访问浏览器：
-http://localhost:3000
+http://localhost:8001
 
 ## 💾 数据持久化
 所有项目代码、数据库和配置都会自动保存到根目录下的 `.platform-data` 文件夹中。
