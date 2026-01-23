@@ -30,6 +30,38 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
 
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const droppedFiles = e.dataTransfer.files;
+        if (droppedFiles && droppedFiles.length > 0) {
+            if (uploadType === 'zip') {
+                const droppedFile = droppedFiles[0];
+                if (droppedFile.name.endsWith('.zip')) {
+                    setFile(droppedFile);
+                } else {
+                    setError("请拖入 ZIP 文件");
+                }
+            } else {
+                // Folder drop support via dataTransfer is complex.
+                // We guide user to click for folders to ensure webkitdirectory works.
+                setError("文件夹请点击选择 (浏览器限制，直接拖拽可能有兼容性问题)");
+            }
+        }
+    };
+
     const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
         if (!files || files.length === 0) return;
@@ -93,6 +125,15 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
     const handleCreate = async () => {
         if (!name.trim()) {
             setError('项目名称不能为空');
+            return;
+        }
+
+        // Validate Name: 
+        // 1. Only English letters, numbers, and hyphens
+        // 2. Cannot start or end with a hyphen
+        const nameRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+        if (!nameRegex.test(name)) {
+            setError('项目名称非法：只能包含字母/数字/连字符，且不能以连字符开头或结尾');
             return;
         }
 
@@ -208,7 +249,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
             {/* 项目名称 */}
             <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                    项目名称 *
+                    项目名称 * <span className="text-xs text-gray-500 font-normal ml-2">(字母/数字/连字符，不能以连字符开头结尾)</span>
                 </label>
                 <input
                     type="text"
@@ -350,94 +391,116 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                     <label className="block text-sm font-medium text-gray-300 mb-3">
                         上传方式 *
                     </label>
-                    <div className="flex gap-4 mb-4">
+
+
+                    <div className="flex gap-4 mb-6">
                         <button
                             onClick={() => setUploadType('folder')}
-                            className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${uploadType === 'folder'
-                                ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                                : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                            className={`flex-1 px-4 py-3 rounded-xl border transition-all ${uploadType === 'folder'
+                                ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
+                                : 'border-gray-800 bg-gray-900/50 text-gray-400 hover:border-gray-700 hover:bg-gray-800'
                                 }`}
                         >
-                            <div className="font-bold">📁 上传文件夹</div>
-                            <div className="text-xs opacity-75">推荐 (webkitdirectory)</div>
+                            <div className="font-bold flex items-center justify-center gap-2">📁 上传文件夹</div>
+                            <div className="text-xs opacity-75 text-center mt-1">推荐 (自动打包)</div>
                         </button>
                         <button
                             onClick={() => setUploadType('zip')}
-                            className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${uploadType === 'zip'
-                                ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                                : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                            className={`flex-1 px-4 py-3 rounded-xl border transition-all ${uploadType === 'zip'
+                                ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
+                                : 'border-gray-800 bg-gray-900/50 text-gray-400 hover:border-gray-700 hover:bg-gray-800'
                                 }`}
                         >
-                            <div className="font-bold">📦 上传 ZIP</div>
-                            <div className="text-xs opacity-75">已打包好的网站</div>
+                            <div className="font-bold flex items-center justify-center gap-2">📦 上传 ZIP</div>
+                            <div className="text-xs opacity-75 text-center mt-1">已打包好的压缩包</div>
                         </button>
                     </div>
 
-                    {uploadType === 'folder' ? (
-                        <div className="relative">
-                            <input
-                                type="file"
-                                // @ts-ignore
-                                webkitdirectory="" directory="" multiple
-                                onChange={handleFolderSelect}
-                                className="hidden"
-                                id="pages-folder-upload"
-                            />
-                            <label
-                                htmlFor="pages-folder-upload"
-                                className="block w-full px-4 py-8 bg-gray-800 border-2 border-dashed border-gray-700 rounded-lg text-center cursor-pointer hover:border-orange-500 transition-colors"
-                            >
-                                {processing ? (
-                                    <div className="animate-pulse">
-                                        <div className="text-4xl mb-2">⏳</div>
-                                        <div className="text-white font-medium">正在打包文件...</div>
-                                    </div>
-                                ) : file ? (
-                                    <div>
-                                        <div className="text-4xl mb-2">📦</div>
-                                        <div className="text-white font-medium">已准备好上传 (自动打包为 ZIP)</div>
-                                        <div className="text-sm text-gray-500 mt-1">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
-                                        <div className="text-xs text-orange-400 mt-2">点击更换文件夹</div>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <div className="text-4xl mb-2">📂</div>
-                                        <div className="text-gray-400">点击选择网站构建目录 (如 dist)</div>
-                                        <div className="text-sm text-gray-600 mt-1">浏览器将自动打包并上传</div>
-                                    </div>
-                                )}
-                            </label>
-                        </div>
-                    ) : (
-                        <div className="relative">
-                            <input
-                                type="file"
-                                accept=".zip"
-                                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                                className="hidden"
-                                id="pages-zip-upload"
-                            />
-                            <label
-                                htmlFor="pages-zip-upload"
-                                className="block w-full px-4 py-8 bg-gray-800 border-2 border-dashed border-gray-700 rounded-lg text-center cursor-pointer hover:border-orange-500 transition-colors"
-                            >
-                                {file ? (
-                                    <div>
-                                        <div className="text-4xl mb-2">📦</div>
-                                        <div className="text-white font-medium">{file.name}</div>
-                                        <div className="text-sm text-gray-500 mt-1">{(file.size / 1024).toFixed(2)} KB</div>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <div className="text-4xl mb-2">🤐</div>
-                                        <div className="text-gray-400">点击选择 ZIP 压缩包</div>
-                                    </div>
-                                )}
-                            </label>
-                        </div>
-                    )}
+                    {/* Integrated Drop Zone */}
+                    <div
+                        className={`relative border-2 border-dashed rounded-2xl transition-all duration-300 ease-in-out group ${isDragging
+                            ? 'border-orange-500 bg-orange-500/10 scale-[1.02]'
+                            : 'border-gray-700 bg-gray-900/30 hover:border-gray-600 hover:bg-gray-900/50'
+                            }`}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        {uploadType === 'folder' ? (
+                            <>
+                                <input
+                                    type="file"
+                                    // @ts-ignore
+                                    webkitdirectory="" directory="" multiple
+                                    onChange={handleFolderSelect}
+                                    className="hidden"
+                                    id="pages-folder-upload"
+                                />
+                                <label
+                                    htmlFor="pages-folder-upload"
+                                    className="block w-full py-12 cursor-pointer flex flex-col items-center justify-center text-center p-6"
+                                >
+                                    {processing ? (
+                                        <div className="animate-pulse">
+                                            <div className="text-5xl mb-4 opacity-80">⏳</div>
+                                            <div className="text-white font-bold text-lg">正在打包文件...</div>
+                                        </div>
+                                    ) : file ? (
+                                        <div>
+                                            <div className="text-5xl mb-4 text-green-400 drop-shadow-lg">📦</div>
+                                            <div className="text-white font-bold text-lg mb-1">已就绪 (自动打包为 ZIP)</div>
+                                            <div className="text-sm text-gray-500 font-mono bg-gray-800/50 px-3 py-1 rounded-full inline-block mb-3">
+                                                {(file.size / 1024 / 1024).toFixed(2)} MB
+                                            </div>
+                                            <div className="text-xs text-orange-400 animate-pulse">点击更换文件夹</div>
+                                        </div>
+                                    ) : (
+                                        <div className="group-hover:scale-105 transition-transform duration-300">
+                                            <div className="text-5xl mb-4 opacity-50 group-hover:opacity-100 group-hover:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all">📂</div>
+                                            <div className="text-gray-300 font-bold text-lg mb-2">点击选择构建产物目录</div>
+                                            {/* Subtly integrated help text */}
+                                            <div className="text-xs text-gray-500 max-w-xs mx-auto leading-relaxed">
+                                                请上传包含 <code className="bg-gray-800 px-1 py-0.5 rounded text-gray-300">index.html</code> 的文件夹
+                                                <br />
+                                                (例如 <code className="text-gray-400">dist</code>, <code className="text-gray-400">build</code>, <code className="text-gray-400">out</code>)
+                                            </div>
+                                        </div>
+                                    )}
+                                </label>
+                            </>
+                        ) : (
+                            <>
+                                <input
+                                    type="file"
+                                    accept=".zip"
+                                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                                    className="hidden"
+                                    id="pages-zip-upload"
+                                />
+                                <label
+                                    htmlFor="pages-zip-upload"
+                                    className="block w-full py-12 cursor-pointer flex flex-col items-center justify-center text-center p-6"
+                                >
+                                    {file ? (
+                                        <div>
+                                            <div className="text-5xl mb-4 text-orange-400">📦</div>
+                                            <div className="text-white font-bold text-lg">{file.name}</div>
+                                            <div className="text-sm text-gray-500 mt-2 font-mono">{(file.size / 1024).toFixed(2)} KB</div>
+                                        </div>
+                                    ) : (
+                                        <div className="group-hover:scale-105 transition-transform duration-300">
+                                            <div className="text-5xl mb-4 opacity-50 group-hover:opacity-100 transition-opacity">🤐</div>
+                                            <div className="text-gray-300 font-bold text-lg mb-2">点击选择 ZIP 压缩包</div>
+                                            <div className="text-xs text-gray-500">或将文件拖拽至此</div>
+                                        </div>
+                                    )}
+                                </label>
+                            </>
+                        )}
+                    </div>
                 </div>
-            )}
+            )
+            }
 
             {/* 端口配置 */}
             <div>
@@ -448,20 +511,30 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                     type="number"
                     value={customPort}
                     onChange={(e) => setCustomPort(e.target.value ? parseInt(e.target.value) : '')}
-                    placeholder="留空自动分配 (8000-9000)"
+                    placeholder="留空自动分配 (默认为内部端口)"
                     min="1024"
                     max="65535"
                     className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
+                <div className="mt-2 space-y-1 bg-gray-900/50 p-3 rounded border border-gray-700">
+                    <p className="text-xs text-gray-400 font-bold mb-1">ℹ️ 关于端口说明：</p>
+                    <ul className="text-xs text-gray-500 list-disc pl-4 space-y-1">
+                        <li>无论留空还是手动填写，此端口均为 <strong>容器内部端口</strong>。</li>
+                        <li>外部无法直接访问（除非通过反向代理域名）。</li>
+                        <li>如需直接通过 IP:Port 访问，必须在 <code>docker-compose.yml</code> 中添加映射。</li>
+                    </ul>
+                </div>
             </div>
 
             {/* 错误提示 */}
-            {error && (
-                <div className="bg-red-500/10 border border-red-500 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2">
-                    <span>⚠️</span>
-                    <span>{error}</span>
-                </div>
-            )}
+            {
+                error && (
+                    <div className="bg-red-500/10 border border-red-500 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2">
+                        <span>⚠️</span>
+                        <span>{error}</span>
+                    </div>
+                )
+            }
 
             {/* 创建按钮 */}
             <div className="flex gap-3 pt-4">
@@ -473,7 +546,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                     {creating ? '创建中...' : processing ? '打包中...' : '🚀 创建并部署'}
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
 

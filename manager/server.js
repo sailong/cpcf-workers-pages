@@ -7,6 +7,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const jwt = require('jsonwebtoken');
 const svgCaptcha = require('svg-captcha');
+const net = require('net'); // Added for port check
 
 const AUTH_FILE = path.join(__dirname, '../.platform-data/auth.json');
 let runtimePassword = process.env.AUTH_PASSWORD || 'admin';
@@ -32,13 +33,95 @@ if (!JWT_SECRET) {
     console.log('Generated and persisted new JWT_SECRET');
 }
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const MANAGER_SERVICE_PORT = process.env.MANAGER_SERVICE_PORT || 3000;
 const DATA_DIR = path.join(__dirname, '../.platform-data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
 const RESOURCES_FILE = path.join(DATA_DIR, 'resources.json');
 const D1_DIR = path.join(DATA_DIR, 'd1-databases');
+
+const app = express();
+
+// ==========================================
+// ==========================================
+// Reverse Proxy Middleware
+// Handles routing for <project-name>.localhost:8001
+// MUST be before express.static and body-parser
+// ==========================================
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
+// Fix: Define proxy middleware GLOBALLY once to prevent EventEmitter memory leaks.
+// (Previously, creating it inside app.use() added new 'upgrade' listeners on every request)
+const dynamicProxy = createProxyMiddleware({
+    // default fallback, overridden by router
+    target: `http://127.0.0.1:${MANAGER_SERVICE_PORT}`,
+    router: (req) => {
+        // Use the target we determined in the wrapper middleware
+        return req.proxyTarget;
+    },
+    changeOrigin: true,
+    ws: true,
+    logLevel: 'error',
+    onError: (err, req, res) => {
+        const pName = req.proxyProjectName || 'Unknown';
+        const pPort = req.proxyProjectPort || 'Unknown';
+        if (!res.headersSent) {
+            res.status(502).send(`Bad Gateway: Project '${pName}' not reachable (Port ${pPort}). Is it running?`);
+        }
+    }
+});
+
+app.use((req, res, next) => {
+    const host = req.headers.host; // e.g., "my-worker.worker.localhost:8001"
+    if (!host) return next();
+
+    const hostname = host.split(':')[0];
+    const parts = hostname.split('.');
+
+    // Check if it appears to be a subdomain request
+    // Support two formats:
+    // 1. <project>.<type>.localhost  (e.g., "my-app.worker.localhost")
+    // 2. <project>.localhost         (Backwards compatibility)
+    if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
+        let projectName = parts[0];
+        let projectType = null;
+
+        // Check for typed subdomain (e.g. name.worker.localhost) -> 3 parts excluding port, ends with localhost
+        if (parts.length >= 3) {
+            const possibleType = parts[parts.length - 2];
+            if (possibleType === 'worker' || possibleType === 'pages') {
+                projectType = possibleType;
+                // Project name is everything before the type
+                projectName = parts.slice(0, parts.length - 2).join('.');
+            }
+        }
+
+        // Find project
+        // Note: 'projects' variable is identified at module scope below, safely accessible at runtime
+        const project = projects.find(p => {
+            const nameMatch = p.name.toLowerCase() === projectName.toLowerCase();
+            const typeMatch = projectType ? p.type === projectType : true;
+            return nameMatch && typeMatch;
+        });
+
+        if (project && project.port) {
+            // Attach target info to request for the global proxy router
+            req.proxyTarget = `http://127.0.0.1:${project.port}`;
+            req.proxyProjectName = project.name;
+            req.proxyProjectPort = project.port;
+
+            // Delegate to the global proxy instance
+            return dynamicProxy(req, res, next);
+        }
+
+        if (parts[0] !== '127') {
+            // 404 if project not found
+            return res.status(404).send(`Project '${projectName}' ${projectType ? `(type: ${projectType})` : ''} not found.`);
+        }
+    }
+
+    next();
+});
 
 // Serve Frontend Static Files
 app.use(express.static(path.join(__dirname, 'client/dist')));
@@ -60,6 +143,16 @@ if (fs.existsSync(PROJECTS_FILE)) {
         console.error("Failed to load projects", e);
     }
 }
+
+
+
+// ==========================================
+// Reverse Proxy Middleware
+// Handles routing for <project-name>.localhost:8001
+// ==========================================
+
+
+
 
 function saveProjects() {
     fs.writeFileSync(PROJECTS_FILE, JSON.stringify(projects, null, 2));
@@ -219,13 +312,44 @@ function updateRuntimeResources() {
 
 // Restart running projects on boot
 // Restart running projects and System Worker on boot
-projects.forEach(p => {
-    if (p.status === 'running') {
-        console.log(`[Auto-Start] Restoring project ${p.name}...`);
-        runtime.start(p);
+(async () => {
+    for (const p of projects) {
+        if (p.status === 'running') {
+            console.log(`[Auto-Start] Restoring project ${p.name}...`);
+
+            // Fix legacy projects without port
+            if (!p.port) {
+                try {
+                    console.log(`[Auto-Start] Project ${p.name} has no port, assigning internal port...`);
+                    p.port = await getAvailablePort();
+                    saveProjects();
+                } catch (e) {
+                    console.error(`[Auto-Start] Failed to assign port for ${p.name}: ${e.message}`);
+                    p.status = 'stopped';
+                    saveProjects();
+                    continue;
+                }
+            }
+
+            try {
+                // Ensure port is not occupied by system
+                const portCheck = await isSystemPortInUse(p.port);
+                if (portCheck) {
+                    console.warn(`[Auto-Start] Port ${p.port} for ${p.name} is in use. Assigning new port...`);
+                    p.port = await getAvailablePort();
+                    saveProjects();
+                }
+
+                await runtime.start(p);
+            } catch (e) {
+                console.error(`[Auto-Start] Failed to start ${p.name}:`, e);
+                p.status = 'stopped'; // Mark as stopped if failed
+                saveProjects();
+            }
+        }
     }
-});
-r2Admin.start();
+    r2Admin.start();
+})();
 
 // --- API ROUTES ---
 
@@ -242,18 +366,45 @@ app.get('/api/projects', (req, res) => {
 // === PORT MANAGEMENT HELPERS ===
 
 /**
- * 验证端口是否可用
+ * 检查系统端口是否被占用 (尝试绑定)
+ * @param {number} port 
+ * @returns {Promise<boolean>} true if in use, false if free
+ */
+function isSystemPortInUse(port) {
+    return new Promise((resolve) => {
+        const server = net.createServer();
+        server.once('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                resolve(true); // Port is in use
+            } else {
+                resolve(false); // Other error, assume free? Or strict fail? 
+                // For safety, if we can't bind, we assume it's not safe to use.
+                // But let's log it.
+                console.warn(`Port check error on ${port}: ${err.message}`);
+                resolve(true);
+            }
+        });
+        server.once('listening', () => {
+            server.close();
+            resolve(false); // Port is free
+        });
+        server.listen(port);
+    });
+}
+
+/**
+ * 验证端口是否可用 (包含数据库检查和系统检查)
  * @param {number} port - 要验证的端口
  * @param {string} excludeProjectId - 排除的项目 ID（用于更新场景）
- * @returns {{valid: boolean, error?: string}}
+ * @returns {Promise<{valid: boolean, error?: string}>}
  */
-function isPortAvailable(port, excludeProjectId = null) {
+async function isPortAvailable(port, excludeProjectId = null) {
     // 检查端口范围
     if (port < 1024 || port > 65535) {
         return { valid: false, error: "端口必须在 1024-65535 范围内" };
     }
 
-    // 检查是否被其他项目占用
+    // 1. 检查是否被其他项目占用 (DB Check)
     const existingProject = projects.find(p =>
         p.port === port && p.id !== excludeProjectId
     );
@@ -265,28 +416,39 @@ function isPortAvailable(port, excludeProjectId = null) {
         };
     }
 
+    // 2. 检查系统端口是否实际被占用 (System Check)
+    const inUse = await isSystemPortInUse(port);
+    if (inUse) {
+        return {
+            valid: false,
+            error: `端口 ${port} 已被系统进程或其他服务占用`
+        };
+    }
+
     return { valid: true };
 }
 
 /**
  * 获取可用端口
  * @param {number} preferredPort - 首选端口
- * @returns {number} 可用端口
+ * @returns {Promise<number>} 可用端口
  */
-function getAvailablePort(preferredPort = null) {
+async function getAvailablePort(preferredPort = null) {
     // 如果指定了首选端口且可用，使用它
     if (preferredPort) {
-        const check = isPortAvailable(preferredPort);
+        const check = await isPortAvailable(preferredPort);
         if (check.valid) return preferredPort;
     }
 
     // 否则从起始范围开始寻找
-    const startPort = parseInt(process.env.PORT_RANGE_START || 8000);
-    const endPort = parseInt(process.env.PORT_RANGE_END || 9000);
+    // 默认使用 10000+ 的内部端口，避免与常用开发端口冲突
+    const startPort = parseInt(process.env.PORT_RANGE_START || 10000);
+    const endPort = parseInt(process.env.PORT_RANGE_END || 20000);
 
     let port = startPort;
     while (port <= endPort) {
-        if (isPortAvailable(port).valid) {
+        const check = await isPortAvailable(port);
+        if (check.valid) {
             return port;
         }
         port++;
@@ -299,10 +461,33 @@ function getAvailablePort(preferredPort = null) {
 // === PROJECT MANAGEMENT API ===
 
 // 2. Create Project
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', async (req, res) => {
     console.log('[DEBUG] Create Project Request Body:', JSON.stringify(req.body, null, 2));
     const { name, type, mainFile, bindings, envVars, port: customPort, code, filename } = req.body;
     console.log(`[DEBUG] Parsed: name=${name}, type=${type}, mainFile=${mainFile}, codeLen=${code ? code.length : 0}, filename=${filename}`);
+
+    // Validate Name: 
+    // 1. Only English letters, numbers, and hyphens
+    // 2. Cannot start or end with a hyphen
+    // Regex: Start with alphanumeric, optionally followed by (alphanumeric/hyphen)* ending with alphanumeric
+    const nameRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
+    if (!nameRegex.test(name)) {
+        return res.status(400).json({ error: "项目名称非法：只能包含字母/数字/连字符，且不能以连字符开头或结尾" });
+    }
+
+    // 检查项目名称重复 (Same Name & Same Type)
+    // 允许同名但不同类型? 通常最好也不要，避免混淆 DNS。
+    // 但用户说 "同一类型（worker或pages）的项目...要验证名称不能重复"
+    // 我们这里严谨一点，如果只是 type 不同可能 DNS 也会冲突 (因为都用 name.type.localhost)
+    // 修正: 我们的路由是 <name>.<type>.localhost. 
+    // 防止混淆，且避免用户误解，我们先按用户要求 "同一类型不能重复"。
+    // 实际: 端口分配独立，Host路由独立，理论上不同类型同名可以存活。
+    // 但是 id 生成逻辑是 name + timestamp，如果 name 一样 type 一样肯定不行。
+
+    const existing = projects.find(p => p.name === name && p.type === type);
+    if (existing) {
+        return res.status(400).json({ error: `该类型的项目名称 "${name}" 已存在，请更换名称` });
+    }
 
     // Simple ID gen
     const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now().toString().slice(-4);
@@ -313,14 +498,14 @@ app.post('/api/projects', (req, res) => {
         if (customPort) {
             // 用户指定了端口，验证是否可用
             const portNum = parseInt(customPort);
-            const portCheck = isPortAvailable(portNum);
+            const portCheck = await isPortAvailable(portNum);
             if (!portCheck.valid) {
                 return res.status(400).json({ error: portCheck.error });
             }
             port = portNum;
         } else {
             // 自动分配可用端口
-            port = getAvailablePort();
+            port = await getAvailablePort();
         }
     } catch (error) {
         return res.status(500).json({ error: error.message });
@@ -397,14 +582,58 @@ app.post('/api/projects/:id/start', async (req, res) => {
     const project = projects.find(p => p.id === req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
 
+    const { force } = req.body; // Check for force flag
+
     try {
+        // 1. Check if port is in use
+        const inUse = await isSystemPortInUse(project.port);
+        if (inUse) {
+            if (force) {
+                console.log(`[Force Start] Killing process on port ${project.port}...`);
+
+                // Try to kill friendly projects first
+                const conflictingProject = projects.find(p => p.port === project.port && p.status === 'running' && p.id !== project.id);
+                if (conflictingProject) {
+                    console.log(`[Force Start] Stopping conflicting project ${conflictingProject.name}...`);
+                    runtime.stop(conflictingProject.id);
+                    conflictingProject.status = 'stopped';
+                    saveProjects();
+                } else {
+                    // Kill system process using fuser (requires psmisc installed in Dockerfile)
+                    try {
+                        require('child_process').execSync(`fuser -k ${project.port}/tcp`);
+                        console.log(`[Force Start] System process on port ${project.port} killed.`);
+                        // Wait a moment for release
+                        await new Promise(r => setTimeout(r, 1000));
+                    } catch (e) {
+                        console.error(`[Force Start] Failed to kill process on port ${project.port}:`, e.message);
+                        // If fuser fails (e.g. permission or not found), we might still try? 
+                        // Or just throw error.
+                        // If return code is 1, it means no process found, but we deduced inUse=true?
+                        // Race condition? Let's proceed and see if start fails.
+                    }
+                }
+            } else {
+                // Return 409 Conflict with details
+                // Try to identify what is using it
+                const conflictingProject = projects.find(p => p.port === project.port && p.status === 'running' && p.id !== project.id);
+                const ownerName = conflictingProject ? `项目 "${conflictingProject.name}"` : "未知系统进程";
+
+                return res.status(409).json({
+                    error: `端口 ${project.port} 已被占用 (${ownerName})`,
+                    portInUse: true,
+                    owner: ownerName
+                });
+            }
+        }
+
         await runtime.start(project);
         project.status = 'running';
         saveProjects();
         res.json({ message: "Project started", project });
     } catch (e) {
         console.error("Start failed", e);
-        res.status(500).json({ error: "Failed to start project" });
+        res.status(500).json({ error: "Start failed: " + e.message });
     }
 });
 
@@ -642,7 +871,7 @@ app.get('/api/projects/:id/full-config', (req, res) => {
 
 
 // 11. Update Project Configuration (bindings and envVars)
-app.put('/api/projects/:id/config', (req, res) => {
+app.put('/api/projects/:id/config', async (req, res) => {
     const { bindings, envVars, port } = req.body;
     const project = projects.find(p => p.id === req.params.id);
 
@@ -652,7 +881,7 @@ app.put('/api/projects/:id/config', (req, res) => {
     if (port !== undefined && port !== project.port) {
         const portNum = parseInt(port);
         // 如果是新端口，检查可用性
-        const check = isPortAvailable(portNum);
+        const check = await isPortAvailable(portNum);
         // 注意：如果是当前项目占用的端口，isPortAvailable 可能会返回 false (被占用)，所以要特判吗？
         // isPortAvailable 只是检查端口是否被监听。如果当前项目正在运行，该端口当然被占用。
         // 所以，如果项目正在运行且端口没变，不需要检查。
@@ -1250,6 +1479,6 @@ app.get('/', (req, res) => {
     res.send("Cloudflare Platform Manager API is running. <br> Frontend failed to load? Check /app/manager/client/dist");
 });
 
-app.listen(PORT, () => {
-    console.log(`Manager Service running on port ${PORT}`);
+app.listen(MANAGER_SERVICE_PORT, () => {
+    console.log(`Manager Service running on port ${MANAGER_SERVICE_PORT}`);
 });

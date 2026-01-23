@@ -22,7 +22,15 @@
 - **在线代码编辑器**: 集成 Monaco Editor，支持 TypeScript/JavaScript 语法高亮与智能提示。
 - **动态部署**: 一键保存代码并自动热重载，秒级生效。
 - **文件上传**: 支持上传单文件 (Worker) 或 ZIP 包 (Pages 静态站点)。
-- **智能端口分配**: 自动管理本地端口资源 (8000+)，确保服务互不冲突。
+- **智能端口分配**:
+- **智能端口分配**:
+    - **自动模式 (推荐)**: 留空端口，系统自动分配内部端口 (10000+)。
+        - **访问地址**: 通过统一反向代理访问。
+            - **Worker**: `http://<项目名>.worker.localhost:8001`
+            - **Pages**: `http://<项目名>.pages.localhost:8001`
+    - **自定义模式**: 支持绑定任意端口 (1024-65535)。
+        - **注意**: 自定义端口**默认无法从外部访问**。必须在 `docker-compose.yml` 的 `ports` 部分手动添加映射（如 `- "8080:8080"`）并重启容器。
+    - **冲突检测**: 自动检测端口占用并提示。
 - **旧项目兼容**: 自动检测并修复旧项目配置（如缺失的资源绑定），确保平滑迁移。
 
 ### 📦 资源与存储模拟
@@ -73,14 +81,31 @@ docker-compose up -d --build
 *   登录成功后，即可开始管理您的 Worker 项目与资源。
 *   **重置密码**: 如果忘记密码，可删除或修改 `.platform-data/auth.json` 文件。
 
-### 安全配置
-您可以在 `docker-compose.yml` 环境变量中修改默认密码：
-*   `AUTH_PASSWORD`: 管理后台登录密码 (默认 admin)
-*   `R2_ADMIN_PORT`: R2 管理服务端口 (默认 9100)
+### ⚙️ 环境配置 (Environment Configuration)
+您可以在 `docker-compose.yml` 环境变量中修改默认配置：
+
+*   `MANAGER_SERVICE_PORT`: 管理后台服务内部监听端口 (默认 `3000`)
+    *   **注意**: 修改此变量后，必须同步修改 `docker-compose.yml` 中的 `ports` 映射（例如 `"8001:3000"` 中的 `3000`）。
+*   `AUTH_PASSWORD`: 管理后台登录密码 (默认 `admin`)
+*   `R2_ADMIN_PORT`: R2 管理服务端口 (默认 `9100`)
 
 ---
 
-## �️ 技术栈 (Tech Stack)
+### ❓ 常见问题 (FAQ)
+
+#### 1. Wrangler 安装失败或卡住
+如果在 `docker-compose build` 阶段，安装 `wrangler` 时长时间无响应，通常是由于 Docker 容器内访问 npm 官方源网络受限。
+
+**解决方案**:
+本项目 Dockerfile 已针对国内网络环境优化：
+1.  **切换包管理器**: 使用 **Yarn** 替代 npm，连接更稳定。
+2.  **配置镜像源**: 默认使用 `https://registry.npmmirror.com`。
+
+如果问题依旧，请检查 Docker 守护进程的 DNS 设置或宿主机网络代理。
+
+---
+
+## 🛠️ 技术栈 (Tech Stack)
 
 *   **Runtime**: Cloudflare Wrangler (Local Mode)
 *   **Backend**: Node.js (Express), `jsonwebtoken` (Auth), `svg-captcha` (Security), `better-sqlite3`, `child_process` (Spawner)

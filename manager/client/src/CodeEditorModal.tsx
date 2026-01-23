@@ -503,37 +503,135 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                     )}
                 </div>
 
-                {/* Upload Modal Overlay for Pages */}
+                {/* Upload Modal Overlay for Pages (Glassmorphism Redesign) */}
                 {showUploadModal && (
-                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60]">
-                        <div className="bg-gray-900 border border-gray-700 rounded-xl p-8 max-w-lg w-full relative shadow-2xl">
-                            <button onClick={() => setShowUploadModal(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white">✕</button>
-                            <h3 className="text-xl font-bold text-white mb-6">更新站点内容</h3>
-                            <div className="flex gap-4 mb-6">
-                                <button onClick={() => setUploadType('folder')} className={`flex-1 px-4 py-2 rounded border ${uploadType === 'folder' ? 'bg-gray-800 border-orange-500 text-white' : 'border-gray-700 text-gray-500'}`}>📁 文件夹</button>
-                                <button onClick={() => setUploadType('zip')} className={`flex-1 px-4 py-2 rounded border ${uploadType === 'zip' ? 'bg-gray-800 border-orange-500 text-white' : 'border-gray-700 text-gray-500'}`}>📦 ZIP</button>
-                            </div>
-                            {uploadType === 'folder' ? (
-                                <div className="relative mb-6">
-                                    <input type="file"
-                                        // @ts-ignore
-                                        webkitdirectory="" directory="" multiple
-                                        onChange={handlePagesFolderSelect} className="hidden" id="modal-folder" />
-                                    <label htmlFor="modal-folder" className="block w-full px-4 py-12 bg-gray-950 border-2 border-dashed border-gray-800 rounded-lg text-center cursor-pointer hover:border-orange-500 transition-colors">
-                                        {processing ? <div className="text-orange-400">打包中...</div> : pagesFile ? <div><div className="text-2xl mb-2">📦</div>{pagesFile.name}</div> : <div><div className="text-4xl mb-2">📂</div><div className="text-gray-500">点击选择文件夹</div></div>}
-                                    </label>
-                                </div>
-                            ) : (
-                                <div className="relative mb-6">
-                                    <input type="file" accept=".zip" onChange={e => setPagesFile(e.target.files?.[0] || null)} className="hidden" id="modal-zip" />
-                                    <label htmlFor="modal-zip" className="block w-full px-4 py-12 bg-gray-950 border-2 border-dashed border-gray-800 rounded-lg text-center cursor-pointer hover:border-orange-500 transition-colors">
-                                        {pagesFile ? <div><div className="text-2xl mb-2">📦</div>{pagesFile.name}</div> : <div><div className="text-4xl mb-2">🤐</div><div className="text-gray-500">点击选择 ZIP</div></div>}
-                                    </label>
-                                </div>
-                            )}
-                            <button onClick={handlePagesUpdate} disabled={!pagesFile || saving} className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded font-bold disabled:bg-gray-700">
-                                {saving ? '部署中...' : '确认更新'}
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] animate-in fade-in duration-200">
+                        <div className="bg-gray-900/80 backdrop-filter backdrop-blur-xl border border-gray-700/50 rounded-2xl p-8 max-w-lg w-full relative shadow-2xl ring-1 ring-white/10 overflow-hidden group">
+                            {/* Decorative Background Gradients */}
+                            <div className="absolute top-0 right-0 -mr-16 -mt-16 w-32 h-32 bg-purple-500/20 rounded-full blur-3xl group-hover:bg-purple-500/30 transition-all duration-700"></div>
+                            <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl group-hover:bg-blue-500/30 transition-all duration-700"></div>
+
+                            <button onClick={() => setShowUploadModal(false)} className="absolute top-5 right-5 text-gray-400 hover:text-white transition-colors z-10 p-1 hover:bg-white/10 rounded-full">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
+
+                            <div className="relative z-0">
+                                <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 mb-2">更新站点内容</h3>
+                                <p className="text-sm text-gray-400 mb-8">请选择一种方式上传您的静态网站文件</p>
+
+                                <div className="flex bg-gray-950/50 p-1 rounded-xl mb-6 shadow-inner ring-1 ring-white/5">
+                                    <button
+                                        onClick={() => setUploadType('folder')}
+                                        className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${uploadType === 'folder'
+                                            ? 'bg-gray-800 text-white shadow-lg ring-1 ring-white/10'
+                                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                                            }`}
+                                    >
+                                        📁 上传文件夹
+                                    </button>
+                                    <button
+                                        onClick={() => setUploadType('zip')}
+                                        className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${uploadType === 'zip'
+                                            ? 'bg-gray-800 text-white shadow-lg ring-1 ring-white/10'
+                                            : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
+                                            }`}
+                                    >
+                                        📦 上传 ZIP 包
+                                    </button>
+                                </div>
+
+                                <div className="mb-8">
+                                    {uploadType === 'folder' ? (
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                // @ts-ignore
+                                                webkitdirectory="" directory="" multiple
+                                                onChange={handlePagesFolderSelect}
+                                                className="hidden"
+                                                id="modal-folder"
+                                            />
+                                            <label
+                                                htmlFor="modal-folder"
+                                                className="block w-full h-48 border-2 border-dashed border-gray-700/70 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 transition-all duration-300 group/label"
+                                            >
+                                                {processing ? (
+                                                    <div className="flex flex-col items-center animate-pulse">
+                                                        <div className="w-12 h-12 mb-3 rounded-full border-2 border-orange-500 border-t-transparent animate-spin"></div>
+                                                        <span className="text-orange-400 font-medium tracking-wide">正在打包文件...</span>
+                                                    </div>
+                                                ) : pagesFile ? (
+                                                    <div className="flex flex-col items-center animate-in zoom-in-95 duration-200">
+                                                        <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mb-3 text-3xl shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                                                            📦
+                                                        </div>
+                                                        <div className="text-white font-medium text-lg max-w-[250px] truncate text-center mb-1">{pagesFile.name}</div>
+                                                        <div className="text-xs text-green-400 font-mono">已准备就绪</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center group-hover/label:scale-105 transition-transform duration-300">
+                                                        <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4 text-3xl shadow-lg ring-1 ring-white/5">
+                                                            📂
+                                                        </div>
+                                                        <span className="text-gray-300 font-medium mb-1">点击选择文件夹</span>
+                                                        <span className="text-xs text-gray-500">将扫描并上传所有文件</span>
+                                                    </div>
+                                                )}
+                                            </label>
+                                        </div>
+                                    ) : (
+                                        <div className="relative">
+                                            <input
+                                                type="file"
+                                                accept=".zip"
+                                                onChange={e => setPagesFile(e.target.files?.[0] || null)}
+                                                className="hidden"
+                                                id="modal-zip"
+                                            />
+                                            <label
+                                                htmlFor="modal-zip"
+                                                className="block w-full h-48 border-2 border-dashed border-gray-700/70 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all duration-300 group/label"
+                                            >
+                                                {pagesFile ? (
+                                                    <div className="flex flex-col items-center animate-in zoom-in-95 duration-200">
+                                                        <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mb-3 text-3xl shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+                                                            🤐
+                                                        </div>
+                                                        <div className="text-white font-medium text-lg max-w-[250px] truncate text-center mb-1">{pagesFile.name}</div>
+                                                        <div className="text-xs text-blue-400 font-mono">已准备就绪</div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex flex-col items-center group-hover/label:scale-105 transition-transform duration-300">
+                                                        <div className="w-16 h-16 bg-gray-800 rounded-2xl flex items-center justify-center mb-4 text-3xl shadow-lg ring-1 ring-white/5">
+                                                            📦
+                                                        </div>
+                                                        <span className="text-gray-300 font-medium mb-1">点击选择 ZIP 文件</span>
+                                                        <span className="text-xs text-gray-500">直接上传已打包的压缩包</span>
+                                                    </div>
+                                                )}
+                                            </label>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button
+                                    onClick={handlePagesUpdate}
+                                    disabled={!pagesFile || saving}
+                                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98] ring-1 ring-white/10"
+                                >
+                                    {saving ? (
+                                        <span className="flex items-center justify-center gap-2">
+                                            <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                            正在上传并部署...
+                                        </span>
+                                    ) : (
+                                        '🚀 确认更新站点'
+                                    )}
+                                </button>
+                                <p className="text-center text-xs text-gray-500 mt-4 opacity-70">
+                                    提示：浏览器可能会请求文件夹访问权限，请点击"上传"允许。
+                                </p>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -908,6 +1006,65 @@ const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving })
         </div>
     );
 };
-const SettingsTab: React.FC<any> = ({ port, onChangePort, onSave, saving }) => (<div className="h-full overflow-y-auto p-6"><div className="max-w-4xl mx-auto space-y-6"><div className="bg-gray-900 p-6 rounded border border-gray-700"><label className="block text-gray-400 mb-2">运行端口 (Port)</label><input type="number" value={port} onChange={e => onChangePort(parseInt(e.target.value))} className="w-full bg-gray-900 border border-gray-700 text-white px-3 py-2 rounded focus:border-blue-500 outline-none" /></div><div className="pt-4 border-t border-gray-700"><button onClick={onSave} disabled={saving} className="w-full px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold transition-colors">{saving ? '保存中...' : '保存设置'}</button></div></div></div>);
+const SettingsTab: React.FC<any> = ({ port, onChangePort, onSave, saving }) => {
+    // Validation: Port must be a number > 0. 
+    // We treat 0 or NaN as invalid because user said "cannot delete port".
+    const isValid = port && !isNaN(port) && port > 0;
+
+    return (
+        <div className="h-full overflow-y-auto p-6">
+            <div className="max-w-4xl mx-auto space-y-6">
+                <div className="bg-gray-900 p-6 rounded-xl border border-gray-700 shadow-lg">
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <span>⚙️</span> 运行端口配置
+                    </h3>
+
+                    <div className="mb-6">
+                        <label className="block text-gray-300 font-medium mb-2">
+                            内部监听端口 (Internal Port) <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                            type="number"
+                            value={port || ''}
+                            onChange={e => onChangePort(parseInt(e.target.value) || 0)}
+                            className={`w-full bg-gray-950 border text-white px-4 py-3 rounded-lg focus:outline-none font-mono text-lg transition-all ${!isValid ? 'border-red-500 focus:border-red-500' : 'border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500'}`}
+                            placeholder="例如: 8001"
+                        />
+                        {!isValid ? (
+                            <p className="text-red-400 text-sm mt-2 flex items-center gap-1">
+                                <span>🚫</span> 端口不能为空，请输入有效的端口号
+                            </p>
+                        ) : (
+                            <p className="text-gray-500 text-sm mt-2 font-mono">Current: {port}</p>
+                        )}
+
+                        <div className="mt-6 bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-5 flex gap-4 text-yellow-200/90 text-sm leading-relaxed">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <p className="font-bold text-yellow-100 mb-2 text-base">关于端口映射的重要说明</p>
+                                <p className="mb-2">无论是自动分配还是您手动指定的端口，都仅仅是 <strong className="text-white">容器内部端口</strong>。</p>
+                                <ul className="list-disc pl-4 space-y-1 opacity-80">
+                                    <li>此设置仅决定 Worker 在容器内监听哪个端口。</li>
+                                    <li>如果不做映射，宿主机（外部）无法直接访问此端口。</li>
+                                    <li>如需外部访问，请务必在 <code>docker-compose.yml</code> 中手动添加端口映射（例如 <code>- "8080:{port}"</code>）。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-800">
+                        <button
+                            onClick={onSave}
+                            disabled={saving || !isValid}
+                            className="w-full px-4 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white rounded-xl font-bold text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all transform active:scale-[0.99]"
+                        >
+                            {saving ? '保存中...' : '💾 保存端口设置'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default CodeEditorModal;

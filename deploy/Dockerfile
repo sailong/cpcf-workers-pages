@@ -30,9 +30,9 @@ RUN npm run build
 FROM node:20-slim
 
 # 【核心修复区】解决卡死问题的三大法宝
-# 1. CI=true: 告诉工具这是自动构建，绝对不要弹出交互式问答（防止Wrangler问"Send metrics?"时卡死）
+# 1. CI=true: 告诉工具这是自动构建，绝对不要弹出交互式问答
 # 2. WRANGLER_SEND_METRICS=false: 显式禁止 Wrangler 发送统计
-# 3. 配置 npm 淘宝源和常见的二进制文件下载源
+# 3. 配置 npm 淘宝源
 ENV CI=true \
     WRANGLER_SEND_METRICS=false \
     NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
@@ -41,14 +41,15 @@ ENV CI=true \
 
 # Install system dependencies
 # 更新 ca-certificates 防止 SSL 报错，安装编译工具
+# psmisc 用于 fuser 命令 (端口管理)
 RUN apt-get update && \
-    apt-get install -y ca-certificates python3 build-essential && \
+    apt-get install -y ca-certificates python3 build-essential psmisc && \
     rm -rf /var/lib/apt/lists/*
 
-# 【大招】安装 CNPM 并用它安装 Wrangler
-# cnpm 对二进制包（如 workerd, esbuild）的国内下载有特殊优化，比单纯换源更强
-RUN npm install -g cnpm --registry=https://registry.npmmirror.com && \
-    cnpm install -g wrangler
+# 【优化】使用 Yarn 安装 Wrangler (生产环境构建更稳定)
+RUN corepack enable && \
+    yarn config set registry https://registry.npmmirror.com && \
+    yarn global add wrangler
 
 WORKDIR /app
 
@@ -57,8 +58,8 @@ COPY manager/package.json manager/package-lock.json* ./manager/
 
 # Install Backend Dependencies
 WORKDIR /app/manager
-# 后端依赖也推荐用 cnpm 安装，速度极快
-RUN cnpm install --production
+# 后端依赖
+RUN npm install --production --registry=https://registry.npmmirror.com
 
 # Copy Backend Code (server.js, utils/, etc.)
 COPY manager/ ./
@@ -68,16 +69,14 @@ COPY manager/ ./
 COPY --from=frontend-builder /app/manager/client/dist ./client/dist
 
 # Expose ports
-# 8001: Manager UI
+# 8001: Manager UI & API
 # 9100: R2 Admin Service
-# 8002-8020: Worker/Pages User Projects
 EXPOSE 8001
 EXPOSE 9100
-EXPOSE 8002-8020
 
 # Environment Variables
 ENV NODE_ENV=production
-ENV PORT=8001
+ENV MANAGER_SERVICE_PORT=8001
 
 
 # Start command

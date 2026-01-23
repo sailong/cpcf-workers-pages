@@ -64,11 +64,13 @@ services:
     container_name: ccfwp
     ports:
       - "8001:8001"
-      - "8002-8020:8002-8020"
+      - "9100:9100"
     volumes:
       - ./data:/app/.platform-data
     environment:
       - NODE_ENV=production
+      - MANAGER_SERVICE_PORT=8001
+      - R2_ADMIN_PORT=9100
     restart: unless-stopped
 ```
 

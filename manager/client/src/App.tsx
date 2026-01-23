@@ -188,6 +188,17 @@ function App() {
 
   const handleCreateR2 = async () => {
     if (!newR2Name) return showToast("请输入 R2 Bucket 名称", 'error');
+
+    // R2 Naming Validation
+    if (newR2Name.length < 3 || newR2Name.length > 63) {
+      return showToast("名称长度必须在 3-63 个字符之间", 'error');
+    }
+    // Regex: Start/End with Alphanumeric, only lowercase/numbers/hyphens allowed
+    const r2Regex = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
+    if (!r2Regex.test(newR2Name)) {
+      return showToast("名称非法：只能包含小写字母/数字/-，且首尾必须是字母或数字", 'error');
+    }
+
     try {
       const res = await authenticatedFetch('/api/resources/r2', {
         method: 'POST',
@@ -208,16 +219,38 @@ function App() {
   };
 
 
+
   const toggleProject = async (id: string, currentStatus: string) => {
     const action = currentStatus === 'running' ? 'stop' : 'start';
-    try {
-      const res = await authenticatedFetch(`/api/projects/${id}/${action}`, { method: 'POST' });
-      if (!res.ok) throw new Error();
-      fetchProjects();
-      showToast(`项目已${action === 'start' ? '启动' : '停止'}`);
-    } catch (e) {
-      showToast(`操作失败`, 'error');
-    }
+
+    // Helper to perform the fetch
+    const doRemoteCall = async (force = false) => {
+      try {
+        const res = await authenticatedFetch(`/api/projects/${id}/${action}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ force })
+        });
+
+        if (res.status === 409 && action === 'start') {
+          const data = await res.json();
+          if (confirm(`端口 ${data.error?.match(/\d+/)?.[0] || 'Unknown'} 已被占用 (${data.owner})\n\n是否强制启动？\n这将会终止占用该端口的进程。`)) {
+            await doRemoteCall(true); // Retry with force
+            return;
+          } else {
+            return; // Cancelled
+          }
+        }
+
+        if (!res.ok) throw new Error((await res.json()).error || 'Unknown error');
+        fetchProjects();
+        showToast(`项目已${action === 'start' ? '启动' : '停止'}`);
+      } catch (e) {
+        showToast(`操作失败: ${e instanceof Error ? e.message : '未知错误'}`, 'error');
+      }
+    };
+
+    await doRemoteCall();
   };
 
   // Initiate Deletion
@@ -518,7 +551,9 @@ function App() {
                     <h3 className="text-lg font-bold text-gray-200">{p.name}</h3>
                     <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
                       <span className="uppercase text-xs font-bold px-2 py-0.5 rounded bg-gray-800 border border-gray-700">{p.type}</span>
-                      <span>端口: <span className="text-gray-300 font-mono">{p.port}</span></span>
+                      <span>端口: <span className="text-gray-300 font-mono">{p.port}</span>
+                        <span className="text-xs text-gray-500 ml-1">(内部)</span>
+                      </span>
                       {p.bindings?.kv && p.bindings.kv.length > 0 && <span className="text-blue-400">{p.bindings.kv.length} KV</span>}
                       {p.bindings?.d1 && p.bindings.d1.length > 0 && <span className="text-purple-400">{p.bindings.d1.length} D1</span>}
                       {p.bindings?.r2 && p.bindings.r2.length > 0 && <span className="text-yellow-400">{p.bindings.r2.length} R2</span>}
@@ -529,7 +564,7 @@ function App() {
                 <div className="flex items-center gap-4">
                   {p.status === 'running' && (
                     <a
-                      href={`http://${window.location.hostname}:${p.port}`}
+                      href={`http://${p.name.toLowerCase()}.${p.type}.localhost:${window.location.port}`}
                       target="_blank"
                       className="text-blue-400 hover:text-blue-300 text-sm underline underline-offset-4"
                     >

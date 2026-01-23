@@ -5,7 +5,6 @@ services:
     container_name: ccfwp-platform
     ports:
       - "8001:8001"
-      - "8002-8020:8002-8020"
       - "9100:9100"
     volumes:
       - ./:/app
@@ -15,10 +14,9 @@ services:
       - ./.platform-data:/app/.platform-data
     environment:
       - NODE_ENV=development
-      - PORT=8001
-      # Range config for manager to know what to assign
-      - PORT_RANGE_START=8002
-      - PORT_RANGE_END=8020
+      # Manager Service Internal Port (Default: 3000)
+      # This is the port the express server listens on inside the container.
+      - MANAGER_SERVICE_PORT=8001
       - R2_ADMIN_PORT=9100
 
     # Override default command to ensure dependencies are installed if missing

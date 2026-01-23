@@ -9,3 +9,15 @@ enabled = true
 binding = "B_r2_mkqnsvkt"
 bucket_name = "r2-mkqnsvkt"
 
+[[r2_buckets]]
+binding = "B_r2_mkr223gr"
+bucket_name = "r2-mkr223gr"
+
+[[r2_buckets]]
+binding = "B_r2_mkr2bjl3"
+bucket_name = "r2-mkr2bjl3"
+
+[[r2_buckets]]
+binding = "B_r2_mkr2c3j7"
+bucket_name = "r2-mkr2c3j7"
+
