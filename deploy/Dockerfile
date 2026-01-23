@@ -68,14 +68,17 @@ COPY manager/ ./
 COPY --from=frontend-builder /app/manager/client/dist ./client/dist
 
 # Expose ports
-# 3000: Manager UI
-# 8000-8020: Worker/Pages User Projects
-EXPOSE 3000
-EXPOSE 8000-8020
+# 8001: Manager UI
+# 9100: R2 Admin Service
+# 8002-8020: Worker/Pages User Projects
+EXPOSE 8001
+EXPOSE 9100
+EXPOSE 8002-8020
 
 # Environment Variables
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8001
+
 
 # Start command
 CMD ["node", "server.js"]
