@@ -87,7 +87,10 @@ export default {
     *   返回 Worker 的详细页面 (退出编辑器)。
     *   点击 **Settings** -> **Variables and Secrets**。
     *   点击 **Add** 添加变量：
-        *   `TARGET_URL`: 您的自建 Worker 地址（https://您的自建Worker域名/api/email/incoming），千万别漏了 /api/email/incoming。
+        *   `TARGET_URL`: 您的自建 Worker 地址。
+            *   **重要提示**：必须填写完整路径，包含 `/api/email/incoming`。
+            *   错误示例：`https://worker.example.com`
+            *   正确示例：`https://worker.example.com/api/email/incoming`
         *   `RELAY_TOKEN`: 您的密钥 (建议点击 Encrypt)。
     *   点击 **Save and deploy**。
 
