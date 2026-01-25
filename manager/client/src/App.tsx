@@ -564,7 +564,7 @@ function App() {
                 <div className="flex items-center gap-4">
                   {p.status === 'running' && (
                     <a
-                      href={`http://${p.name.toLowerCase()}.${p.type}.localhost:${window.location.port}`}
+                      href={`${window.location.protocol}//${p.name.toLowerCase()}.${p.type}.${window.location.hostname}:${window.location.port}`}
                       target="_blank"
                       className="text-blue-400 hover:text-blue-300 text-sm underline underline-offset-4"
                     >

@@ -34,6 +34,8 @@ if (!JWT_SECRET) {
 }
 
 const MANAGER_SERVICE_PORT = process.env.MANAGER_SERVICE_PORT || 3000;
+const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'localhost'; // Support custom domains
+
 const DATA_DIR = path.join(__dirname, '../.platform-data');
 const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const PROJECTS_FILE = path.join(DATA_DIR, 'projects.json');
@@ -45,7 +47,7 @@ const app = express();
 // ==========================================
 // ==========================================
 // Reverse Proxy Middleware
-// Handles routing for <project-name>.localhost:8001
+// Handles routing for <project-name>.<type>.<ROOT_DOMAIN>
 // MUST be before express.static and body-parser
 // ==========================================
 const { createProxyMiddleware } = require('http-proxy-middleware');
@@ -72,29 +74,41 @@ const dynamicProxy = createProxyMiddleware({
 });
 
 app.use((req, res, next) => {
-    const host = req.headers.host; // e.g., "my-worker.worker.localhost:8001"
+    const host = req.headers.host; // e.g., "my-worker.worker.localhost:8001" or "my-worker.worker.ccfwp.com"
     if (!host) return next();
 
+    // Remove port from host if present
     const hostname = host.split(':')[0];
-    const parts = hostname.split('.');
 
-    // Check if it appears to be a subdomain request
-    // Support two formats:
-    // 1. <project>.<type>.localhost  (e.g., "my-app.worker.localhost")
-    // 2. <project>.localhost         (Backwards compatibility)
-    if (parts.length >= 2 && parts[parts.length - 1] === 'localhost') {
-        let projectName = parts[0];
+    // Check if hostname ends with ROOT_DOMAIN
+    // e.g. ROOT_DOMAIN="localhost" -> ends with ".localhost" (or is "localhost", but we need subdomain)
+    // e.g. ROOT_DOMAIN="ccfwp.com" -> ends with ".ccfwp.com"
+
+    // We expect at least one dot before ROOT_DOMAIN for subdomains
+    const domainSuffix = '.' + ROOT_DOMAIN;
+
+    if (hostname.endsWith(domainSuffix)) {
+        // Extract the prefix (everything before .ROOT_DOMAIN)
+        // e.g. "my-app.worker.ccfwp.com" -> "my-app.worker"
+        const prefix = hostname.slice(0, -domainSuffix.length);
+        const parts = prefix.split('.');
+
+        let projectName = prefix; // default fallback
         let projectType = null;
 
-        // Check for typed subdomain (e.g. name.worker.localhost) -> 3 parts excluding port, ends with localhost
-        if (parts.length >= 3) {
-            const possibleType = parts[parts.length - 2];
+        // Check for typed subdomain (e.g. name.worker) -> at least 2 parts
+        if (parts.length >= 2) {
+            const possibleType = parts[parts.length - 1];
             if (possibleType === 'worker' || possibleType === 'pages') {
                 projectType = possibleType;
                 // Project name is everything before the type
-                projectName = parts.slice(0, parts.length - 2).join('.');
+                // e.g. "my.app.worker" -> "my.app"
+                projectName = parts.slice(0, parts.length - 1).join('.');
             }
         }
+
+        // If parts.length == 1, it's just <project-name>.<ROOT_DOMAIN> (Legacy/Simple)
+        // projectName is already set to prefix.
 
         // Find project
         // Note: 'projects' variable is identified at module scope below, safely accessible at runtime

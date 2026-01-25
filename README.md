@@ -88,6 +88,8 @@ docker-compose up -d --build
     *   **注意**: 修改此变量后，必须同步修改 `docker-compose.yml` 中的 `ports` 映射（例如 `"8001:3000"` 中的 `3000`）。
 *   `AUTH_PASSWORD`: 管理后台登录密码 (默认 `admin`)
 *   `R2_ADMIN_PORT`: R2 管理服务端口 (默认 `9100`)
+*   `ROOT_DOMAIN`: 根域名配置 (默认 `localhost`)
+    *   **部署场景**: 如果部署到公网或使用反向代理（如 1Panel），请将其设置为你的域名（例如 `ccfwp.example.com`）。此时项目访问地址将变为 `http://<项目名>.<类型>.ccfwp.example.com:端口`。
 
 ---
 

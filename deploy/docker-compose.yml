@@ -18,4 +18,7 @@ services:
       # Manager Service Internal Port
       - MANAGER_SERVICE_PORT=8001
       - R2_ADMIN_PORT=9100
+      # Domain Configuration (Default: localhost)
+      # For 1Panel or public deployment, set this to your domain (e.g., ccfwp.example.com)
+      # - ROOT_DOMAIN=localhost
     restart: unless-stopped

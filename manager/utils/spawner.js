@@ -112,7 +112,7 @@ class ProjectRuntime {
             this.processes.delete(project.id);
         });
 
-        this.processes.set(project.id, child);
+        this.processes.set(project.id, { child, port: project.port });
     }
 
     /**
@@ -120,9 +120,32 @@ class ProjectRuntime {
      * @param {string} projectId 
      */
     stop(projectId) {
-        const child = this.processes.get(projectId);
-        if (child) {
-            child.kill('SIGTERM');
+        const processData = this.processes.get(projectId);
+        if (processData) {
+            const { child, port } = processData;
+
+            console.log(`[Runtime] Stopping project ${projectId} on port ${port}...`);
+
+            // 1. Try graceful kill (SIGTERM)
+            if (child && !child.killed) {
+                child.kill('SIGTERM');
+            }
+
+            // 2. Force kill any process on this port (Zombie cleanup)
+            // Since we are stopping the project that OWNS this port, this is safe and necessary
+            // because npx/wrangler often leaves subprocesses running.
+            if (port) {
+                try {
+                    const { execSync } = require('child_process');
+                    // fuser -k <port>/tcp kills processes on that port
+                    // -k: kill, -s: silent (optional, but we want logs if it fails?)
+                    execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
+                    console.log(`[Runtime] Force-freed port ${port}`);
+                } catch (e) {
+                    // Ignore error (exit code 1 means no process found to kill, which is good)
+                }
+            }
+
             this.processes.delete(projectId);
             return true;
         }
