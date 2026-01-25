@@ -124,9 +124,17 @@ app.use((req, res, next) => {
         // Note: 'projects' variable is identified at module scope below, safely accessible at runtime
         const project = projects.find(p => {
             const nameMatch = p.name.toLowerCase() === projectName.toLowerCase();
-            const typeMatch = projectType ? p.type === projectType : true;
+            // Robust type check (case-insensitive)
+            // Also handle case where project uses old type-less structure in DB? (Unlikely)
+            const typeMatch = projectType ? (p.type && p.type.toLowerCase() === projectType.toLowerCase()) : true;
             return nameMatch && typeMatch;
         });
+
+        if (!project) {
+            console.log(`[ProxyRouter] Lookup failed for Name: ${projectName}, Type: ${projectType}`);
+        } else {
+            console.log(`[ProxyRouter] Found Project: ${project.name} (Port: ${project.port})`);
+        }
 
         if (project && project.port) {
             // Attach target info to request for the global proxy router

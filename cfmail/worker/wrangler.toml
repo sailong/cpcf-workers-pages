@@ -1,0 +1,11 @@
+name = "mail-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+RELAY_TOKEN = "your-secret-token"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mail-db"
+database_id = "your-d1-database-id"

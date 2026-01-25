@@ -1,0 +1,10 @@
+name = "email-relay"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# 变量配置
+# 请在 Cloudflare Dashboard Settings -> Variables 中设置具体的生产环境值
+# 或者本地运行时创建 .dev.vars 文件
+[vars]
+TARGET_URL = "https://your-self-hosted-worker-domain.com/api/email/incoming"
+RELAY_TOKEN = "your-secret-token"
