@@ -86,22 +86,25 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
             const data = await res.json();
 
             // Set Common Data
+            // Common Data (Port, Bindings, EnvVars)
             setPort(data.port);
+            setBindings({
+                kv: data.bindings?.kv || [],
+                d1: data.bindings?.d1 || [],
+                r2: data.bindings?.r2 || []
+            });
+            setEnvVars(data.envVarsRaw || {});
+
+            // Load available resources for bindings UI
+            loadResources();
 
             if (isPages) {
                 // For Pages: List files
                 await loadFileList();
             } else {
-                // For Workers: Set Code & Bindings
+                // For Workers: Set Code
                 setCode(data.code);
                 setLanguage(data.language);
-                setBindings({
-                    kv: data.bindings?.kv || [],
-                    d1: data.bindings?.d1 || [],
-                    r2: data.bindings?.r2 || []
-                });
-                setEnvVars(data.envVarsRaw || {});
-                loadResources();
             }
         } catch (err) {
             setError('加载失败');
@@ -375,22 +378,18 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                     >
                         {isPages ? '📄 站点内容' : '📝 代码'}
                     </button>
-                    {!isPages && (
-                        <>
-                            <button
-                                onClick={() => setActiveTab('bindings')}
-                                className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'bindings' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
-                            >
-                                🔗 绑定
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('envvars')}
-                                className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'envvars' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
-                            >
-                                🔒 变量
-                            </button>
-                        </>
-                    )}
+                    <button
+                        onClick={() => setActiveTab('bindings')}
+                        className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'bindings' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
+                    >
+                        🔗 绑定
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('envvars')}
+                        className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'envvars' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
+                    >
+                        🔒 变量
+                    </button>
                     <button
                         onClick={() => setActiveTab('settings')}
                         className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'settings' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
@@ -494,9 +493,9 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                                 )
                             )}
 
-                            {activeTab === 'bindings' && !isPages && <BindingsTab bindings={bindings} kvResources={kvResources} d1Resources={d1Resources} r2Resources={r2Resources} onAddKv={() => { setBindings({ ...bindings, kv: [...bindings.kv, { varName: '', resourceId: '' }] }) }} onRemoveKv={(i: number) => setBindings({ ...bindings, kv: bindings.kv.filter((_, idx) => idx !== i) })} onUpdateKv={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.kv]; k[i][f] = v; setBindings({ ...bindings, kv: k }) }} onAddD1={() => { setBindings({ ...bindings, d1: [...bindings.d1, { varName: '', resourceId: '' }] }) }} onRemoveD1={(i: number) => setBindings({ ...bindings, d1: bindings.d1.filter((_, idx) => idx !== i) })} onUpdateD1={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.d1]; k[i][f] = v; setBindings({ ...bindings, d1: k }) }} onAddR2={() => { setBindings({ ...bindings, r2: [...bindings.r2, { varName: '', resourceId: '' }] }) }} onRemoveR2={(i: number) => setBindings({ ...bindings, r2: bindings.r2.filter((_, idx) => idx !== i) })} onUpdateR2={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.r2]; k[i][f] = v; setBindings({ ...bindings, r2: k }) }} onSave={handleSaveConfig} saving={saving} />}
+                            {activeTab === 'bindings' && <BindingsTab bindings={bindings} kvResources={kvResources} d1Resources={d1Resources} r2Resources={r2Resources} onAddKv={() => { setBindings({ ...bindings, kv: [...bindings.kv, { varName: '', resourceId: '' }] }) }} onRemoveKv={(i: number) => setBindings({ ...bindings, kv: bindings.kv.filter((_, idx) => idx !== i) })} onUpdateKv={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.kv]; k[i][f] = v; setBindings({ ...bindings, kv: k }) }} onAddD1={() => { setBindings({ ...bindings, d1: [...bindings.d1, { varName: '', resourceId: '' }] }) }} onRemoveD1={(i: number) => setBindings({ ...bindings, d1: bindings.d1.filter((_, idx) => idx !== i) })} onUpdateD1={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.d1]; k[i][f] = v; setBindings({ ...bindings, d1: k }) }} onAddR2={() => { setBindings({ ...bindings, r2: [...bindings.r2, { varName: '', resourceId: '' }] }) }} onRemoveR2={(i: number) => setBindings({ ...bindings, r2: bindings.r2.filter((_, idx) => idx !== i) })} onUpdateR2={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.r2]; k[i][f] = v; setBindings({ ...bindings, r2: k }) }} onSave={handleSaveConfig} saving={saving} />}
 
-                            {activeTab === 'envvars' && !isPages && <EnvVarsTab envVars={envVars} onAdd={(k: string, t: any, v: string) => setEnvVars({ ...envVars, [k]: { type: t, value: t === 'json' ? JSON.parse(v) : v } })} onRemove={(k: string) => { const e = { ...envVars }; delete e[k]; setEnvVars(e) }} onSave={handleSaveConfig} saving={saving} />}
+                            {activeTab === 'envvars' && <EnvVarsTab envVars={envVars} onAdd={(k: string, t: any, v: string) => setEnvVars({ ...envVars, [k]: { type: t, value: t === 'json' ? JSON.parse(v) : v } })} onRemove={(k: string) => { const e = { ...envVars }; delete e[k]; setEnvVars(e) }} onSave={handleSaveConfig} saving={saving} />}
 
                             {activeTab === 'settings' && <SettingsTab port={port} onChangePort={setPort} onSave={handleSaveConfig} saving={saving} />}
                         </>
@@ -923,8 +922,8 @@ const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving })
                                 onClick={() => { onAdd(k, t, v); setK(''); setV('') }}
                                 disabled={!k}
                                 className={`w-full text-white rounded-lg py-2.5 font-medium transition-colors ${isEditing
-                                        ? 'bg-orange-600 hover:bg-orange-500'
-                                        : 'bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500'
+                                    ? 'bg-orange-600 hover:bg-orange-500'
+                                    : 'bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500'
                                     }`}
                             >
                                 {isEditing ? '更新' : '添加'}
