@@ -1,4 +1,43 @@
-node_modules
-.platform-data
-.wrangler
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment Variables
+.env
+.env.*
+
+# Build Outputs
+dist/
+build/
+**/dist/
+**/build/
+
+# Local Data & State (Platform Specific)
+.platform-data/
+**/.platform-data/
+.wrangler/
+**/.wrangler/
+
+# Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+manager.log
+
+# System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE Configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*.tgz

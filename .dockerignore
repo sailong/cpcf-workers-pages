@@ -27,3 +27,14 @@ deploy/
 .DS_Store
 **/.DS_Store
 Thumbs.db
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+
+# Documentation
+*.md
+LICENSE
+coverage/
