@@ -104,5 +104,9 @@ location ^~ / {
 *   **Bad Gateway (502)**: 检查 1Panel 网站反代目标是否填写正确 (`http://127.0.0.1:8001`)。
 *   **Worker 无法访问**: 检查 `ROOT_DOMAIN` 环境变量是否与你在 Nginx 绑定的域名一致。
 *   **SSL 报错 (ERR_SSL_VERSION...)**:
+    *   **关键检查**: 泛域名证书 **不支持多级子域名**。
+        *   ❌ 错误: 证书是 `*.example.com`，访问域名是 `app.ccfwp.example.com` (三级子域名) -> **握手失败**。
+        *   ✅ 正确 A: 申请 `*.ccfwp.example.com` 的证书。
+        *   ✅ 正确 B: 将 `ROOT_DOMAIN` 改为 `example.com`，访问 `app-ccfwp.example.com` (二级子域名)。
     *   确保申请了 **泛域名证书** (例如 `*.ccfwp.example.com`)。
     *   注意：系统使用 **连字符** (`demo-worker`) 连接项目名和类型，这确保了所有子域名都是一级子域名，因此一张泛域名证书即可覆盖所有项目。

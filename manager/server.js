@@ -77,6 +77,9 @@ app.use((req, res, next) => {
     const host = req.headers.host; // e.g., "my-worker.worker.localhost:8001" or "my-worker.worker.ccfwp.com"
     if (!host) return next();
 
+    // Debug Log for Domain routing
+    // console.log(`[ProxyDebug] Host: ${host}, ROOT_DOMAIN: ${ROOT_DOMAIN}`);
+
     // Remove port from host if present
     const hostname = host.split(':')[0];
 
@@ -91,21 +94,26 @@ app.use((req, res, next) => {
         // Extract the prefix (everything before .ROOT_DOMAIN)
         // e.g. "my-app-worker.ccfwp.com" -> "my-app-worker"
         const prefix = hostname.slice(0, -domainSuffix.length);
-        
+
+        console.log(`[ProxyRouter] Match! Prefix: ${prefix}, Suffix: ${domainSuffix}`);
+
         // New Logic: Use hyphen separator to flatten domain structure (SSL Wildcard Friendly)
         // Format: <first-part>-<last-part> where last-part is 'worker' or 'pages'
         // Regex: /^(.*)-(worker|pages)$/
-        
+
         let projectName = prefix;
         let projectType = null;
-        
+
         const match = prefix.match(/^(.*)-(worker|pages)$/);
-        
+
         if (match) {
             projectName = match[1]; // "my-app"
             projectType = match[2]; // "worker"
+            console.log(`[ProxyRouter] Resolved Project: ${projectName}, Type: ${projectType}`);
+        } else {
+            console.log(`[ProxyRouter] No type match for prefix: ${prefix}, treating as project name`);
         }
-        
+
         // If no match, it falls back to treating 'prefix' as projectName (Legacy/Direct access)
 
         // Find project
