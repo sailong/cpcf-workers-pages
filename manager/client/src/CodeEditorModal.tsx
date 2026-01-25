@@ -876,6 +876,8 @@ const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving })
     const [v, setV] = useState('');
     const [showValues, setShowValues] = useState(true);
 
+    const isEditing = k in envVars;
+
     return (
         <div className="h-full overflow-y-auto p-6">
             <div className="max-w-5xl mx-auto space-y-8">
@@ -883,7 +885,7 @@ const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving })
                 {/* Add New Var */}
                 <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 shadow-lg">
                     <h3 className="text-lg font-bold text-gray-200 mb-4 flex items-center gap-2">
-                        <span>➕</span> 添加环境变量
+                        <span>{isEditing ? '✏️' : '➕'}</span> {isEditing ? '编辑环境变量' : '添加环境变量'}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                         <div className="md:col-span-3">
@@ -920,9 +922,12 @@ const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving })
                             <button
                                 onClick={() => { onAdd(k, t, v); setK(''); setV('') }}
                                 disabled={!k}
-                                className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg py-2.5 font-medium transition-colors"
+                                className={`w-full text-white rounded-lg py-2.5 font-medium transition-colors ${isEditing
+                                        ? 'bg-orange-600 hover:bg-orange-500'
+                                        : 'bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500'
+                                    }`}
                             >
-                                添加
+                                {isEditing ? '更新' : '添加'}
                             </button>
                         </div>
                     </div>
@@ -969,14 +974,25 @@ const EnvVarsTab: React.FC<any> = ({ envVars, onAdd, onRemove, onSave, saving })
                                                 {vl.type.toUpperCase()}
                                             </span>
                                         </div>
-                                        <div className="col-span-6 font-mono text-sm text-gray-300 break-all">
+                                        <div className="col-span-12 md:col-span-5 font-mono text-sm text-gray-300 break-all">
                                             {showValues ? (
                                                 vl.type === 'json' ? JSON.stringify(vl.value) : vl.value
                                             ) : (
                                                 <span className="text-gray-600 italic">••••••</span>
                                             )}
                                         </div>
-                                        <div className="col-span-1 text-right opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="col-span-2 text-right opacity-0 group-hover:opacity-100 transition-opacity flex justify-end gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    setK(ky);
+                                                    setT(vl.type);
+                                                    setV(vl.type === 'json' ? JSON.stringify(vl.value) : vl.value);
+                                                }}
+                                                className="text-orange-500 hover:text-orange-400 p-1.5 hover:bg-orange-500/10 rounded"
+                                                title="编辑"
+                                            >
+                                                ✎
+                                            </button>
                                             <button
                                                 onClick={() => onRemove(ky)}
                                                 className="text-red-500 hover:text-red-400 p-1.5 hover:bg-red-500/10 rounded"
