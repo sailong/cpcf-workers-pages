@@ -26,8 +26,8 @@
 - **智能端口分配**:
     - **自动模式 (推荐)**: 留空端口，系统自动分配内部端口 (10000+)。
         - **访问地址**: 通过统一反向代理访问。
-            - **Worker**: `http://<项目名>.worker.localhost:8001`
-            - **Pages**: `http://<项目名>.pages.localhost:8001`
+            - **Worker**: `http://<项目名>-worker.localhost:8001`
+            - **Pages**: `http://<项目名>-pages.localhost:8001`
     - **自定义模式**: 支持绑定任意端口 (1024-65535)。
         - **注意**: 自定义端口**默认无法从外部访问**。必须在 `docker-compose.yml` 的 `ports` 部分手动添加映射（如 `- "8080:8080"`）并重启容器。
     - **冲突检测**: 自动检测端口占用并提示。
@@ -89,7 +89,7 @@ docker-compose up -d --build
 *   `AUTH_PASSWORD`: 管理后台登录密码 (默认 `admin`)
 *   `R2_ADMIN_PORT`: R2 管理服务端口 (默认 `9100`)
 *   `ROOT_DOMAIN`: 根域名配置 (默认 `localhost`)
-    *   **部署场景**: 如果部署到公网或使用反向代理（如 1Panel），请将其设置为你的域名（例如 `ccfwp.example.com`）。此时项目访问地址将变为 `http://<项目名>.<类型>.ccfwp.example.com:端口`。
+    *   **部署场景**: 如果部署到公网或使用反向代理（如 1Panel），请将其设置为你的域名（例如 `ccfwp.example.com`）。此时项目访问地址将变为 `http://<项目名>-<类型>.ccfwp.example.com:端口`。
 
 ---
 

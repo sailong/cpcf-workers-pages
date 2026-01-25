@@ -89,25 +89,27 @@ app.use((req, res, next) => {
 
     if (hostname.endsWith(domainSuffix)) {
         // Extract the prefix (everything before .ROOT_DOMAIN)
-        // e.g. "my-app.worker.ccfwp.com" -> "my-app.worker"
+        // e.g. "my-app-worker.ccfwp.com" -> "my-app-worker"
         const prefix = hostname.slice(0, -domainSuffix.length);
-        const parts = prefix.split('.');
-
-        let projectName = prefix; // default fallback
+        
+        // New Logic: Use hyphen separator to flatten domain structure (SSL Wildcard Friendly)
+        // Format: <first-part>-<last-part> where last-part is 'worker' or 'pages'
+        // Regex: /^(.*)-(worker|pages)$/
+        
+        let projectName = prefix;
         let projectType = null;
-
-        // Check for typed subdomain (e.g. name.worker) -> at least 2 parts
-        if (parts.length >= 2) {
-            const possibleType = parts[parts.length - 1];
-            if (possibleType === 'worker' || possibleType === 'pages') {
-                projectType = possibleType;
-                // Project name is everything before the type
-                // e.g. "my.app.worker" -> "my.app"
-                projectName = parts.slice(0, parts.length - 1).join('.');
-            }
+        
+        const match = prefix.match(/^(.*)-(worker|pages)$/);
+        
+        if (match) {
+            projectName = match[1]; // "my-app"
+            projectType = match[2]; // "worker"
         }
+        
+        // If no match, it falls back to treating 'prefix' as projectName (Legacy/Direct access)
 
-        // If parts.length == 1, it's just <project-name>.<ROOT_DOMAIN> (Legacy/Simple)
+        // Find project
+        // Note: 'projects' variable is identified at module scope below, safely accessible at runtime
         // projectName is already set to prefix.
 
         // Find project

@@ -12,7 +12,7 @@ services:
     volumes:
       # Persistent Data Volume
       # Maps local .platform-data folder to the container
-      - ../.platform-data:/app/.platform-data
+      - .platform-data:/app/.platform-data
     environment:
       - NODE_ENV=production
       # Manager Service Internal Port

@@ -96,11 +96,13 @@ location ^~ / {
 1.  访问管理后台: `http://ccfwp.example.com` (如果配置了 HTTPS 则是 https)。
 2.  创建一个测试 Worker 项目，名称为 `demo`。
 3.  启动项目。
-4.  点击 "打开应用"，浏览器应跳转至 `http://demo.worker.ccfwp.example.com` 并成功显示内容。
+4.  点击 "打开应用"，浏览器应跳转至 `http://demo-worker.ccfwp.example.com` 并成功显示内容。
 
 ## 故障排查
 
 *   **访问 404**: 检查 DNS 是否泛解析成功（ping `test.ccfwp.example.com` 是否指向服务器 IP）。
 *   **Bad Gateway (502)**: 检查 1Panel 网站反代目标是否填写正确 (`http://127.0.0.1:8001`)。
 *   **Worker 无法访问**: 检查 `ROOT_DOMAIN` 环境变量是否与你在 Nginx 绑定的域名一致。
-*   **WebSocket 报错**: 检查 Nginx 配置中是否添加了 `Upgrade` 和 `Connection` 头。
+*   **SSL 报错 (ERR_SSL_VERSION...)**:
+    *   确保申请了 **泛域名证书** (例如 `*.ccfwp.example.com`)。
+    *   注意：系统使用 **连字符** (`demo-worker`) 连接项目名和类型，这确保了所有子域名都是一级子域名，因此一张泛域名证书即可覆盖所有项目。
