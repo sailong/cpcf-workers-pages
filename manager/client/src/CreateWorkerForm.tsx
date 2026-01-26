@@ -40,6 +40,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
 
     // Build State
     const [buildCommand, setBuildCommand] = useState('');
+    const [deployCommand, setDeployCommand] = useState(''); // New State
     const [outputDir, setOutputDir] = useState('dist');
     const [framework, setFramework] = useState('Other');
     const [buildLogs, setBuildLogs] = useState<string[]>([]);
@@ -60,7 +61,16 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
         }
     };
 
+    // ... handleBuild (no changes needed as it uses form data constructed later? Wait, handleBuild constructs FormData)
     const handleBuild = async () => {
+        // ...
+        // Note: The /api/build endpoint is for PREVIEW build. It doesn't deploy.
+        // So we don't send deployCommand here.
+        // ... (existing handleBuild logic)
+        // Oops, actually handleBuild is for the "Build & Deploy" flow initial step.
+        // But the user request says "add ... to build and rebuild ... to specify command to deploy ... (e.g. npx wrangler deploy)"
+        // "Build & Deploy" flow creates project with buildId.
+        // It seems consistent to saving it in project creation payload.
         if (!file) return setError('请先选择项目文件');
         if (!name.trim()) return setError('项目名称不能为空');
 
@@ -158,6 +168,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
     };
 
     const handleFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        // ... (existing logic)
         const files = e.target.files;
         if (!files || files.length === 0) return;
 
@@ -169,6 +180,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
 
             // Check for common root folder
             const fileArray = Array.from(files);
+            // ... (existing zipping logic)
             if (fileArray.length > 0) {
                 // Get the first part of the path of the first file
                 // e.g., "dist/index.html" -> "dist"
@@ -211,6 +223,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                 if (analysis.detected) setFramework(analysis.framework);
                 if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
                 if (analysis.outputDir) setOutputDir(analysis.outputDir);
+                if (analysis.deployCommand) setDeployCommand(analysis.deployCommand); // Auto-set deploy cmd
                 showToast(`已自动识别: ${analysis.framework}`);
             }
 
@@ -237,6 +250,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
             if (analysis.detected) setFramework(analysis.framework);
             if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
             if (analysis.outputDir) setOutputDir(analysis.outputDir);
+            if (analysis.deployCommand) setDeployCommand(analysis.deployCommand); // Auto-set deploy cmd
             showToast(`已自动识别: ${analysis.framework}`);
         }
     };
@@ -328,7 +342,8 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                     envVars: {},
                     buildId: buildId || undefined, // Send buildId if exists
                     outputDir: buildId ? outputDir : undefined, // Inform server of output subpath
-                    buildCommand: buildId ? buildCommand : undefined // Persist build command
+                    buildCommand: buildId ? buildCommand : undefined, // Persist build command
+                    deployCommand: buildId ? deployCommand : undefined // Persist deploy command
                 };
 
                 const res = await authenticatedFetch('/api/projects', {
@@ -677,7 +692,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-400 mb-2">构建命令</label>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">构建命令 (Build Command)</label>
                                 <div className="relative">
                                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm">$</span>
                                     <input
@@ -688,6 +703,21 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                                         className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-4 py-3 text-white font-mono text-sm outline-none focus:border-orange-500"
                                     />
                                 </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-400 mb-2">部署命令 (Deploy Command, Optional)</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-mono text-sm">$</span>
+                                    <input
+                                        type="text"
+                                        value={deployCommand}
+                                        onChange={e => setDeployCommand(e.target.value)}
+                                        placeholder="npx wrangler deploy --dry-run"
+                                        className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-4 py-3 text-white font-mono text-sm outline-none focus:border-orange-500"
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">此命令将在构建成功后自动执行 (例如推送到远程或执行后置脚本)</p>
                             </div>
 
                             {/* Logs Terminal */}

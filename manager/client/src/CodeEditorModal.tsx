@@ -74,6 +74,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
 
     // Build State (for Redeploy)
     const [buildCommand, setBuildCommand] = useState('');
+    const [deployCommand, setDeployCommand] = useState(''); // New State
     const [outputDir, setOutputDir] = useState('dist');
     const [framework, setFramework] = useState('Other');
     const [buildLogs, setBuildLogs] = useState<string[]>([]);
@@ -118,6 +119,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
             });
             setEnvVars(data.envVarsRaw || {});
             setBuildCommand(data.buildCommand || '');
+            setDeployCommand(data.deployCommand || ''); // Load
             setOutputDir(data.outputDir || 'dist');
 
             // Load available resources for bindings UI
@@ -467,6 +469,7 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                 },
                 body: JSON.stringify({
                     buildCommand,
+                    deployCommand, // Send
                     outputDir
                 })
             });
@@ -710,6 +713,16 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                                                                 className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white text-sm"
                                                                 placeholder="dist"
                                                             />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm text-gray-400 mb-1">部署命令 (Deploy Command, Optional)</label>
+                                                            <input
+                                                                value={deployCommand}
+                                                                onChange={e => setDeployCommand(e.target.value)}
+                                                                className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white font-mono text-sm"
+                                                                placeholder="npx wrangler deploy --dry-run"
+                                                            />
+                                                            <p className="text-xs text-gray-500 mt-1">此命令将在构建成功后自动执行</p>
                                                         </div>
 
                                                         {/* Rebuild Logs */}

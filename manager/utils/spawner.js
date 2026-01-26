@@ -29,8 +29,22 @@ class ProjectRuntime {
         let cwd = this.uploadsDir;
 
         if (project.type === 'pages') {
-            // For Pages: wrangler pages dev <directory>
-            args.push('pages', 'dev', project.mainFile);
+            // Check for Source Directory (Pages Functions Support)
+            // project.mainFile is relative to uploadsDir, e.g. "page-xxx/dist"
+            const projectRootRel = path.dirname(project.mainFile);
+            const sourceDir = path.join(this.uploadsDir, projectRootRel, 'source');
+
+            if (fs.existsSync(sourceDir)) {
+                // Run from source directory so Wrangler finds /functions
+                cwd = sourceDir;
+                // Use outputDir from config, or fallback to basename of mainFile (e.g. 'dist' or 'public')
+                const targetDir = project.outputDir || path.basename(project.mainFile);
+                args.push('pages', 'dev', targetDir);
+                console.log(`[Runtime] Detected source dir for ${project.name}, using CWD: ${cwd}, Target: ${targetDir}`);
+            } else {
+                // Legacy: Run from uploads dir, point to full relative path
+                args.push('pages', 'dev', project.mainFile);
+            }
 
             // Add bindings via CLI for Pages (simpler than config file)
             // KV Bindings

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -488,11 +489,23 @@ app.post('/api/build', (req, res, next) => {
 });
 
 // 1. Get All Projects (with Real-time Status)
-app.get('/api/projects', (req, res) => {
-    // Merge runtime status
-    const projectsWithStatus = projects.map(p => ({
-        ...p,
-        status: runtime.isRunning(p.id) ? 'running' : 'stopped'
+app.get('/api/projects', async (req, res) => {
+    // Merge runtime status and check port usage
+    // Using Promise.all for parallel checks
+    const projectsWithStatus = await Promise.all(projects.map(async p => {
+        const running = runtime.isRunning(p.id);
+
+        // Check actual system port usage
+        // Note: isSystemPortInUse returns true if port is bound.
+        // If it's running, we expect it to be true.
+        // If it's stopped, we expect it to be false.
+        const portInUse = await isSystemPortInUse(p.port);
+
+        return {
+            ...p,
+            status: running ? 'running' : 'stopped',
+            portInUse // Boolean: true means something is listening on this port
+        };
     }));
     res.json(projectsWithStatus);
 });
@@ -597,7 +610,7 @@ async function getAvailablePort(preferredPort = null) {
 // 2. Create Project
 app.post('/api/projects', async (req, res) => {
     console.log('[DEBUG] Create Project Request Body:', JSON.stringify(req.body, null, 2));
-    const { name, type, mainFile, bindings, envVars, port: customPort, code, filename, buildId, outputDir, buildCommand } = req.body;
+    const { name, type, mainFile, bindings, envVars, port: customPort, code, filename, buildId, outputDir, buildCommand, deployCommand } = req.body;
     console.log(`[DEBUG] Parsed: name=${name}, type=${type}, buildId=${buildId}`);
 
     // Validate Name: 
@@ -718,6 +731,7 @@ app.post('/api/projects', async (req, res) => {
         envVars: envVars || {},
         buildCommand: buildCommand || '',
         outputDir: outputDir || '',
+        deployCommand: deployCommand || '',
         createdAt: new Date().toISOString()
     };
 
@@ -731,7 +745,7 @@ app.post('/api/projects/:id/rebuild', async (req, res) => {
     const project = projects.find(p => p.id === req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
 
-    let { buildCommand, outputDir } = req.body;
+    let { buildCommand, outputDir, deployCommand } = req.body;
 
     // Use saved values if not provided, or update saved values if provided
     if (buildCommand) project.buildCommand = buildCommand;
@@ -739,6 +753,9 @@ app.post('/api/projects/:id/rebuild', async (req, res) => {
 
     if (outputDir) project.outputDir = outputDir;
     else outputDir = project.outputDir;
+
+    if (deployCommand) project.deployCommand = deployCommand;
+    else deployCommand = project.deployCommand;
 
     saveProjects();
 
@@ -843,6 +860,29 @@ app.post('/api/projects/:id/rebuild', async (req, res) => {
         fs.cpSync(artifactInSource, distDir, { recursive: true });
 
         sendLog("Deployment updated successfully.");
+
+        // Deploy Logic
+        if (deployCommand) {
+            sendLog(`Executing deploy command: ${deployCommand}`);
+            const { spawn } = require('child_process');
+            const deployChild = spawn(deployCommand, {
+                cwd: sourceDir,
+                shell: true,
+                env: { ...process.env, CI: 'true', PATH: process.env.PATH }
+            });
+
+            deployChild.stdout.on('data', d => sendLog(`[Deploy] ${d.toString()}`));
+            deployChild.stderr.on('data', d => sendLog(`[Deploy] ${d.toString()}`));
+
+            await new Promise((resolve, reject) => {
+                deployChild.on('close', code => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`Deploy failed with code ${code}`));
+                });
+                deployChild.on('error', err => reject(err));
+            });
+            sendLog("Deploy command finished successfully.");
+        }
         sendResult({ success: true });
         res.end();
 

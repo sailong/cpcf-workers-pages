@@ -4,6 +4,7 @@ export interface ProjectAnalysis {
     framework: string;
     buildCommand: string;
     outputDir: string;
+    deployCommand?: string; // New field
     detected: boolean;
 }
 
@@ -15,8 +16,16 @@ export const analyzePackageJson = (pkg: any): ProjectAnalysis => {
         framework: 'Other',
         buildCommand: '',
         outputDir: 'dist',
+        deployCommand: '', // Default
         detected: true
     };
+
+    // Detect Deploy Command
+    if (scripts['deploy']) {
+        analysis.deployCommand = 'npm run deploy';
+    } else if (scripts['pages:deploy']) {
+        analysis.deployCommand = 'npm run pages:deploy';
+    }
 
     // Detect Framework
     if (deps['next']) {
@@ -54,10 +63,6 @@ export const analyzePackageJson = (pkg: any): ProjectAnalysis => {
             analysis.buildCommand = 'npm install && npm run build';
         }
     }
-
-    // Heuristics for special cases
-    // if package has husky, we might want --ignore-scripts in install?
-    // But that's hard to generalize.
 
     return analysis;
 };

@@ -22,6 +22,7 @@ interface Project {
     r2?: Array<{ varName: string; resourceId: string }>;
   };
   envVars?: Record<string, string>;
+  portInUse?: boolean; // Added field
 }
 
 interface Resource {
@@ -553,6 +554,11 @@ function App() {
                       <span className="uppercase text-xs font-bold px-2 py-0.5 rounded bg-gray-800 border border-gray-700">{p.type}</span>
                       <span>端口: <span className="text-gray-300 font-mono">{p.port}</span>
                         <span className="text-xs text-gray-500 ml-1">(内部)</span>
+                        {p.status === 'stopped' && p.portInUse && (
+                          <span className="ml-2 text-red-400 text-xs font-bold animate-pulse" title="此端口已被系统或其他程序占用">
+                            ⚠️ 端口被占用
+                          </span>
+                        )}
                       </span>
                       {p.bindings?.kv && p.bindings.kv.length > 0 && <span className="text-blue-400">{p.bindings.kv.length} KV</span>}
                       {p.bindings?.d1 && p.bindings.d1.length > 0 && <span className="text-purple-400">{p.bindings.d1.length} D1</span>}
