@@ -30,23 +30,24 @@ class ProjectRuntime {
 
         if (project.type === 'pages') {
             // Check for Source Directory (Pages Functions Support)
-            // project.mainFile is relative to uploadsDir, e.g. "page-xxx/dist"
+            // ... (existing logic)
             const projectRootRel = path.dirname(project.mainFile);
             const sourceDir = path.join(this.uploadsDir, projectRootRel, 'source');
 
             if (fs.existsSync(sourceDir)) {
-                // Run from source directory so Wrangler finds /functions
                 cwd = sourceDir;
-                // Use outputDir from config, or fallback to basename of mainFile (e.g. 'dist' or 'public')
                 const targetDir = project.outputDir || path.basename(project.mainFile);
                 args.push('pages', 'dev', targetDir);
                 console.log(`[Runtime] Detected source dir for ${project.name}, using CWD: ${cwd}, Target: ${targetDir}`);
             } else {
-                // Legacy: Run from uploads dir, point to full relative path
                 args.push('pages', 'dev', project.mainFile);
             }
 
-            // Add bindings via CLI for Pages (simpler than config file)
+            // Sync KV Data before starting
+            await this.seedKV(project, cwd);
+
+            // Add bindings via CLI for Pages
+            // ...
             // KV Bindings
             if (project.bindings && project.bindings.kv && project.bindings.kv.length > 0) {
                 project.bindings.kv.forEach(binding => {
@@ -172,6 +173,130 @@ class ProjectRuntime {
      */
     isRunning(projectId) {
         return this.processes.has(projectId);
+    }
+
+    /**
+     * Seed KV data from JSON to Wrangler Local State
+     * @param {Object} project
+     * @param {string} cwd
+     */
+    async seedKV(project, cwd) {
+        if (!project.bindings || !project.bindings.kv || project.bindings.kv.length === 0) return;
+
+        // Path to KV JSON data (User managed data)
+        const kvDataDir = path.join(path.dirname(this.uploadsDir), 'kv-data');
+        let hasData = false;
+
+        // Construct Seeder Worker
+        let scriptContent = `export default { async fetch(request, env) { try {`;
+        let tomlContent = `name = "seeder-${Date.now()}"\ncompatibility_date = "2024-01-01"\n\n`;
+
+        for (const binding of project.bindings.kv) {
+            const resourceId = binding.resourceId;
+            const varName = binding.varName;
+
+            const jsonPath = path.join(kvDataDir, `${resourceId}.json`);
+            if (fs.existsSync(jsonPath)) {
+                try {
+                    const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+                    const keys = Object.keys(data);
+
+                    if (keys.length > 0) {
+                        hasData = true;
+                        // Add binding to config
+                        tomlContent += `[[kv_namespaces]]\nbinding = "${varName}"\nid = "${resourceId}"\npreview_id = "${resourceId}"\n\n`;
+
+                        // Add put operations to script
+                        console.log(`[KV Seed] Found ${keys.length} keys for ${varName} (${resourceId})`);
+                        for (const k of keys) {
+                            // Serialize value safely. Handles numbers, booleans, strings etc.
+                            // KV values are strings. if data[k] is object, JSON stringify it.
+                            let val = data[k];
+                            // If it's not a string, stringify it because KV put expects string/stream/buffer
+                            if (typeof val !== 'string') val = JSON.stringify(val);
+
+                            const keyStr = JSON.stringify(k);
+                            const valStr = JSON.stringify(val);
+                            scriptContent += `\n      await env.${varName}.put(${keyStr}, ${valStr});`;
+                        }
+                    }
+                } catch (e) {
+                    console.error(`[KV Seed] Error reading/parsing ${jsonPath}:`, e.message);
+                }
+            }
+        }
+
+        if (!hasData) return;
+
+        scriptContent += `\n      return new Response("Seeded successfully"); \n    } catch(e) { return new Response(e.stack, {status: 500}); } } };`;
+
+        console.log(`[KV Seed] Starting Seeder Worker...`);
+
+        const seedId = Date.now();
+        const scriptPath = path.join(cwd, `seeder-${seedId}.js`);
+        const configPath = path.join(cwd, `seeder-${seedId}.toml`);
+        // Random port between 40000-50000
+        const port = 40000 + Math.floor(Math.random() * 10000);
+
+        fs.writeFileSync(scriptPath, scriptContent);
+        fs.writeFileSync(configPath, tomlContent);
+
+        return new Promise((resolve) => {
+            const { spawn } = require('child_process');
+            const seedChild = spawn('npx', ['wrangler', 'dev', `seeder-${seedId}.js`, '--config', `seeder-${seedId}.toml`, '--port', port.toString()], {
+                cwd,
+                env: { ...process.env, FORCE_COLOR: '1' }
+            });
+
+            // Handle logging slightly to confirm it runs
+            // seedChild.stdout.on('data', d => console.log(`[Seeder] ${d}`));
+            // seedChild.stderr.on('data', d => console.log(`[Seeder] ${d}`));
+
+            // Poll for readiness
+            let checks = 0;
+            const maxChecks = 30; // 30 seconds max
+            const interval = setInterval(async () => {
+                checks++;
+                try {
+                    // Try to trigger the seeder
+                    const res = await fetch(`http://127.0.0.1:${port}`);
+                    if (res.ok) {
+                        const text = await res.text();
+                        console.log(`[KV Seed] Response: ${text}`);
+                        clearInterval(interval);
+                        cleanupAndResolve();
+                    } else {
+                        const text = await res.text();
+                        console.error(`[KV Seed] Error response: ${text}`);
+                        if (checks > maxChecks) { clearInterval(interval); cleanupAndResolve(); }
+                    }
+                } catch (e) {
+                    // Connection refused, waiting for Wrangler to start
+                    if (checks > maxChecks) {
+                        console.error(`[KV Seed] Timeout waiting for seeder to start on port ${port}`);
+                        clearInterval(interval);
+                        cleanupAndResolve();
+                    }
+                }
+            }, 1000);
+
+            function cleanupAndResolve() {
+                // Kill seeder
+                try {
+                    process.kill(seedChild.pid, 'SIGTERM');
+                    // Force kill if needed? logic for spawner.js tracks pids, but this is temp.
+                    // Just emit sigtikill slightly later if needed?
+                    // Usually wrangler dev dies on sigterm.
+                } catch (e) { }
+
+                // Clean files
+                // Wait a moment for process to release locks on windows? (Mac is fine)
+                try { fs.unlinkSync(scriptPath); fs.unlinkSync(configPath); } catch (e) { }
+
+                console.log(`[KV Seed] Done.`);
+                resolve();
+            }
+        });
     }
 }
 
