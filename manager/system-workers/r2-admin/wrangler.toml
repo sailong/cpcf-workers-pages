@@ -17,7 +17,3 @@ bucket_name = "r2-mkr223gr"
 binding = "B_r2_mkr2bjl3"
 bucket_name = "r2-mkr2bjl3"
 
-[[r2_buckets]]
-binding = "B_r2_mkr2c3j7"
-bucket_name = "r2-mkr2c3j7"
-

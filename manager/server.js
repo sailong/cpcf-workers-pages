@@ -146,10 +146,15 @@ app.use((req, res, next) => {
             return dynamicProxy(req, res, next);
         }
 
-        if (parts[0] !== '127') {
-            // 404 if project not found
-            return res.status(404).send(`Project '${projectName}' ${projectType ? `(type: ${projectType})` : ''} not found.`);
-        }
+        // Fix: Use hostname parts or standard check for 404
+        // Logic: if we matched the domain suffix but failed to find a project, return 404.
+        // Unless it's localhost (IP access?), but we checked endsWith(.ROOT_DOMAIN).
+
+        console.log(`[ProxyRouter] Lookup failed for Name: ${projectName}, Type: ${projectType} in list of ${projects.length} projects.`);
+        // debug: list names
+        // console.log("Available:", projects.map(p => p.name));
+
+        return res.status(404).send(`Project '${projectName}' ${projectType ? `(type: ${projectType})` : ''} not found.`);
     }
 
     next();
@@ -383,7 +388,104 @@ function updateRuntimeResources() {
     r2Admin.start();
 })();
 
+const TEMP_BUILD_DIR = path.join(DATA_DIR, 'temp_builds');
+if (!fs.existsSync(TEMP_BUILD_DIR)) fs.mkdirSync(TEMP_BUILD_DIR, { recursive: true });
+
 // --- API ROUTES ---
+
+// 0. Build Project (Stream Logs)
+app.post('/api/build', (req, res, next) => {
+    console.log('[DEBUG] /api/build request received');
+    next();
+}, upload.single('file'), async (req, res) => {
+    console.log('[DEBUG] File uploaded:', req.file ? req.file.path : 'No file');
+
+    // Set headers for SSE/streaming
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    // Flush headers to establish connection immediately
+    if (res.flushHeaders) res.flushHeaders();
+
+    const sendLog = (data) => {
+        console.log(`[Build Log] ${data}`);
+        res.write(`data: ${JSON.stringify({ type: 'log', content: data })}\n\n`);
+        // Try to flush if method exists (compression middleware sometimes adds it, or just to be safe)
+        if (res.flush) res.flush();
+    };
+    const sendError = (msg) => {
+        console.error(`[Build Error] ${msg}`);
+        res.write(`data: ${JSON.stringify({ type: 'error', content: msg })}\n\n`);
+    };
+    const sendResult = (result) => res.write(`data: ${JSON.stringify({ type: 'result', ...result })}\n\n`);
+
+    if (!req.file) {
+        sendError("No file uploaded");
+        return res.end();
+    }
+
+    const { buildCommand, outputDir } = req.body;
+    const buildId = 'build-' + Date.now();
+    const workDir = path.join(TEMP_BUILD_DIR, buildId);
+
+    try {
+        // 1. Extract
+        sendLog(`Extracting files to ${workDir}...`);
+        const AdmZip = require('adm-zip');
+        const zip = new AdmZip(req.file.path);
+        zip.extractAllTo(workDir, true);
+        fs.unlinkSync(req.file.path); // Clean up uploaded zip
+        sendLog("Extraction complete.");
+
+        // 2. Build
+        if (buildCommand) {
+            sendLog(`Executing build command: ${buildCommand}`);
+
+            // Check for package.json if npm/pnpm/yarn used
+            if ((buildCommand.includes('npm') || buildCommand.includes('yarn') || buildCommand.includes('pnpm')) && !fs.existsSync(path.join(workDir, 'package.json'))) {
+                sendLog("Warning: package.json not found, but build command looks like a node script.");
+            }
+
+            const child = spawn(buildCommand, {
+                cwd: workDir,
+                shell: true,
+                env: { ...process.env, CI: 'true' }
+            });
+
+            child.stdout.on('data', d => sendLog(d.toString()));
+            child.stderr.on('data', d => sendLog(d.toString()));
+
+            await new Promise((resolve, reject) => {
+                child.on('close', code => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`Build failed with code ${code}`));
+                });
+                child.on('error', err => reject(err));
+            });
+
+            sendLog("Build command finished successfully.");
+        } else {
+            sendLog("No build command provided, skipping build step.");
+        }
+
+        // 3. Verify Output
+        const finalOutputDir = outputDir ? path.join(workDir, outputDir) : workDir;
+        if (!fs.existsSync(finalOutputDir)) {
+            throw new Error(`Output directory '${outputDir}' not found after build.`);
+        }
+
+        // 4. Success
+        sendResult({ success: true, buildId });
+        res.end();
+
+    } catch (e) {
+        sendError(e.message);
+        // Clean up on failure
+        // try { fs.rmSync(workDir, { recursive: true, force: true }); } catch {} 
+        // Keep for debugging? No, better clean
+        res.end();
+    }
+});
 
 // 1. Get All Projects (with Real-time Status)
 app.get('/api/projects', (req, res) => {
@@ -495,8 +597,8 @@ async function getAvailablePort(preferredPort = null) {
 // 2. Create Project
 app.post('/api/projects', async (req, res) => {
     console.log('[DEBUG] Create Project Request Body:', JSON.stringify(req.body, null, 2));
-    const { name, type, mainFile, bindings, envVars, port: customPort, code, filename } = req.body;
-    console.log(`[DEBUG] Parsed: name=${name}, type=${type}, mainFile=${mainFile}, codeLen=${code ? code.length : 0}, filename=${filename}`);
+    const { name, type, mainFile, bindings, envVars, port: customPort, code, filename, buildId, outputDir, buildCommand } = req.body;
+    console.log(`[DEBUG] Parsed: name=${name}, type=${type}, buildId=${buildId}`);
 
     // Validate Name: 
     // 1. Only English letters, numbers, and hyphens
@@ -544,9 +646,55 @@ app.post('/api/projects', async (req, res) => {
     }
 
 
-    // 处理代码输入：如果提供了代码，创建文件
+    // 处理代码输入
     let actualMainFile = mainFile;
-    if (code && filename) {
+
+    if (buildId) {
+        // Handle Pre-built Project
+        const tempBuildPath = path.join(TEMP_BUILD_DIR, buildId);
+        // sourcePath here essentially points to the build output directory inside the temp build
+        const buildOutputPath = outputDir ? path.join(tempBuildPath, outputDir) : tempBuildPath;
+
+        if (!fs.existsSync(buildOutputPath)) {
+            return res.status(400).json({ error: "Build artifact expired or invalid" });
+        }
+
+        const projectDirName = `page-${name}-${Date.now().toString(36)}`;
+        const projectRootPath = path.join(UPLOADS_DIR, projectDirName);
+        const sourceDir = path.join(projectRootPath, 'source');
+        const distDir = path.join(projectRootPath, 'dist');
+
+        try {
+            // Create directories
+            fs.mkdirSync(sourceDir, { recursive: true });
+
+            // 1. Move entire temp build dir (source code) to sourceDir
+            // parsing logic: tempBuildPath contains the full source.
+            fs.cpSync(tempBuildPath, sourceDir, { recursive: true });
+
+            // 2. Cleanup temp build dir
+            try { fs.rmSync(tempBuildPath, { recursive: true, force: true }); } catch { }
+
+            // 3. Copy build artifacts from sourceDir to distDir (for serving)
+            // Identify where 'dist' is within the new sourceDir
+            const artifactInSource = outputDir ? path.join(sourceDir, outputDir) : sourceDir;
+
+            // Avoid copying if sourceDir IS distDir (unlikely if outputDir is empty and we want separation)
+            // If outputDir is empty, source == dist. 
+            // In that case, we duplicate? Yes, to keep 'dist' clean for serving logic if we strictly serve 'dist'.
+            // But if we serve 'dist', we need to make sure we copy it.
+            fs.cpSync(artifactInSource, distDir, { recursive: true });
+
+        } catch (e) {
+            console.error("Failed to setup project directories", e);
+            return res.status(500).json({ error: "Failed to create project files: " + e.message });
+        }
+
+        // Set mainFile to point to the dist folder relative to UPLOADS_DIR
+        actualMainFile = path.join(projectDirName, 'dist');
+        console.log(`Promoted build ${buildId} to project dir ${projectDirName}`);
+
+    } else if (code && filename) {
         // 直接从代码创建文件
         const generatedFilename = `${id}-${filename}`;
         const filePath = path.join(UPLOADS_DIR, generatedFilename);
@@ -555,7 +703,7 @@ app.post('/api/projects', async (req, res) => {
         actualMainFile = generatedFilename;
         console.log(`Created file from code: ${generatedFilename}`);
     } else if (!mainFile) {
-        return res.status(400).json({ error: "必须提供 mainFile 或 code+filename" });
+        return res.status(400).json({ error: "必须提供 mainFile, buildId, 或 code+filename" });
     }
 
     const newProject = {
@@ -565,14 +713,143 @@ app.post('/api/projects', async (req, res) => {
         port,
         status: 'stopped',
         mainFile: actualMainFile,
+        mainFile: actualMainFile,
         bindings: bindings || {},
         envVars: envVars || {},
+        buildCommand: buildCommand || '',
+        outputDir: outputDir || '',
         createdAt: new Date().toISOString()
     };
 
     projects.push(newProject);
     saveProjects();
     res.json(newProject);
+});
+
+// Rebuild Project from Source
+app.post('/api/projects/:id/rebuild', async (req, res) => {
+    const project = projects.find(p => p.id === req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    let { buildCommand, outputDir } = req.body;
+
+    // Use saved values if not provided, or update saved values if provided
+    if (buildCommand) project.buildCommand = buildCommand;
+    else buildCommand = project.buildCommand;
+
+    if (outputDir) project.outputDir = outputDir;
+    else outputDir = project.outputDir;
+
+    saveProjects();
+
+    // Set headers for SSE
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    if (res.flushHeaders) res.flushHeaders();
+
+    const sendLog = (data) => {
+        res.write(`data: ${JSON.stringify({ type: 'log', content: data })}\n\n`);
+        if (res.flush) res.flush();
+    };
+    const sendError = (msg) => {
+        res.write(`data: ${JSON.stringify({ type: 'error', content: msg })}\n\n`);
+    };
+    const sendResult = (result) => res.write(`data: ${JSON.stringify({ type: 'result', ...result })}\n\n`);
+
+    try {
+        // Locate source directory
+        // Handle both new structure (page-xxx/dist) and legacy (page-xxx)
+        let relativeRoot = path.dirname(project.mainFile);
+        if (relativeRoot === '.') relativeRoot = project.mainFile;
+
+        const projectRootPath = path.join(UPLOADS_DIR, relativeRoot);
+        const sourceDir = path.join(projectRootPath, 'source');
+        const distDir = path.join(projectRootPath, 'dist');
+
+        if (!fs.existsSync(sourceDir)) {
+            sendError("Source code not found. This feature is only available for projects created after the update.");
+            return res.end();
+        }
+
+        sendLog(`Starting rebuild for project: ${project.name}`);
+
+        // Build Logic
+        if (buildCommand) {
+            const { spawn } = require('child_process');
+
+            // Check if we need to install dependencies (if package.json exists but node_modules missing)
+            if (fs.existsSync(path.join(sourceDir, 'package.json')) && !fs.existsSync(path.join(sourceDir, 'node_modules'))) {
+                sendLog("Installing dependencies (this may take a while)...");
+                const installCmd = fs.existsSync(path.join(sourceDir, 'yarn.lock')) ? 'yarn install' : 'npm install';
+
+                const installChild = spawn(installCmd, {
+                    cwd: sourceDir,
+                    shell: true,
+                    env: { ...process.env, CI: 'true', PATH: process.env.PATH }
+                });
+
+                installChild.stdout.on('data', d => sendLog(`[Install] ${d.toString()}`));
+                installChild.stderr.on('data', d => sendLog(`[Install] ${d.toString()}`));
+
+                await new Promise((resolve, reject) => {
+                    installChild.on('close', code => {
+                        if (code === 0) resolve();
+                        else reject(new Error(`Install failed with code ${code}`));
+                    });
+                });
+                sendLog("Dependencies installed successfully.");
+            }
+
+            sendLog(`Executing build command: ${buildCommand}`);
+            const child = spawn(buildCommand, {
+                cwd: sourceDir,
+                shell: true,
+                env: { ...process.env, CI: 'true', PATH: process.env.PATH }
+            });
+
+            child.stdout.on('data', d => sendLog(d.toString()));
+            child.stderr.on('data', d => sendLog(d.toString()));
+
+            await new Promise((resolve, reject) => {
+                child.on('close', code => {
+                    if (code === 0) resolve();
+                    else reject(new Error(`Build failed with code ${code}`));
+                });
+                child.on('error', err => reject(err));
+            });
+
+            sendLog("Build command finished successfully.");
+        } else {
+            sendLog("No build command provided, syncing source to dist...");
+        }
+
+        // Update Dist
+        // If distDir does not exist (legacy migration?), create it.
+        // If it exists, clean it.
+        if (fs.existsSync(distDir)) {
+            // fs.rmSync(distDir, { recursive: true, force: true });
+            // Better to empty it than remove/recreate to avoid permission issues? 
+            // rmSync recursive is fine.
+            fs.rmSync(distDir, { recursive: true, force: true });
+        }
+        fs.mkdirSync(distDir, { recursive: true });
+
+        const artifactInSource = outputDir ? path.join(sourceDir, outputDir) : sourceDir;
+        if (!fs.existsSync(artifactInSource)) {
+            throw new Error(`Output directory '${outputDir}' not found in source after build.`);
+        }
+
+        fs.cpSync(artifactInSource, distDir, { recursive: true });
+
+        sendLog("Deployment updated successfully.");
+        sendResult({ success: true });
+        res.end();
+
+    } catch (e) {
+        sendError(e.message);
+        res.end();
+    }
 });
 
 // 3. Upload File (Enhanced for Pages ZIP support)
@@ -720,6 +997,56 @@ app.get('/api/projects/:id/code', (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: "Failed to read code file" });
+    }
+});
+
+// 8. Deploy Build to Existing Project
+app.post('/api/projects/:id/deploy', async (req, res) => {
+    const project = projects.find(p => p.id === req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    const { buildId, outputDir } = req.body;
+    if (!buildId) return res.status(400).json({ error: "buildId is required" });
+
+    const tempBuildPath = path.join(TEMP_BUILD_DIR, buildId);
+    const sourcePath = outputDir ? path.join(tempBuildPath, outputDir) : tempBuildPath;
+
+    if (!fs.existsSync(sourcePath)) {
+        return res.status(400).json({ error: "Build artifact expired or invalid" });
+    }
+
+    // Determine new folder name
+    // We create a NEW folder to avoid race conditions or locking issues, 
+    // then update project reference.
+    const newProjectDirName = `page-${project.name}-${Date.now().toString(36)}`;
+    const targetPath = path.join(UPLOADS_DIR, newProjectDirName);
+
+    try {
+        // Move (Rename) or Copy
+        try {
+            fs.renameSync(sourcePath, targetPath);
+            if (outputDir) {
+                try { fs.rmSync(tempBuildPath, { recursive: true, force: true }); } catch { }
+            }
+        } catch (e) {
+            fs.cpSync(sourcePath, targetPath, { recursive: true });
+            try { fs.rmSync(tempBuildPath, { recursive: true, force: true }); } catch { }
+        }
+
+        project.mainFile = newProjectDirName;
+        saveProjects();
+
+        // Restart if running
+        if (project.status === 'running') {
+            runtime.stop(project.id);
+            await runtime.start(project);
+        }
+
+        res.json({ success: true, restarted: project.status === 'running' });
+
+    } catch (e) {
+        console.error("Deploy failed", e);
+        res.status(500).json({ error: "Deploy failed: " + e.message });
     }
 });
 
@@ -894,6 +1221,8 @@ app.get('/api/projects/:id/full-config', (req, res) => {
         },
         envVars: maskSecrets(project.envVars || {}),
         envVarsRaw: project.envVars || {},
+        buildCommand: project.buildCommand,
+        outputDir: project.outputDir,
         port: project.port,
         name: project.name,
         type: project.type

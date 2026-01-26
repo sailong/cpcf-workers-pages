@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import JSZip from 'jszip';
-import { authenticatedFetch } from './api';
+import { authenticatedFetch, getToken } from './api';
+import { analyzeFiles, analyzeZip } from './utils/projectAnalyzer';
 
 interface Binding {
     varName: string;
@@ -24,7 +25,7 @@ interface CodeEditorModalProps {
     onSaved: () => void;
 }
 
-type TabType = 'code' | 'bindings' | 'envvars' | 'settings';
+type TabType = 'code' | 'bindings' | 'envvars' | 'settings' | 'redeploy';
 
 const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onSaved }) => {
     // Project Type Checking
@@ -68,8 +69,30 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
 
     // Pages Update State (Bulk Upload)
     const [pagesFile, setPagesFile] = useState<File | null>(null);
-    const [uploadType, setUploadType] = useState<'zip' | 'folder'>('folder');
+    const [uploadType, setUploadType] = useState<'zip' | 'folder' | 'build' | 'rebuild'>('folder');
     const [showUploadModal, setShowUploadModal] = useState(false); // To toggle upload UI inside Pages view
+
+    // Build State (for Redeploy)
+    const [buildCommand, setBuildCommand] = useState('');
+    const [outputDir, setOutputDir] = useState('dist');
+    const [framework, setFramework] = useState('Other');
+    const [buildLogs, setBuildLogs] = useState<string[]>([]);
+    const [buildId, setBuildId] = useState<string | null>(null);
+    const [isBuilding, setIsBuilding] = useState(false);
+
+    const handleFrameworkChange = (fw: string) => {
+        setFramework(fw);
+        if (fw === 'React' || fw === 'Vue') {
+            setBuildCommand('npm install && npm run build');
+            setOutputDir('dist');
+        } else if (fw === 'Next.js (Static)') {
+            setBuildCommand('npm install && npm run build');
+            setOutputDir('out');
+        } else {
+            setBuildCommand('');
+            setOutputDir('dist');
+        }
+    };
 
     // Load full config
     useEffect(() => {
@@ -94,6 +117,8 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                 r2: data.bindings?.r2 || []
             });
             setEnvVars(data.envVarsRaw || {});
+            setBuildCommand(data.buildCommand || '');
+            setOutputDir(data.outputDir || 'dist');
 
             // Load available resources for bindings UI
             loadResources();
@@ -233,6 +258,15 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                 }
             }
 
+            // Auto-Analyze
+            const analysis = await analyzeFiles(fileArray);
+            if (analysis) {
+                if (analysis.detected) setFramework(analysis.framework);
+                if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
+                if (analysis.outputDir) setOutputDir(analysis.outputDir);
+                showToast(`已自动识别: ${analysis.framework}`);
+            }
+
             const content = await zip.generateAsync({ type: "blob" });
             const zipFile = new File([content], "update.zip", { type: "application/zip" });
             setPagesFile(zipFile);
@@ -241,6 +275,22 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
             setError("文件夹打包失败");
         } finally {
             setProcessing(false);
+        }
+    };
+
+    // Zip handler wrapper to support analysis (need to split existing inline handler)
+    const handleZipSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setPagesFile(file);
+
+        // Analyze
+        const analysis = await analyzeZip(file);
+        if (analysis) {
+            if (analysis.detected) setFramework(analysis.framework);
+            if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
+            if (analysis.outputDir) setOutputDir(analysis.outputDir);
+            showToast(`已自动识别: ${analysis.framework}`);
         }
     };
 
@@ -353,6 +403,124 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
 
     // --- Helper Components & Render ---
 
+    // --- Helper for Build Redeploy ---
+    const handleBuild = async () => {
+        if (!pagesFile) return setError('请先选择项目文件');
+
+        setIsBuilding(true);
+        setBuildLogs(['Starting build process...', 'Uploading files...']);
+        setBuildId(null);
+        setError('');
+
+        try {
+            const formData = new FormData();
+            formData.append('file', pagesFile);
+            formData.append('buildCommand', buildCommand); // Allow empty
+            formData.append('outputDir', outputDir);
+
+            const token = getToken();
+            const response = await fetch('/api/build', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            if (!reader) throw new Error('Stream failed');
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'log') setBuildLogs(p => [...p, data.content]);
+                            else if (data.type === 'error') { setError(data.content); setBuildLogs(p => [...p, `Error: ${data.content}`]) }
+                            else if (data.type === 'result' && data.success) {
+                                setBuildId(data.buildId);
+                                setBuildLogs(p => [...p, 'Build Successful! Ready to deploy.']);
+                            }
+                        } catch { }
+                    }
+                }
+            }
+        } catch (e) { console.error(e); setError('Build failed'); } finally { setIsBuilding(false); }
+    };
+
+    const handleRebuildProject = async () => {
+        setIsBuilding(true);
+        setBuildLogs(['Initiating remote rebuild...', 'Connecting to build server...']);
+        setBuildId(null);
+        setError('');
+
+        try {
+            const token = getToken();
+            const response = await fetch(`/api/projects/${project.id}/rebuild`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    buildCommand,
+                    outputDir
+                })
+            });
+
+            const reader = response.body?.getReader();
+            const decoder = new TextDecoder();
+            if (!reader) throw new Error('Stream failed');
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            if (data.type === 'log') setBuildLogs(p => [...p, data.content]);
+                            else if (data.type === 'error') { setError(data.content); setBuildLogs(p => [...p, `Error: ${data.content}`]) }
+                            else if (data.type === 'result' && data.success) {
+                                setBuildLogs(p => [...p, 'Rebuild Successful! Site updated.']);
+                                showToast('重建并部署成功');
+                                setBuildLogs(p => [...p, 'Rebuild Successful! Site updated.']);
+                                showToast('重建并部署成功');
+                                // onSaved(); // Keep modal open to show logs
+                            }
+                        } catch { }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            setError('Rebuild request failed');
+            setBuildLogs(p => [...p, 'Fatal Error: Request failed.']);
+        } finally {
+            setIsBuilding(false);
+        }
+    };
+
+    const handleDeployBuild = async () => {
+        if (!buildId) return;
+        setSaving(true);
+        try {
+            const res = await authenticatedFetch(`/api/projects/${project.id}/deploy`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ buildId, outputDir })
+            });
+            if (!res.ok) throw new Error('Deploy failed');
+            showToast('部署成功，服务已重启');
+            onSaved();
+        } catch (e) { showToast('部署失败', 'error'); } finally { setSaving(false); }
+    };
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-gray-800 rounded-lg w-full max-w-7xl h-[95vh] flex flex-col shadow-2xl overflow-hidden relative">
@@ -378,6 +546,14 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                     >
                         {isPages ? '📄 站点内容' : '📝 代码'}
                     </button>
+                    {isPages && (
+                        <button
+                            onClick={() => setActiveTab('redeploy')}
+                            className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'redeploy' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
+                        >
+                            🛠️ 重新部署
+                        </button>
+                    )}
                     <button
                         onClick={() => setActiveTab('bindings')}
                         className={`px-6 py-3 font-medium transition-colors border-b-2 ${activeTab === 'bindings' ? 'text-orange-400 border-orange-400 bg-gray-800' : 'text-gray-400 border-transparent hover:text-white hover:bg-gray-800'}`}
@@ -491,6 +667,137 @@ const CodeEditorModal: React.FC<CodeEditorModalProps> = ({ project, onClose, onS
                                         <div className="flex-1"><Editor height="100%" language={language} value={code} onChange={v => setCode(v || '')} theme="vs-dark" options={{ minimap: { enabled: true }, fontSize: 14, automaticLayout: true }} /></div>
                                     </div>
                                 )
+                            )}
+
+                            {activeTab === 'redeploy' && (
+                                <div className="h-full overflow-y-auto p-8">
+                                    <div className="max-w-2xl mx-auto space-y-6">
+                                        <h3 className="text-xl font-bold text-white mb-6">更新站点内容</h3>
+
+                                        {/* Upload Mode Selection */}
+                                        <div className="grid grid-cols-4 gap-4 mb-6">
+                                            <button onClick={() => setUploadType('folder')} className={`py-3 rounded-lg border font-medium ${uploadType === 'folder' ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 bg-gray-800 text-gray-400'}`}>📁 文件夹</button>
+                                            <button onClick={() => setUploadType('zip')} className={`py-3 rounded-lg border font-medium ${uploadType === 'zip' ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 bg-gray-800 text-gray-400'}`}>📦 ZIP 压缩包</button>
+                                            <button onClick={() => setUploadType('build')} className={`py-3 rounded-lg border font-medium ${uploadType === 'build' ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 bg-gray-800 text-gray-400'}`}>🛠️ Build 构建</button>
+                                            <button onClick={() => setUploadType('rebuild')} className={`py-3 rounded-lg border font-medium ${uploadType === 'rebuild' ? 'border-orange-500 bg-orange-500/10 text-orange-400' : 'border-gray-700 bg-gray-800 text-gray-400'}`}>🔄 Rebuild 重建</button>
+                                        </div>
+
+                                        {/* File Input or Rebuild UI */}
+                                        <div className="border-2 border-dashed border-gray-700 hover:border-orange-500/50 rounded-xl p-8 text-center transition-colors bg-gray-900/50">
+                                            {uploadType === 'rebuild' ? (
+                                                <div className="text-left">
+                                                    <div className="text-center mb-6">
+                                                        <div className="text-4xl mb-3">🔄</div>
+                                                        <h4 className="text-gray-300 font-bold mb-1">使用现有源码重建</h4>
+                                                        <p className="text-gray-500 text-xs">将使用上次上传并保存的源代码进行重新构建</p>
+                                                    </div>
+
+                                                    <div className="space-y-4 max-w-lg mx-auto">
+                                                        <div>
+                                                            <label className="block text-sm text-gray-400 mb-1">构建命令 (Build Command)</label>
+                                                            <input
+                                                                value={buildCommand}
+                                                                onChange={e => setBuildCommand(e.target.value)}
+                                                                className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white font-mono text-sm"
+                                                                placeholder="npm install && npm run build"
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm text-gray-400 mb-1">输出目录 (Output Directory)</label>
+                                                            <input
+                                                                value={outputDir}
+                                                                onChange={e => setOutputDir(e.target.value)}
+                                                                className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-white text-sm"
+                                                                placeholder="dist"
+                                                            />
+                                                        </div>
+
+                                                        {/* Rebuild Logs */}
+                                                        {(isBuilding || buildLogs.length > 0) && (
+                                                            <div className="mt-4">
+                                                                <label className="block text-xs text-gray-500 mb-1">构建日志</label>
+                                                                <div className="bg-black rounded border border-gray-800 p-3 h-48 overflow-y-auto text-xs font-mono text-gray-300">
+                                                                    {buildLogs.map((l, i) => <div key={i} className="whitespace-pre-wrap break-all">{l}</div>)}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                uploadType === 'folder' || uploadType === 'build' ? (
+                                                    <>
+                                                        <input type="file"
+                                                            // @ts-ignore
+                                                            webkitdirectory="" directory="" multiple className="hidden" id="rd-folder"
+                                                            onChange={handlePagesFolderSelect} />
+                                                        <label htmlFor="rd-folder" className="cursor-pointer">
+                                                            <div className="text-4xl mb-3">📂</div>
+                                                            <div className="text-gray-300 font-bold mb-1">{pagesFile?.name || (uploadType === 'build' ? '选择源码目录' : '选择构建产物目录')}</div>
+                                                            <div className="text-gray-500 text-xs">{uploadType === 'build' ? '包含 package.json' : '包含 index.html'}</div>
+                                                        </label>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <input type="file" accept=".zip" className="hidden" id="rd-zip" onChange={handleZipSelect} />
+                                                        <label htmlFor="rd-zip" className="cursor-pointer">
+                                                            <div className="text-4xl mb-3">📦</div>
+                                                            <div className="text-gray-300 font-bold mb-1">{pagesFile?.name || '选择 ZIP 文件'}</div>
+                                                        </label>
+                                                    </>
+                                                )
+                                            )}
+                                        </div>
+
+                                        {/* Build UI (Client-side Build Upload) */}
+                                        {uploadType === 'build' && (
+                                            <div className="space-y-4 border-t border-gray-800 pt-6">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm text-gray-400 mb-1">框架</label>
+                                                        <select value={framework} onChange={e => handleFrameworkChange(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white">
+                                                            <option value="Other">Custom</option>
+                                                            <option value="React">React</option>
+                                                            <option value="Vue">Vue</option>
+                                                            <option value="Next.js (Static)">Next.js</option>
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm text-gray-400 mb-1">输出目录</label>
+                                                        <input value={outputDir} onChange={e => setOutputDir(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm text-gray-400 mb-1">构建命令</label>
+                                                    <input value={buildCommand} onChange={e => setBuildCommand(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded p-2 text-white font-mono" />
+                                                </div>
+                                                <button onClick={handleBuild} disabled={isBuilding || !pagesFile} className="w-full py-2 bg-gray-800 border border-gray-700 rounded hover:bg-gray-700 text-white font-medium disabled:opacity-50">
+                                                    {isBuilding ? '构建中...' : '开始构建'}
+                                                </button>
+                                                {/* Logs */}
+                                                <div className="bg-black rounded border border-gray-800 p-2 h-32 overflow-y-auto text-xs font-mono text-gray-300">
+                                                    {buildLogs.map((l, i) => <div key={i}>{l}</div>)}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={() => {
+                                                console.log('Deploy Clicked. Type:', uploadType);
+                                                if (uploadType === 'build') {
+                                                    handleDeployBuild();
+                                                } else if (uploadType === 'rebuild') {
+                                                    handleRebuildProject();
+                                                } else {
+                                                    handlePagesUpdate(); // Use existing bulk update
+                                                }
+                                            }}
+                                            disabled={(uploadType !== 'rebuild' && !pagesFile) || (uploadType === 'build' && !buildId) || saving || (uploadType === 'rebuild' && isBuilding)}
+                                            className="w-full py-3 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-bold shadow-lg disabled:bg-gray-700 disabled:cursor-not-allowed transition-all"
+                                        >
+                                            {saving || (uploadType === 'rebuild' && isBuilding) ? '正在处理...' : (uploadType === 'rebuild' ? '🔄 开始重建' : '🚀 确认部署')}
+                                        </button>
+                                    </div>
+                                </div>
                             )}
 
                             {activeTab === 'bindings' && <BindingsTab bindings={bindings} kvResources={kvResources} d1Resources={d1Resources} r2Resources={r2Resources} onAddKv={() => { setBindings({ ...bindings, kv: [...bindings.kv, { varName: '', resourceId: '' }] }) }} onRemoveKv={(i: number) => setBindings({ ...bindings, kv: bindings.kv.filter((_, idx) => idx !== i) })} onUpdateKv={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.kv]; k[i][f] = v; setBindings({ ...bindings, kv: k }) }} onAddD1={() => { setBindings({ ...bindings, d1: [...bindings.d1, { varName: '', resourceId: '' }] }) }} onRemoveD1={(i: number) => setBindings({ ...bindings, d1: bindings.d1.filter((_, idx) => idx !== i) })} onUpdateD1={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.d1]; k[i][f] = v; setBindings({ ...bindings, d1: k }) }} onAddR2={() => { setBindings({ ...bindings, r2: [...bindings.r2, { varName: '', resourceId: '' }] }) }} onRemoveR2={(i: number) => setBindings({ ...bindings, r2: bindings.r2.filter((_, idx) => idx !== i) })} onUpdateR2={(i: number, f: 'varName' | 'resourceId', v: string) => { const k = [...bindings.r2]; k[i][f] = v; setBindings({ ...bindings, r2: k }) }} onSave={handleSaveConfig} saving={saving} />}
