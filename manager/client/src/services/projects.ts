@@ -68,22 +68,57 @@ export const ProjectService = {
             for (const line of lines) {
                 if (line.startsWith('data: ')) {
                     const jsonStr = line.substring(6);
+                    let message;
                     try {
-                        const message = JSON.parse(jsonStr);
-                        if (message.type === 'log') onLog(message.content);
-                        if (message.type === 'error') throw new Error(message.content);
-                        if (message.type === 'result') return message;
+                        message = JSON.parse(jsonStr);
                     } catch (e) {
-                        // ignore partial JSON
+                        continue; // Ignore partial or invalid JSON
                     }
+
+                    if (message.type === 'log') onLog(message.content);
+                    if (message.type === 'error') throw new Error(message.content);
+                    if (message.type === 'result') return message;
                 }
             }
         }
     },
 
     // Deploy Build Artifact to Existing Project
-    deploy: async (id: string, buildId: string, outputDir: string) => {
-        const res = await api.post(`/projects/${id}/deploy`, { buildId, outputDir });
-        return res.data;
+    deploy: async (id: string, buildId: string, outputDir: string, onLog: (msg: string) => void, onError: (msg: string) => void) => {
+        const response = await fetch(`/api/projects/${id}/deploy`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+            },
+            body: JSON.stringify({ buildId, outputDir })
+        });
+
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+
+        if (!reader) return;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const jsonStr = line.substring(6);
+                    let message;
+                    try {
+                        message = JSON.parse(jsonStr);
+                    } catch (e) {
+                        continue; // Ignore partial or invalid JSON
+                    }
+
+                    if (message.type === 'log') onLog(message.content);
+                    if (message.type === 'error') onError(message.content);
+                    if (message.type === 'result') return message;
+                }
+            }
+        }
     }
 };

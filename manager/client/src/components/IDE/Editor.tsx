@@ -1,21 +1,25 @@
 import React from 'react';
 import MonacoEditor from '@monaco-editor/react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface EditorProps {
     code: string;
     language: string;
     onChange: (value: string | undefined) => void;
     readOnly?: boolean;
+    height?: string;
 }
 
-const Editor: React.FC<EditorProps> = ({ code, language, onChange, readOnly = false }) => {
+const Editor: React.FC<EditorProps> = ({ code, language, onChange, readOnly = false, height = "100%" }) => {
+    const { theme } = useTheme();
+
     return (
         <MonacoEditor
-            height="100%"
+            height={height}
             language={language}
             value={code}
             onChange={onChange}
-            theme="vs-dark"
+            theme={theme === 'dark' ? 'vs-dark' : 'light'}
             options={{
                 minimap: { enabled: true },
                 fontSize: 14,

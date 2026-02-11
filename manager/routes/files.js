@@ -32,7 +32,11 @@ router.get('/:id/files', (req, res) => {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
 
-    const projectDir = path.join(config.UPLOADS_DIR, project.mainFile);
+    // For Pages build-flow, we might want to edit the 'source' dir instead of 'dist' (mainFile)
+    const projectRoot = path.join(config.UPLOADS_DIR, path.dirname(project.mainFile) === '.' ? project.mainFile : path.dirname(project.mainFile));
+    const sourceDir = path.join(projectRoot, 'source');
+    const projectDir = fs.existsSync(sourceDir) ? sourceDir : path.join(config.UPLOADS_DIR, project.mainFile);
+
     if (!fs.existsSync(projectDir)) {
         return res.json([]);
     }
@@ -65,8 +69,11 @@ router.get('/:id/files/content', (req, res) => {
     // Prevent directory traversal
     if (filePathParam.includes('..')) return res.status(400).json({ error: "Invalid path" });
 
-    // Determine root
-    let rootPath = path.join(config.UPLOADS_DIR, project.mainFile);
+    // Determine root: Prefer 'source' if it exists
+    const projectRoot = path.join(config.UPLOADS_DIR, path.dirname(project.mainFile) === '.' ? project.mainFile : path.dirname(project.mainFile));
+    const sourceDir = path.join(projectRoot, 'source');
+    let rootPath = fs.existsSync(sourceDir) ? sourceDir : path.join(config.UPLOADS_DIR, project.mainFile);
+
     if (fs.existsSync(rootPath) && !fs.statSync(rootPath).isDirectory()) {
         rootPath = path.dirname(rootPath);
     }
@@ -100,7 +107,11 @@ router.put('/:id/files/content', (req, res) => {
 
     if (filePathParam.includes('..')) return res.status(400).json({ error: "Invalid path" });
 
-    let rootPath = path.join(config.UPLOADS_DIR, project.mainFile);
+    // Determine root: Prefer 'source' if it exists
+    const projectRoot = path.join(config.UPLOADS_DIR, path.dirname(project.mainFile) === '.' ? project.mainFile : path.dirname(project.mainFile));
+    const sourceDir = path.join(projectRoot, 'source');
+    let rootPath = fs.existsSync(sourceDir) ? sourceDir : path.join(config.UPLOADS_DIR, project.mainFile);
+
     if (fs.existsSync(rootPath) && !fs.statSync(rootPath).isDirectory()) {
         rootPath = path.dirname(rootPath);
     }

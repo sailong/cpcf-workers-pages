@@ -76,6 +76,7 @@ async function startServer() {
             console.log(`=============================================`);
             console.log(`   CCFWP Manager Service Running             `);
             console.log(`   Port: ${MANAGER_SERVICE_PORT}             `);
+            console.log(`   Version: 2026-02-12 01:25 (Flattening Fix)`);
             console.log(`   Domain: ${process.env.ROOT_DOMAIN || 'localhost'}`);
             console.log(`=============================================`);
 

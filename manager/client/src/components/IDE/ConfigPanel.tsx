@@ -11,8 +11,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
     const [bindings, setBindings] = useState<Bindings>({ kv: [], d1: [], r2: [] });
     const [envVars, setEnvVars] = useState<EnvVars>({});
     const [port, setPort] = useState<number>(0);
+    const [buildCommand, setBuildCommand] = useState('');
+    const [outputDir, setOutputDir] = useState('');
+    const [deployCommand, setDeployCommand] = useState('');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     const [resources, setResources] = useState<{ kv: any[], d1: any[], r2: any[] }>({ kv: [], d1: [], r2: [] });
 
@@ -44,6 +48,9 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 // @ts-ignore - backend might return object, frontend type expects specific structure
                 setEnvVars(current.envVars || {});
                 setPort(current.port);
+                setBuildCommand(current.buildCommand || '');
+                setOutputDir(current.outputDir || '');
+                setDeployCommand(current.deployCommand || '');
             }
         } catch (e) {
             console.error(e);
@@ -65,13 +72,19 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
 
     const handleSave = async () => {
         setSaving(true);
+        setSaveSuccess(false);
         try {
             await ProjectService.updateConfig(project.id, {
                 bindings,
                 envVars,
-                port
+                port,
+                buildCommand,
+                outputDir,
+                deployCommand
             });
             onSave();
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
         } catch (e) {
             alert('Save failed');
         } finally {
@@ -293,19 +306,55 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 )}
             </div>
             <div>
-                <h3 className="text-lg font-bold text-white mb-4">系统设置 (System Settings)</h3>
-                <div className="flex items-center gap-4">
-                    <label className="text-sm">服务端口 (Port)</label>
-                    <input
-                        type="number"
-                        value={port}
-                        onChange={e => setPort(parseInt(e.target.value))}
-                        className="bg-gray-900 border border-gray-700 rounded px-3 py-1 w-24"
-                    />
+                <h3 className="text-lg font-bold text-white mb-4">系统与构建设置 (System & Build Settings)</h3>
+
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">服务端口 (Port)</label>
+                        <input
+                            type="number"
+                            value={port}
+                            onChange={e => setPort(parseInt(e.target.value))}
+                            className="input-liquid w-full p-3 font-mono"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">输出目录 (Output Directory)</label>
+                        <input
+                            type="text"
+                            value={outputDir}
+                            onChange={e => setOutputDir(e.target.value)}
+                            placeholder="dist"
+                            className="input-liquid w-full p-3 font-mono"
+                        />
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">构建命令 (Build Command)</label>
+                        <input
+                            type="text"
+                            value={buildCommand}
+                            onChange={e => setBuildCommand(e.target.value)}
+                            placeholder="npm install && npm run build"
+                            className="input-liquid w-full p-3 font-mono"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">部署命令 (Deploy Command, Optional)</label>
+                        <input
+                            type="text"
+                            value={deployCommand}
+                            onChange={e => setDeployCommand(e.target.value)}
+                            placeholder="npx wrangler deploy"
+                            className="input-liquid w-full p-3 font-mono"
+                        />
+                    </div>
                 </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-700">
+            <div className="pt-4 border-t border-gray-700 flex items-center gap-4">
                 <button
                     onClick={handleSave}
                     disabled={saving}
@@ -313,6 +362,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 >
                     {saving ? '保存中...' : '保存配置'}
                 </button>
+                {saveSuccess && (
+                    <span className="text-sm text-green-400 animate-fade-in flex items-center gap-1.5">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        配置已保存
+                    </span>
+                )}
             </div>
         </div>
     );

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { AuthService } from '../services';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface LoginProps {
     onLogin: (token: string) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+    const { theme, toggleTheme } = useTheme();
     const [password, setPassword] = useState('');
     const [captcha, setCaptcha] = useState('');
     const [captchaId, setCaptchaId] = useState('');
@@ -49,17 +51,36 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     };
 
     return (
-        <div className="min-h-screen bg-black flex items-center justify-center p-4 font-sans relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center p-4 font-sans relative overflow-hidden transition-colors duration-300">
+            {/* Theme Toggle in Login */}
+            <div className="absolute top-6 right-6 z-50">
+                <button
+                    onClick={toggleTheme}
+                    className="glass border-transparent p-2.5 rounded-xl transition-all active:scale-95 shadow-lg"
+                    title={theme === 'dark' ? '切换亮色' : '切换暗色'}
+                >
+                    {theme === 'dark' ? (
+                        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l.707.707M6.343 6.343l.707-.707" />
+                            <circle cx="12" cy="12" r="4" />
+                        </svg>
+                    ) : (
+                        <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    )}
+                </button>
+            </div>
             {/* Background Decoration */}
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] pointer-events-none"></div>
 
             <div className="glass-card p-10 w-full max-w-md relative z-10">
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
+                    <h1 className="text-3xl font-bold mb-2 tracking-tight">
                         欢迎回来
                     </h1>
-                    <p className="text-gray-500 text-sm">Sign in to CCFWP Manager</p>
+                    <p className="opacity-40 text-sm font-medium">Sign in to CCFWP Manager</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -97,7 +118,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                 className="input-liquid flex-1 p-3"
                             />
                             <div
-                                className="w-32 h-[46px] bg-[#2c2c2e] rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border border-white/10"
+                                className="w-32 h-[46px] rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-black/5 dark:border-white/10 flex items-center justify-center bg-white/50 backdrop-blur-md dark:bg-transparent dark:invert"
                                 onClick={fetchCaptcha}
                                 dangerouslySetInnerHTML={{ __html: captchaSvg }}
                                 title="点击刷新"

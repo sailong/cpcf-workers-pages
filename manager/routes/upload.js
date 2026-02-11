@@ -20,6 +20,10 @@ router.post('/', upload.single('file'), (req, res) => {
             const zip = new AdmZip(filePath);
             zip.extractAllTo(extractDir, true);
 
+            // Normalize: handle nested folder in ZIP
+            const { flattenDirectory } = require('../utils/fs-helper');
+            flattenDirectory(extractDir);
+
             // Delete the ZIP file after extraction
             fs.unlinkSync(filePath);
 

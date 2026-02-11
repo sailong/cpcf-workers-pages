@@ -38,10 +38,15 @@ router.post('/', (req, res, next) => {
         // 1. Extract
         sendLog(`Extracting files to ${workDir}...`);
         const AdmZip = require('adm-zip');
+        const { flattenDirectory } = require('../utils/fs-helper'); // 新增工具
         const zip = new AdmZip(req.file.path);
         zip.extractAllTo(workDir, true);
         fs.unlinkSync(req.file.path);
-        sendLog("Extraction complete.");
+
+        // Normalize: handle nested folder in ZIP
+        flattenDirectory(workDir);
+
+        sendLog("Extraction complete and directory normalized.");
 
         // 2. Build
         if (buildCommand) {

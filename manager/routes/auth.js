@@ -16,7 +16,7 @@ router.get('/captcha', (req, res) => {
         ignoreChars: '0o1i',
         noise: 2,
         color: true,
-        background: '#111827' // gray-900 to match dark theme
+        // background: '#111827' // Removed to support transparency
     });
 
     // Sign the captcha text into a token (avoid session state)

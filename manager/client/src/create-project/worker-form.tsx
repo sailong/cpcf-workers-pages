@@ -1,5 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
-import Editor from '@monaco-editor/react';
+import Editor from '../components/IDE/Editor';
 import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types';
 
 type CodeSource = 'editor' | 'upload';
@@ -56,34 +56,34 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
 
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+            <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
                 代码来源 *
             </label>
-            <div className="flex gap-4 mb-4">
+            <div className="flex gap-4 mb-8">
                 <button
                     onClick={() => setCodeSource('editor')}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${codeSource === 'editor'
-                        ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                    className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${codeSource === 'editor'
+                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
+                        : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold">✏️ 在线编写</div>
+                    <div className="font-bold flex items-center justify-center gap-2">✏️ 在线编写</div>
                 </button>
                 <button
                     onClick={() => setCodeSource('upload')}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 transition-all ${codeSource === 'upload'
-                        ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                        : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
+                    className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${codeSource === 'upload'
+                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
+                        : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold">📁 上传文件</div>
+                    <div className="font-bold flex items-center justify-center gap-2">📁 上传文件</div>
                 </button>
             </div>
 
             {codeSource === 'editor' ? (
-                <div className="space-y-3">
+                <div className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                        <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1 tracking-widest">
                             文件名 *
                         </label>
                         <input
@@ -91,17 +91,15 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                             value={filename}
                             onChange={(e) => setFilename(e.target.value)}
                             placeholder="worker.js"
-                            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                            className="input-liquid w-full p-4 font-mono"
                         />
                     </div>
-                    <div className="border-2 border-gray-700 rounded-lg overflow-hidden">
+                    <div className="border border-current/10 rounded-2xl overflow-hidden glass shadow-2xl">
                         <Editor
                             height="400px"
                             language={filename.endsWith('.ts') ? 'typescript' : 'javascript'}
-                            value={code}
+                            code={code}
                             onChange={(value) => setCode(value || '')}
-                            theme="vs-dark"
-                            options={{ minimap: { enabled: false }, fontSize: 14, automaticLayout: true }}
                         />
                     </div>
                 </div>
@@ -116,18 +114,24 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                     />
                     <label
                         htmlFor="worker-file-upload"
-                        className="block w-full px-4 py-8 bg-gray-800 border-2 border-dashed border-gray-700 rounded-lg text-center cursor-pointer hover:border-orange-500 transition-colors"
+                        className={`block w-full px-4 py-12 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all duration-300 ${file
+                            ? 'border-blue-500/50 bg-blue-500/5'
+                            : 'border-current/10 glass hover:border-blue-500/30'
+                            }`}
                     >
                         {file ? (
-                            <div>
-                                <div className="text-4xl mb-2">📄</div>
-                                <div className="text-white font-medium">{file.name}</div>
-                                <div className="text-sm text-gray-500 mt-1">{(file.size / 1024).toFixed(2)} KB</div>
+                            <div className="animate-in fade-in zoom-in duration-300">
+                                <div className="text-5xl mb-4 drop-shadow-lg">📄</div>
+                                <div className="font-bold text-lg mb-1">{file.name}</div>
+                                <div className="text-xs text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full inline-block font-mono">
+                                    {(file.size / 1024).toFixed(2)} KB
+                                </div>
                             </div>
                         ) : (
                             <div>
-                                <div className="text-4xl mb-2">📁</div>
-                                <div className="text-gray-400">点击选择代码文件 (.js/.ts)</div>
+                                <div className="text-5xl mb-4 opacity-30">📁</div>
+                                <div className="font-bold text-lg mb-1 opacity-60">点击选择代码文件</div>
+                                <div className="text-xs opacity-40">支持 .js, .ts 格式</div>
                             </div>
                         )}
                     </label>

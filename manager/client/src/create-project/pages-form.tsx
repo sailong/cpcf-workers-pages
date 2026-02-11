@@ -116,38 +116,40 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
 
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+            <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
                 上传方式 *
             </label>
 
-            <div className="flex gap-4 mb-6">
+            <div className="flex gap-4 mb-8">
                 <button
                     onClick={() => setUploadType('folder')}
-                    className={`flex-1 px-4 py-3 rounded-xl border transition-all ${uploadType === 'folder'
-                        ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
-                        : 'border-gray-800 bg-gray-900/50 text-gray-400 hover:border-gray-700 hover:bg-gray-800'
+                    className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${uploadType === 'folder'
+                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
+                        : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
                     <div className="font-bold flex items-center justify-center gap-2">📁 上传文件夹</div>
-                    <div className="text-xs opacity-75 text-center mt-1">推荐 (自动打包)</div>
+                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">推荐 (自动打包)</div>
                 </button>
                 <button
                     onClick={() => setUploadType('zip')}
-                    className={`flex-1 px-4 py-3 rounded-xl border transition-all ${uploadType === 'zip'
-                        ? 'border-orange-500 bg-orange-500/10 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.1)]'
-                        : 'border-gray-800 bg-gray-900/50 text-gray-400 hover:border-gray-700 hover:bg-gray-800'
+                    className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${uploadType === 'zip'
+                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
+                        : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
                     <div className="font-bold flex items-center justify-center gap-2">📦 上传 ZIP</div>
-                    <div className="text-xs opacity-75 text-center mt-1">已打包好的压缩包</div>
+                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">压缩包上传</div>
                 </button>
             </div>
 
             {/* 拖拽上传区域 */}
             <div
-                className={`relative border-2 border-dashed rounded-2xl transition-all duration-300 ease-in-out group ${isDragging
-                    ? 'border-orange-500 bg-orange-500/10 scale-[1.02]'
-                    : 'border-gray-700 bg-gray-900/30 hover:border-gray-600 hover:bg-gray-900/50'
+                className={`relative border-2 border-dashed rounded-2xl transition-all duration-300 ease-in-out group overflow-hidden ${isDragging
+                    ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
+                    : file
+                        ? 'border-blue-500/30 bg-blue-500/5'
+                        : 'border-current/10 glass hover:border-blue-500/30'
                     }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -165,28 +167,28 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         />
                         <label
                             htmlFor="pages-folder-upload"
-                            className="block w-full py-12 cursor-pointer flex flex-col items-center justify-center text-center p-6"
+                            className="block w-full py-16 cursor-pointer flex flex-col items-center justify-center text-center p-6"
                         >
                             {processing ? (
-                                <div className="animate-pulse">
-                                    <div className="text-5xl mb-4 opacity-80">⏳</div>
-                                    <div className="text-white font-bold text-lg">正在打包文件...</div>
+                                <div className="text-center">
+                                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                                    <div className="font-bold text-lg">正在打包文件...</div>
                                 </div>
                             ) : file ? (
-                                <div>
-                                    <div className="text-5xl mb-4 text-green-400 drop-shadow-lg">📦</div>
-                                    <div className="text-white font-bold text-lg mb-1">{file.name} (Ready)</div>
-                                    <div className="text-sm text-gray-500 font-mono bg-gray-800/50 px-3 py-1 rounded-full inline-block mb-3">
+                                <div className="animate-in fade-in zoom-in duration-300">
+                                    <div className="text-6xl mb-4 drop-shadow-2xl">📦</div>
+                                    <div className="font-bold text-xl mb-1">{file.name}</div>
+                                    <div className="text-xs text-blue-500 bg-blue-500/10 px-4 py-1.5 rounded-full inline-block font-mono mb-4">
                                         {(file.size / 1024 / 1024).toFixed(2)} MB
                                     </div>
-                                    <div className="text-xs text-orange-400 animate-pulse">点击更换</div>
+                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">点击更换目录</div>
                                 </div>
                             ) : (
-                                <div className="group-hover:scale-105 transition-transform duration-300">
-                                    <div className="text-5xl mb-4 opacity-50 group-hover:opacity-100 group-hover:drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all">📂</div>
-                                    <div className="text-gray-300 font-bold text-lg mb-2">点击选择构建产物目录</div>
-                                    <div className="text-xs text-gray-500 max-w-xs mx-auto leading-relaxed">
-                                        请上传包含 index.html 的文件夹 (dist/build)
+                                <div className="transition-transform duration-300 group-hover:scale-105">
+                                    <div className="text-6xl mb-4 opacity-30 group-hover:opacity-100 group-hover:drop-shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all">📂</div>
+                                    <div className="font-bold text-xl mb-2 opacity-60">选择项目构建目录</div>
+                                    <div className="text-sm opacity-40 max-w-xs mx-auto leading-relaxed">
+                                        上传包含 (dist/build/out) 产物的文件夹
                                     </div>
                                 </div>
                             )}
@@ -203,19 +205,22 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         />
                         <label
                             htmlFor="pages-zip-upload"
-                            className="block w-full py-12 cursor-pointer flex flex-col items-center justify-center text-center p-6"
+                            className="block w-full py-16 cursor-pointer flex flex-col items-center justify-center text-center p-6"
                         >
                             {file ? (
-                                <div>
-                                    <div className="text-5xl mb-4 text-orange-400">📦</div>
-                                    <div className="text-white font-bold text-lg">{file.name}</div>
-                                    <div className="text-sm text-gray-500 mt-2 font-mono">{(file.size / 1024).toFixed(2)} KB</div>
+                                <div className="animate-in fade-in zoom-in duration-300">
+                                    <div className="text-6xl mb-4 drop-shadow-2xl">📦</div>
+                                    <div className="font-bold text-xl mb-1 text-center">{file.name}</div>
+                                    <div className="text-xs text-blue-500 bg-blue-500/10 px-4 py-1.5 rounded-full inline-block font-mono mb-4">
+                                        {(file.size / 1024).toFixed(2)} KB
+                                    </div>
+                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">点击更换 ZIP 文件</div>
                                 </div>
                             ) : (
-                                <div className="group-hover:scale-105 transition-transform duration-300">
-                                    <div className="text-5xl mb-4 opacity-50 group-hover:opacity-100 transition-opacity">🤐</div>
-                                    <div className="text-gray-300 font-bold text-lg mb-2">点击选择 ZIP 压缩包</div>
-                                    <div className="text-xs text-gray-500">或将文件拖拽至此</div>
+                                <div className="transition-transform duration-300 group-hover:scale-105">
+                                    <div className="text-6xl mb-4 opacity-30 group-hover:opacity-100 transition-opacity">🤐</div>
+                                    <div className="font-bold text-xl mb-2 opacity-60">选择 ZIP 压缩包</div>
+                                    <div className="text-sm opacity-40">点击上传或将文件拖至此处</div>
                                 </div>
                             )}
                         </label>
