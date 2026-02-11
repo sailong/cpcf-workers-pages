@@ -78,6 +78,23 @@ class ProjectRuntime {
                 });
             }
 
+            // 环境变量 (envVars) - 通过 --binding 参数传递
+            if (project.envVars && Object.keys(project.envVars).length > 0) {
+                Object.entries(project.envVars).forEach(([key, varData]) => {
+                    let value;
+                    if (varData.type === 'json') {
+                        // JSON 类型序列化为字符串
+                        value = typeof varData.value === 'string'
+                            ? varData.value
+                            : JSON.stringify(varData.value);
+                    } else {
+                        // plain 和 secret 类型直接使用值
+                        value = varData.value;
+                    }
+                    args.push('--binding', `${key}=${value}`);
+                });
+            }
+
             // Port and IP
             args.push('--port', project.port.toString());
             args.push('--ip', '0.0.0.0');
