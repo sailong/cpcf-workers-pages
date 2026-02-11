@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { D1Manager } from './D1Manager'
 import KVManager from './KVManager'
 import CodeEditorModal from './CodeEditorModal'
-import CreateWorkerForm from './CreateWorkerForm'
+import CreateProjectPage from './create-project'
 import R2Manager from './R2Manager'
 import Login from './Login'
 import ChangePasswordModal from './ChangePasswordModal'
@@ -531,7 +531,7 @@ function App() {
               </h2>
               <p className="text-gray-500 text-sm mt-1">支持在线编写 Worker 或上传 Pages 静态文件</p>
             </div>
-            <CreateWorkerForm onSuccess={() => {
+            <CreateProjectPage onSuccess={() => {
               fetchProjects();
               setActiveTab('list');
             }} />
