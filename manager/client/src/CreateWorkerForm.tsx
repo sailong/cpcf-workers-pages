@@ -414,6 +414,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                         onClick={() => {
                             setProjectType('worker');
                             setCodeSource('editor');
+                            setUploadType('folder');
                             setFile(null);
                         }}
                         className={`flex-1 px-6 py-4 rounded-lg border-2 transition-all ${projectType === 'worker'
@@ -430,6 +431,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                         onClick={() => {
                             setProjectType('pages');
                             setCodeSource('upload');
+                            setUploadType('folder');
                             setFile(null);
                         }}
                         className={`flex-1 px-6 py-4 rounded-lg border-2 transition-all ${projectType === 'pages' && uploadType !== 'build'
@@ -448,7 +450,7 @@ const CreateWorkerForm: React.FC<CreateWorkerFormProps> = ({ onSuccess }) => {
                             setUploadType('build');
                             setFile(null);
                         }}
-                        className={`flex-1 px-6 py-4 rounded-lg border-2 transition-all ${uploadType === 'build'
+                        className={`flex-1 px-6 py-4 rounded-lg border-2 transition-all ${projectType === 'pages' && uploadType === 'build'
                             ? 'border-orange-500 bg-orange-500/10 text-orange-400'
                             : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
                             }`}
