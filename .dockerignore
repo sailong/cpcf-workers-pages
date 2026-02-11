@@ -3,9 +3,8 @@
 .gitignore
 
 # Docker & Environment
-docker-compose.yml
+docker-compose.dev.yml
 .env
-deploy/
 
 # Dependencies (Installed inside container)
 **/node_modules
@@ -34,11 +33,18 @@ Thumbs.db
 *.swp
 *.swo
 
-# Documentation
+# Documentation (not needed in image)
+docs/
 *.md
+!manager/client/src/**/*.md
 LICENSE
 coverage/
 
-# Other
-cfmail/
+# Examples & Tests (not needed in image)
+examples/
+manager/tests/
 tmp/
+
+# Gemini AI
+.gemini/
+.agent/

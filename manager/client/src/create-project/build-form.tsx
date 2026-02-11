@@ -70,7 +70,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
         if (!file) return setError('请先选择项目文件');
 
         setIsBuilding(true);
-        setBuildLogs(['Starting build process...', 'Uploading files...']);
+        setBuildLogs(['开始构建流程...', '正在上传文件...']);
         setBuildId(null);
         setError('');
 
@@ -109,11 +109,11 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                                 setBuildLogs(prev => [...prev, data.content]);
                             } else if (data.type === 'error') {
                                 setError(data.content);
-                                setBuildLogs(prev => [...prev, `Error: ${data.content}`]);
+                                setBuildLogs(prev => [...prev, `错误: ${data.content}`]);
                             } else if (data.type === 'result') {
                                 if (data.success) {
                                     setBuildId(data.buildId);
-                                    setBuildLogs(prev => [...prev, 'Build Successful! You can now deploy.']);
+                                    setBuildLogs(prev => [...prev, '构建成功！可以开始部署。']);
                                 }
                             }
                         } catch (e) {
@@ -123,7 +123,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                 }
             }
         } catch (e) {
-            setError('Build failed to start');
+            setError('构建启动失败');
             console.error(e);
         } finally {
             setIsBuilding(false);

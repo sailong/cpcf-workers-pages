@@ -1,0 +1,27 @@
+services:
+  ccfwp-platform:
+    build: .
+    # image: ccfwp-platform
+    container_name: ccfwp-platform
+    ports:
+      - "8001:8001"
+      - "9100:9100"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/manager/client/node_modules
+      # Persistent data for manager and user projects
+      - ./.platform-data:/app/.platform-data
+    environment:
+      - NODE_ENV=development
+      # Manager Service Internal Port (Default: 3000)
+      # This is the port the express server listens on inside the container.
+      - MANAGER_SERVICE_PORT=8001
+      - R2_ADMIN_PORT=9100
+
+    # Override default command to ensure dependencies are installed if missing
+    # In a real dev env, we might want to run `npm install` inside.
+    # For now, we assume user/script handles it, or we run it manually.
+    # We'll use nodemon if available for dev, or just node.
+    command: sh -c "cd manager && npm install && cd client && npm install && npm run build && cd .. && node server.js"
+    restart: unless-stopped

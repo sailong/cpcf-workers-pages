@@ -114,31 +114,57 @@ docker-compose up -d --build
 *   **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Monaco Editor
 *   **Infrastructure**: Docker, Docker Compose
 
-## � 目录结构
+## 🗂 目录结构
 
 ```
 .
-├── docker-compose.yml       # 容器编排配置
-├── manager/
-│   ├── server.js            # 后端 API 服务
-│   ├── client/              # 前端 React 应用
-│   ├── system-workers/      # 系统级 Worker (如 R2 Admin)
-│   ├── utils/
-│   │   ├── spawner.js       # 进程管理器 (核心)
-│   │   ├── generator.js     # 配置文件生成器
-│   │   ├── kv-storage.js    # KV 存储引擎
-│   │   ├── r2-admin-manager.js # R2 服务进程管理
-│   │   ├── d1-helper.js     # D1 数据库操作封装
-│   │   └── crypto-helper.js # 加密与脱敏工具
-│   └── ...
-└── .platform-data/          # (自动生成) 持久化数据目录
-    ├── auth.json            # 认证凭证 (密码/JWT Secret)
-    ├── uploads/             # 项目代码文件
-    ├── d1-databases/        # D1 SQLite 文件
-    ├── kv-data/             # KV 持久化数据
-    ├── r2-data/             # R2 对象存储数据
-    ├── projects.json        # 项目元数据
-    └── resources.json       # 资源元数据
+├── Dockerfile                # 多阶段生产构建
+├── docker-compose.yml        # 生产环境编排
+├── docker-compose.dev.yml    # 开发环境编排 (挂载源码)
+├── README.md
+│
+├── manager/                  # 核心服务
+│   ├── server.js             # 后端入口 (轻量级)
+│   ├── package.json
+│   ├── routes/               # API 路由定义
+│   ├── middleware/           # 中间件 (Auth, Proxy)
+│   ├── services/             # 业务逻辑服务
+│   ├── client/               # 前端 React 应用 (Vite)
+│   │   └── src/
+│   │       ├── components/   # 通用组件 (IDE, Resources)
+│   │   │   ├── pages/        # 页面组件
+│   │   │   ├── services/     # 前端 APISDK
+│   │   │   ├── types/        # TypeScript 类型
+│   │   │   ├── App.tsx       # 路由配置
+│   │   │   └── main.tsx      # 入口文件
+│   │   └── dist/             # 构建产物 (后端托管)
+│   ├── utils/                # 后端工具模块
+│   │   ├── spawner.js        # 进程管理器 (核心)
+│   │   ├── generator.js      # wrangler.toml 配置生成
+│   │   ├── d1-helper.js      # D1 数据库操作
+│   │   ├── kv-storage.js     # KV 存储引擎
+│   │   ├── r2-admin-manager.js # R2 服务管理
+│   │   └── crypto-helper.js  # 加密/脱敏工具
+│   ├── system-workers/       # 系统级 Worker (R2 Admin)
+│   └── tests/                # 测试脚本
+│
+├── docs/                     # 文档中心
+│   ├── deployment.md         # Docker 部署指南
+│   ├── manual-run.md         # 手动运行指南
+│   ├── 1panel.md             # 1Panel 部署指南
+│   └── publishing.md         # 镜像发布指南
+│
+├── examples/                 # 示例项目
+│   └── cfmail/               # Cloudflare 邮件路由方案
+│
+└── .platform-data/           # (自动生成) 持久化数据
+    ├── auth.json             # 认证凭证
+    ├── projects.json         # 项目元数据
+    ├── resources.json        # 资源元数据
+    ├── uploads/              # 项目代码文件
+    ├── d1-databases/         # D1 SQLite 文件
+    ├── kv-data/              # KV 持久化数据
+    └── r2-data/              # R2 对象存储数据
 ```
 
 ## � 致谢 (Acknowledgements)
