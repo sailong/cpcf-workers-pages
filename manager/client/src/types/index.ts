@@ -27,8 +27,8 @@ export interface BindingItem {
 
 export interface EnvVars {
     [key: string]: {
-        type: 'plain' | 'secret';
-        value: string;
+        type: 'plain' | 'secret' | 'json';
+        value: string | any;
     };
 }
 

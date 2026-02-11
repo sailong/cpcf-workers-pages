@@ -124,26 +124,13 @@ router.post('/:id/start', async (req, res) => {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
 
-    const { force } = req.body;
-
     try {
-        const inUse = await projectService.isSystemPortInUse(project.port);
-        if (inUse) {
-            if (force) {
-                try {
-                    console.log(`[Start] Force starting ${project.name}, killing port ${project.port}...`);
-                    await killPort(project.port);
-                    // Wait a bit for OS to release port
-                    await new Promise(r => setTimeout(r, 1000));
-                } catch (e) {
-                    console.error(`[Start] Failed to kill port ${project.port}`, e);
-                }
-            } else {
-                return res.status(409).json({
-                    error: `端口 ${project.port} 已被占用`,
-                    portInUse: true
-                });
-            }
+        // Always force release port to ensure clean startup
+        try {
+            console.log(`[Start] Ensuring port ${project.port} is free for ${project.name}...`);
+            await killPort(project.port);
+        } catch (e) {
+            console.error(`[Start] Failed to kill port ${project.port}`, e);
         }
 
         await runtime.start(project);

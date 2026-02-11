@@ -30,7 +30,8 @@ app.use(require('./middleware/auth'));
 
 // Services (Auto-start projects and R2 Admin)
 const runtimeService = require('./services/runtime-service');
-runtimeService.startAll();
+const projectService = require('./services/project-service');
+const killPort = require('./utils/port-killer');
 
 // API Routes
 app.use('/api', require('./routes/auth'));
@@ -60,10 +61,31 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'client/dist/index.html'));
 });
 
-app.listen(MANAGER_SERVICE_PORT, () => {
-    console.log(`=============================================`);
-    console.log(`   CCFWP Manager Service Running             `);
-    console.log(`   Port: ${MANAGER_SERVICE_PORT}             `);
-    console.log(`   Domain: ${process.env.ROOT_DOMAIN || 'localhost'}`);
-    console.log(`=============================================`);
-});
+// Start Server Function
+async function startServer() {
+    try {
+        const isPortInUse = await projectService.isSystemPortInUse(MANAGER_SERVICE_PORT);
+        if (isPortInUse) {
+            console.log(`[Startup] Port ${MANAGER_SERVICE_PORT} is in use. Attempting to free it...`);
+            await killPort(MANAGER_SERVICE_PORT);
+            // Give the OS a moment to reclaim the port
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        app.listen(MANAGER_SERVICE_PORT, () => {
+            console.log(`=============================================`);
+            console.log(`   CCFWP Manager Service Running             `);
+            console.log(`   Port: ${MANAGER_SERVICE_PORT}             `);
+            console.log(`   Domain: ${process.env.ROOT_DOMAIN || 'localhost'}`);
+            console.log(`=============================================`);
+
+            // Start projects after server is up
+            runtimeService.startAll();
+        });
+    } catch (e) {
+        console.error('[Startup] Failed to start server:', e);
+        process.exit(1);
+    }
+}
+
+startServer();

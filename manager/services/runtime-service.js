@@ -5,6 +5,7 @@ const resourceService = require('./resource-service');
 const projectService = require('./project-service');
 const ProjectRuntime = require('../utils/spawner');
 const R2AdminManager = require('../utils/r2-admin-manager');
+const killPort = require('../utils/port-killer');
 
 // Initialize Runtime
 const runtime = new ProjectRuntime(config.UPLOADS_DIR, resourceService.getAll());
@@ -37,12 +38,14 @@ async function startAll() {
             }
 
             try {
-                // Ensure port is not occupied by system
-                const portCheck = await projectService.isSystemPortInUse(p.port);
-                if (portCheck) {
-                    console.warn(`[Auto-Start] Port ${p.port} for ${p.name} is in use. Assigning new port...`);
-                    p.port = await projectService.getAvailablePort();
-                    projectService.save();
+                // Always attempt to release port before starting
+                // This prevents issues where isSystemPortInUse might return false negatives (e.g. ipv6/ipv4 mismatch)
+                // or if a zombie process is holding the port.
+                try {
+                    console.log(`[Auto-Start] Ensuring port ${p.port} is free for ${p.name}...`);
+                    await killPort(p.port);
+                } catch (e) {
+                    console.warn(`[Auto-Start] Kill port error: ${e.message}`);
                 }
 
                 await runtime.start(p);

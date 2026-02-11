@@ -15,6 +15,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
     const [files, setFiles] = useState<FileList | null>(null);
     const [zipFile, setZipFile] = useState<File | null>(null);
     const [isDeploying, setIsDeploying] = useState(false);
+    const [deploySuccess, setDeploySuccess] = useState(false);
 
     // Build Config
     const [buildCommand, setBuildCommand] = useState('');
@@ -44,12 +45,15 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
 
     const handleDeploy = async () => {
         setIsDeploying(true);
-        onLog('开始处理...');
+        setDeploySuccess(false);
+        const startTime = new Date().toLocaleTimeString();
+        onLog(`[${startTime}] 🚀 开始构建任务...`);
 
         try {
             if (uploadType === 'rebuild') {
                 // Remote Rebuild
                 await ProjectService.rebuild(project.id, { buildCommand, outputDir }, onLog);
+                setDeploySuccess(true);
                 onSuccess();
             } else {
                 // Upload & Build/Deploy
@@ -121,7 +125,9 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 if (buildId) {
                     onLog('构建完成，正在部署...');
                     await ProjectService.deploy(project.id, buildId, outputDir);
-                    onLog('部署成功！');
+                    const endTime = new Date().toLocaleTimeString();
+                    onLog(`[${endTime}] ✅ 部署成功！`);
+                    setDeploySuccess(true);
                     onSuccess();
                 }
 
@@ -135,44 +141,62 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
 
     return (
         <div className="p-6 text-gray-300">
+            {/* 成功/错误提示 Banner */}
+            {isDeploying && (
+                <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center gap-3 animate-pulse">
+                    <span className="text-xl">⏳</span>
+                    <span className="font-medium">正在部署中，请稍候...</span>
+                </div>
+            )}
+
+            {!isDeploying && deploySuccess && (
+                <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-3">
+                    <span className="text-xl">✅</span>
+                    <div>
+                        <div className="font-bold">部署成功</div>
+                        <div className="text-xs opacity-70">项目已更新，稍后即可访问最新版本。</div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex gap-4 mb-6">
-                <button onClick={() => setUploadType('folder')} className={`px-4 py-2 border rounded ${uploadType === 'folder' ? 'border-orange-500 text-orange-400' : 'border-gray-700'}`}>文件夹 (Folder)</button>
-                <button onClick={() => setUploadType('zip')} className={`px-4 py-2 border rounded ${uploadType === 'zip' ? 'border-orange-500 text-orange-400' : 'border-gray-700'}`}>Zip 压缩包</button>
-                <button onClick={() => setUploadType('rebuild')} className={`px-4 py-2 border rounded ${uploadType === 'rebuild' ? 'border-orange-500 text-orange-400' : 'border-gray-700'}`}>重新构建 (Rebuild)</button>
+                <button onClick={() => setUploadType('folder')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'folder' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>文件夹 (Folder)</button>
+                <button onClick={() => setUploadType('zip')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'zip' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>Zip 压缩包</button>
+                <button onClick={() => setUploadType('rebuild')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'rebuild' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>重新构建 (Rebuild)</button>
             </div>
 
-            <div className="border border-dashed border-gray-700 rounded-xl p-8 text-center mb-6">
+            <div className="border border-dashed border-gray-700 rounded-2xl p-8 text-center mb-6 bg-black/20 hover:bg-black/40 transition-colors">
                 {uploadType === 'folder' && (
                     <input type="file"
                         // @ts-ignore
                         webkitdirectory="" directory="" multiple
                         onChange={handleFolderSelect}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-600/20 file:text-orange-400 hover:file:bg-orange-600/30 cursor-pointer"
                     />
                 )}
                 {uploadType === 'zip' && (
-                    <input type="file" accept=".zip" onChange={handleZipSelect} className="block w-full" />
+                    <input type="file" accept=".zip" onChange={handleZipSelect} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-600/20 file:text-orange-400 hover:file:bg-orange-600/30 cursor-pointer" />
                 )}
                 {uploadType === 'rebuild' && (
-                    <p>使用上次上传的源代码重新构建。</p>
+                    <p className="text-gray-400">使用服务器上缓存的源代码重新触发构建流程。</p>
                 )}
             </div>
 
-            <div className="space-y-4 mb-6">
+            <div className="grid grid-cols-2 gap-6 mb-8">
                 <div>
-                    <label className="block text-sm mb-1">构建命令 (Build Command)</label>
-                    <input value={buildCommand} onChange={e => setBuildCommand(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded p-2" placeholder="npm install && npm run build" />
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">构建命令 (Build Command)</label>
+                    <input value={buildCommand} onChange={e => setBuildCommand(e.target.value)} className="input-liquid w-full p-3" placeholder="npm install && npm run build" />
                 </div>
                 <div>
-                    <label className="block text-sm mb-1">输出目录 (Output Directory)</label>
-                    <input value={outputDir} onChange={e => setOutputDir(e.target.value)} className="w-full bg-gray-900 border border-gray-700 rounded p-2" placeholder="dist" />
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">输出目录 (Output Directory)</label>
+                    <input value={outputDir} onChange={e => setOutputDir(e.target.value)} className="input-liquid w-full p-3" placeholder="dist" />
                 </div>
             </div>
 
-            <button onClick={handleDeploy} disabled={isDeploying} className="w-full bg-green-600 hover:bg-green-500 text-white py-2 rounded font-bold disabled:opacity-50">
-                {isDeploying ? '部署中...' : '开始部署'}
+            <button onClick={handleDeploy} disabled={isDeploying} className="w-full btn-primary py-3 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                {isDeploying ? '🚀 正在部署...' : '开始部署'}
             </button>
-        </div>
+        </div >
     );
 };
 

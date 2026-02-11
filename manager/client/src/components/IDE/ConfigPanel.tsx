@@ -198,7 +198,100 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 </div>
             </div>
 
-            {/* Port */}
+            {/* Environment Variables */}
+            <div className="mb-8 border-t border-gray-700 pt-6">
+                <div className="flex justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">环境变量 (Environment Variables)</h3>
+                    <button
+                        onClick={() => {
+                            const newKey = `VAR_${Object.keys(envVars).length + 1}`;
+                            setEnvVars({ ...envVars, [newKey]: { type: 'plain', value: '' } });
+                        }}
+                        className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700"
+                    >
+                        + 添加变量
+                    </button>
+                </div>
+
+                {Object.entries(envVars).map(([key, config], i) => (
+                    <div key={i} className="flex gap-2 mb-2 items-start">
+                        <input
+                            className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm w-1/4 font-mono"
+                            placeholder="KEY"
+                            value={key}
+                            onChange={e => {
+                                const newKey = e.target.value;
+                                if (newKey !== key) {
+                                    const newEnv = { ...envVars };
+                                    const val = newEnv[key];
+                                    delete newEnv[key];
+                                    newEnv[newKey] = val;
+                                    setEnvVars(newEnv);
+                                }
+                            }}
+                        />
+                        <select
+                            className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm w-24"
+                            value={config.type}
+                            onChange={e => {
+                                setEnvVars({
+                                    ...envVars,
+                                    [key]: { ...config, type: e.target.value as any }
+                                });
+                            }}
+                        >
+                            <option value="plain">文本</option>
+                            <option value="secret">密钥</option>
+                            <option value="json">JSON</option>
+                        </select>
+                        <input
+                            className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm flex-1 font-mono"
+                            placeholder="Value"
+                            value={typeof config.value === 'string' ? config.value : JSON.stringify(config.value)}
+                            onChange={e => {
+                                let val: any = e.target.value;
+                                if (config.type === 'json') {
+                                    try {
+                                        val = JSON.parse(e.target.value);
+                                    } catch (err) {
+                                        // Keep as string if invalid JSON, or handle error?
+                                        // For input field, we keep string, it might be partial.
+                                        // Actually for json type, we should probably allow string input and parse on save?
+                                        // OR just store as string in UI and try parse.
+                                        // But here we're updating state directly.
+                                        // Let's store as string for now if it fails parse, but type ensures structure.
+                                        // Wait, config.value can be object.
+                                        // If user types "{", it's invalid JSON until "}".
+                                        // Simple approach: Store value as string in UI, parse in backend? 
+                                        // Backend expects object for JSON type?
+                                        // Let's strictly treat 'json' type input as string here for simplicity 
+                                        // and let spawner/generator handle string-ified JSON.
+                                        // Actually `generator.js` lines 80-82: `typeof varData.value === 'string' ? ... : JSON.stringify(...)`
+                                        // So passing string is fine!
+                                    }
+                                }
+                                setEnvVars({
+                                    ...envVars,
+                                    [key]: { ...config, value: val }
+                                });
+                            }}
+                        />
+                        <button
+                            onClick={() => {
+                                const newEnv = { ...envVars };
+                                delete newEnv[key];
+                                setEnvVars(newEnv);
+                            }}
+                            className="text-red-500 hover:text-red-400 px-2 pt-1"
+                        >
+                            ×
+                        </button>
+                    </div>
+                ))}
+                {Object.keys(envVars).length === 0 && (
+                    <div className="text-gray-500 text-sm italic">暂无环境变量</div>
+                )}
+            </div>
             <div>
                 <h3 className="text-lg font-bold text-white mb-4">系统设置 (System Settings)</h3>
                 <div className="flex items-center gap-4">

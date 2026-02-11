@@ -49,51 +49,55 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 w-full max-w-md shadow-2xl">
-                <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-500 to-yellow-500 mb-2">
-                        CCFWP 管理后台
+        <div className="min-h-screen bg-black flex items-center justify-center p-4 font-sans relative overflow-hidden">
+            {/* Background Decoration */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+
+            <div className="glass-card p-10 w-full max-w-md relative z-10">
+                <div className="text-center mb-10">
+                    <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">
+                        欢迎回来
                     </h1>
-                    <p className="text-gray-500">请验证您的身份以继续</p>
+                    <p className="text-gray-500 text-sm">Sign in to CCFWP Manager</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-gray-500 text-sm mb-1">用户名</label>
+                        <label className="block text-gray-400 text-xs font-bold uppercase mb-2 ml-1">用户名</label>
                         <input
                             type="text"
                             value="admin"
                             readOnly
                             disabled
-                            className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-gray-400 cursor-not-allowed"
+                            className="input-liquid w-full p-3 opacity-50 cursor-not-allowed"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-gray-500 text-sm mb-1">密码</label>
+                        <label className="block text-gray-400 text-xs font-bold uppercase mb-2 ml-1">密码</label>
                         <input
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="请输入密码"
-                            className="w-full bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 outline-none transition-all placeholder-gray-600"
+                            className="input-liquid w-full p-3"
                             autoFocus
                         />
                     </div>
 
                     <div>
-                        <label className="block text-gray-500 text-sm mb-1">验证码</label>
+                        <label className="block text-gray-400 text-xs font-bold uppercase mb-2 ml-1">验证码</label>
                         <div className="flex gap-4">
                             <input
                                 type="text"
                                 value={captcha}
                                 onChange={(e) => setCaptcha(e.target.value)}
-                                placeholder="请输入验证码"
-                                className="flex-1 bg-gray-950 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 outline-none transition-all placeholder-gray-600"
+                                placeholder="验证码"
+                                className="input-liquid flex-1 p-3"
                             />
                             <div
-                                className="w-32 h-12 bg-gray-800 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                                className="w-32 h-[46px] bg-[#2c2c2e] rounded-xl overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border border-white/10"
                                 onClick={fetchCaptcha}
                                 dangerouslySetInnerHTML={{ __html: captchaSvg }}
                                 title="点击刷新"
@@ -102,22 +106,23 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     </div>
 
                     {error && (
-                        <div className="bg-red-900/20 border border-red-800/50 text-red-400 px-4 py-3 rounded-lg text-sm text-center">
-                            {error === 'Login failed' ? '登录失败' : error === 'Connection failed' ? '连接失败' : error}
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm text-center">
+                            {error === 'Login failed' ? '登录失败，请检查密码或验证码' : error === 'Connection failed' ? '连接失败' : error}
                         </div>
                     )}
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-lg ${loading
-                            ? 'bg-gray-700 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-orange-600 to-yellow-600 hover:from-orange-500 hover:to-yellow-500 shadow-orange-900/20 transform hover:-translate-y-0.5'
-                            }`}
+                        className="w-full btn-primary py-3.5 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-4"
                     >
-                        {loading ? '验证中...' : '登录'}
+                        {loading ? '验证中...' : '登 录'}
                     </button>
                 </form>
+            </div>
+
+            <div className="absolute bottom-6 text-center text-gray-600 text-xs">
+                &copy; {new Date().getFullYear()} CCFWP Manager. All rights reserved.
             </div>
         </div>
     );

@@ -29,18 +29,76 @@ class ProjectRuntime {
         let cwd = this.uploadsDir;
 
         if (project.type === 'pages') {
-            // Check for Source Directory (Pages Functions Support)
-            // ... (existing logic)
+            // Logic to determine Project Root (where functions/ or _worker.js might be)
+            // and Static Assets Dir (which is passed to 'wrangler pages dev [DIR]')
+
+            // 1. Build Flow (Source Directory Exists)
             const projectRootRel = path.dirname(project.mainFile);
             const sourceDir = path.join(this.uploadsDir, projectRootRel, 'source');
 
             if (fs.existsSync(sourceDir)) {
                 cwd = sourceDir;
-                const targetDir = project.outputDir || path.basename(project.mainFile);
-                args.push('pages', 'dev', targetDir);
-                console.log(`[Runtime] Detected source dir for ${project.name}, using CWD: ${cwd}, Target: ${targetDir}`);
+                // For Build projects, user defines outputDir (e.g. 'dist')
+                // If outputDir is empty or '.', we use '.'
+                let targetDirName = project.outputDir || '.';
+
+                // If outputDir is absolute or attempts to escape, sanitize? 
+                // Assuming outputDir is relative to sourceDir.
+
+                // Auto-detection within sourceDir if outputDir seems wrong?
+                // existing logic kept simple: Use explicit outputDir if provided.
+
+                args.push('pages', 'dev', targetDirName);
+                console.log(`[Runtime] Build Project ${project.name}: CWD=${cwd}, Target=${targetDirName}`);
+
             } else {
-                args.push('pages', 'dev', project.mainFile);
+                // 2. Direct Upload Flow (Zip or Folder)
+                // project.mainFile is likely 'page-name-timestamp' (the extract dir)
+                // We initially assume CWD is the extract dir.
+
+                let targetPath = project.mainFile;
+                let fullPath = path.join(this.uploadsDir, targetPath);
+
+                // Auto-detect nested project root vs static dir
+                // Scenario A: Zip contains [ 'index.html', 'functions/' ] -> CWD = fullPath, Target = '.'
+                // Scenario B: Zip contains [ 'dist/index.html', 'functions/' ] -> CWD = fullPath, Target = 'dist'
+                // Scenario C: Zip contains [ 'my-app/' ] -> [ 'my-app/index.html', 'my-app/functions/' ] 
+                //    -> CWD = fullPath/my-app, Target = '.'
+
+                // Step 1: Check for single top-level folder wrapper (Scenario C)
+                if (fs.existsSync(fullPath) && fs.lstatSync(fullPath).isDirectory()) {
+                    const items = fs.readdirSync(fullPath).filter(i => !i.startsWith('.'));
+                    // If only one folder, and no index.html/functions in root, drill down
+                    if (items.length === 1 && fs.statSync(path.join(fullPath, items[0])).isDirectory()) {
+                        const subPath = path.join(fullPath, items[0]);
+                        // Check if this subfolder looks like a project root
+                        if (fs.existsSync(path.join(subPath, 'index.html')) ||
+                            fs.existsSync(path.join(subPath, 'functions')) ||
+                            fs.existsSync(path.join(subPath, '_worker.js'))) {
+
+                            console.log(`[Runtime] Auto-detected nested root: ${items[0]}`);
+                            fullPath = subPath; // Update root
+                            // Note: We don't update targetPath string yet, we handle CWD
+                        }
+                    }
+                }
+
+                cwd = fullPath;
+                let staticArg = '.';
+
+                // Step 2: Check for specific static directory (Scenario B: dist/ or public/)
+                // Only if index.html is NOT in current root
+                if (!fs.existsSync(path.join(cwd, 'index.html'))) {
+                    const candidates = ['dist', 'public', 'build', 'out'];
+                    const found = candidates.find(d => fs.existsSync(path.join(cwd, d, 'index.html')));
+                    if (found) {
+                        staticArg = found;
+                        console.log(`[Runtime] Auto-detected static dir: ${found}`);
+                    }
+                }
+
+                args.push('pages', 'dev', staticArg);
+                console.log(`[Runtime] Direct Upload ${project.name}: CWD=${cwd}, Target=${staticArg}`);
             }
 
             // Sync KV Data before starting
@@ -94,6 +152,10 @@ class ProjectRuntime {
                     args.push('--binding', `${key}=${value}`);
                 });
             }
+
+            // Force shared persistence so Pages see the same D1 data
+            const sharedStateDir = path.join(path.dirname(this.uploadsDir), 'wrangler-shared-state');
+            args.push('--persist-to', sharedStateDir);
 
             // Port and IP
             args.push('--port', project.port.toString());

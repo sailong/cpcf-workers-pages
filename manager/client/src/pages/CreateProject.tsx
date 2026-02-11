@@ -117,98 +117,116 @@ const CreateProject: React.FC = () => {
     const isCreateDisabled = creating;
 
     return (
-        <div className="max-w-5xl mx-auto p-6 space-y-6 text-gray-300">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-white">新建项目</h1>
-                <button onClick={() => navigate('/')} className="text-gray-400 hover:text-white">返回控制台</button>
+        <div className="min-h-screen bg-black text-gray-200 p-6 md:p-10 font-sans">
+            <div className="max-w-4xl mx-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold text-white tracking-tight">新建项目</h1>
+                        <p className="text-gray-500 text-sm mt-1">Create a new Worker, Pages, or Build project</p>
+                    </div>
+                    <button onClick={() => navigate('/')} className="glass-button px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2">
+                        <span>←</span> 返回控制台
+                    </button>
+                </div>
+
+                <div className="grid gap-8">
+                    {/* Project Type */}
+                    <div className="glass-card p-8">
+                        <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1">选择项目类型</label>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {['worker', 'pages', 'build'].map(m => (
+                                <button
+                                    key={m}
+                                    onClick={() => setMode(m as ProjectMode)}
+                                    className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${mode === m
+                                        ? 'border-blue-500/50 bg-blue-500/10 text-white shadow-lg shadow-blue-900/20'
+                                        : 'border-transparent bg-[#2c2c2e] text-gray-400 hover:bg-[#3a3a3c] hover:text-gray-200'
+                                        }`}
+                                >
+                                    <div className="text-3xl mb-3">{m === 'worker' ? '⚡️' : m === 'pages' ? '📄' : '🛠️'}</div>
+                                    <div className="font-bold text-lg capitalize mb-1">{m}</div>
+                                    <div className="text-xs opacity-60 font-medium">
+                                        {m === 'worker' ? '高性能边缘计算函数' : m === 'pages' ? '静态网站托管' : 'CI/CD 构建流水线'}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Basic Info */}
+                    <div className="glass-card p-8 space-y-6">
+                        <div>
+                            <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1">项目名称</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder={mode === 'worker' ? 'my-awesome-worker' : 'my-static-site'}
+                                className="input-liquid w-full p-4 text-lg"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1">内部端口 (可选)</label>
+                            <input
+                                type="number"
+                                value={customPort}
+                                onChange={(e) => setCustomPort(e.target.value ? parseInt(e.target.value) : '')}
+                                placeholder="留空则自动分配"
+                                className="input-liquid w-full p-4"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Detailed Config (Sub Forms) */}
+                    <div className="glass-card p-8">
+                        <label className="block text-gray-500 text-xs font-bold uppercase mb-6 ml-1">详细配置</label>
+                        {mode === 'worker' && <WorkerForm ref={formRef} setError={setError} showToast={showToast} />}
+                        {mode === 'pages' && <PagesForm ref={formRef} setError={setError} showToast={showToast} />}
+                        {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} />}
+                    </div>
+                </div>
+
+                {/* Error & Submit */}
+                <div className="mt-8 mb-20">
+                    {error && (
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-4 rounded-xl flex items-center gap-3 mb-6">
+                            <span className="text-xl">⚠️</span><span>{error}</span>
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleCreate}
+                        disabled={isCreateDisabled}
+                        className="w-full btn-primary py-4 text-xl font-bold shadow-xl shadow-blue-900/30 disabled:opacity-50"
+                    >
+                        {creating ? '🚀 创建部署中...' : '立即创建项目'}
+                    </button>
+                </div>
             </div>
 
             {/* Toast */}
             {toast && (
-                <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded shadow-lg text-white font-medium z-[70] ${toast.type === 'error' ? 'bg-red-600' : 'bg-green-600'}`}>
-                    {toast.type === 'success' ? '✅ ' : '❌ '}{toast.msg}
+                <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl text-white font-medium z-[100] flex items-center gap-3 backdrop-blur-md border border-white/10 ${toast.type === 'error' ? 'bg-red-500/80 shadow-red-900/50' : 'bg-green-500/80 shadow-green-900/50'}`}>
+                    <span>{toast.type === 'success' ? '✅' : '❌'}</span>
+                    <span>{toast.msg}</span>
                 </div>
             )}
 
             {/* Success Modal */}
             {successMsg && (
-                <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-                    <div className="bg-gray-800 border border-green-500/50 p-8 rounded-xl flex flex-col items-center gap-4">
-                        <div className="text-3xl">✅</div>
-                        <h3 className="text-2xl font-bold text-white">{successMsg}</h3>
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100]">
+                    <div className="glass-card p-10 text-center max-w-sm mx-4 transform scale-100 animate-in fade-in zoom-in duration-300">
+                        <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <span className="text-4xl">🎉</span>
+                        </div>
+                        <h3 className="text-2xl font-bold text-white mb-2">创建成功!</h3>
+                        <p className="text-gray-400 mb-6">{successMsg}</p>
+                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                     </div>
                 </div>
             )}
-
-            {/* Name */}
-            <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">项目名称 *</label>
-                <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder={mode === 'worker' ? 'my-worker' : 'my-static-site'}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500"
-                />
-            </div>
-
-            {/* Type */}
-            <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">项目类型 *</label>
-                <div className="flex gap-4">
-                    {['worker', 'pages', 'build'].map(m => (
-                        <button
-                            key={m}
-                            onClick={() => setMode(m as ProjectMode)}
-                            className={`flex-1 px-6 py-4 rounded-lg border-2 transition-all capitalize ${mode === m
-                                ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                                : 'border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600'
-                                }`}
-                        >
-                            <div className="text-2xl mb-2">{m === 'worker' ? '⚡️' : m === 'pages' ? '📄' : '🛠️'}</div>
-                            <div className="font-bold">{m}</div>
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Sub Forms */}
-            <div className="bg-gray-900 p-6 rounded-xl border border-gray-800">
-                {mode === 'worker' && <WorkerForm ref={formRef} setError={setError} showToast={showToast} />}
-                {mode === 'pages' && <PagesForm ref={formRef} setError={setError} showToast={showToast} />}
-                {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} />}
-            </div>
-
-            {/* Port */}
-            <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">内部端口 (可选)</label>
-                <input
-                    type="number"
-                    value={customPort}
-                    onChange={(e) => setCustomPort(e.target.value ? parseInt(e.target.value) : '')}
-                    placeholder="留空则自动分配"
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white"
-                />
-            </div>
-
-            {/* Error */}
-            {error && (
-                <div className="bg-red-500/10 border border-red-500 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2">
-                    <span>⚠️</span><span>{error}</span>
-                </div>
-            )}
-
-            // Submit
-            <div className="pt-4">
-                <button
-                    onClick={handleCreate}
-                    disabled={isCreateDisabled}
-                    className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-400 hover:to-orange-500 text-white font-bold rounded-lg disabled:opacity-50 transition-all"
-                >
-                    {creating ? '创建中...' : '🚀 创建并部署'}
-                </button>
-            </div>
         </div>
     );
 };
