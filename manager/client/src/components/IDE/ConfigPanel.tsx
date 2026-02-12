@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Project, Bindings, EnvVars, KVNamespace, D1Database, R2Bucket } from '../../types';
 import { ProjectService, ResourceService } from '../../services';
 
@@ -8,6 +9,7 @@ interface ConfigPanelProps {
 }
 
 const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
+    const { t } = useTranslation();
     const [bindings, setBindings] = useState<Bindings>({ kv: [], d1: [], r2: [] });
     const [envVars, setEnvVars] = useState<EnvVars>({});
     const [port, setPort] = useState<number>(0);
@@ -86,7 +88,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (e) {
-            alert('Save failed');
+            alert(t('common.saveFailed'));
         } finally {
             setSaving(false);
         }
@@ -121,25 +123,25 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
         // Assuming EnvVars management is similar to listings.
     };
 
-    if (loading) return <div>正在加载配置...</div>;
+    if (loading) return <div>{t('config.loading')}</div>;
 
     return (
         <div className="p-6 space-y-8 text-gray-300 overflow-y-auto h-full">
             {/* Bindings Section */}
             <div>
-                <h3 className="text-lg font-bold text-white mb-4">资源绑定 (Resource Bindings)</h3>
+                <h3 className="text-lg font-bold text-white mb-4">{t('config.bindings')}</h3>
 
                 {/* KV */}
                 <div className="mb-6">
                     <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium text-blue-400">KV 命名空间绑定 (KV Namespace)</label>
-                        <button onClick={() => addBinding('kv')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ 添加</button>
+                        <label className="text-sm font-medium text-blue-400">{t('config.kvBinding')}</label>
+                        <button onClick={() => addBinding('kv')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ {t('common.add')}</button>
                     </div>
                     {bindings.kv.map((b, i) => (
                         <div key={i} className="flex gap-2 mb-2">
                             <input
                                 className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm w-1/3"
-                                placeholder="变量名 (Variable Name)"
+                                placeholder={t('config.variableName')}
                                 value={b.varName}
                                 onChange={e => updateBinding('kv', i, 'varName', e.target.value)}
                             />
@@ -148,7 +150,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                                 value={b.resourceId}
                                 onChange={e => updateBinding('kv', i, 'resourceId', e.target.value)}
                             >
-                                <option value="">选择 KV 命名空间</option>
+                                <option value="">{t('config.selectKV')}</option>
                                 {resources.kv.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
                             <button onClick={() => removeBinding('kv', i)} className="text-red-500 hover:text-red-400 px-2">×</button>
@@ -159,14 +161,14 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 {/* D1 */}
                 <div className="mb-6">
                     <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium text-purple-400">D1 数据库绑定 (D1 Database)</label>
-                        <button onClick={() => addBinding('d1')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ 添加</button>
+                        <label className="text-sm font-medium text-purple-400">{t('config.d1Binding')}</label>
+                        <button onClick={() => addBinding('d1')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ {t('common.add')}</button>
                     </div>
                     {bindings.d1.map((b, i) => (
                         <div key={i} className="flex gap-2 mb-2">
                             <input
                                 className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm w-1/3"
-                                placeholder="变量名 (Variable Name)"
+                                placeholder={t('config.variableName')}
                                 value={b.varName}
                                 onChange={e => updateBinding('d1', i, 'varName', e.target.value)}
                             />
@@ -175,7 +177,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                                 value={b.resourceId}
                                 onChange={e => updateBinding('d1', i, 'resourceId', e.target.value)}
                             >
-                                <option value="">选择 D1 数据库</option>
+                                <option value="">{t('config.selectD1')}</option>
                                 {resources.d1.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
                             <button onClick={() => removeBinding('d1', i)} className="text-red-500 hover:text-red-400 px-2">×</button>
@@ -186,14 +188,14 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 {/* R2 */}
                 <div className="mb-6">
                     <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium text-yellow-400">R2 存储桶绑定 (R2 Bucket)</label>
-                        <button onClick={() => addBinding('r2')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ 添加</button>
+                        <label className="text-sm font-medium text-yellow-400">{t('config.r2Binding')}</label>
+                        <button onClick={() => addBinding('r2')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ {t('common.add')}</button>
                     </div>
                     {bindings.r2.map((b, i) => (
                         <div key={i} className="flex gap-2 mb-2">
                             <input
                                 className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm w-1/3"
-                                placeholder="变量名 (Variable Name)"
+                                placeholder={t('config.variableName')}
                                 value={b.varName}
                                 onChange={e => updateBinding('r2', i, 'varName', e.target.value)}
                             />
@@ -202,7 +204,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                                 value={b.resourceId}
                                 onChange={e => updateBinding('r2', i, 'resourceId', e.target.value)}
                             >
-                                <option value="">选择 R2 存储桶</option>
+                                <option value="">{t('config.selectR2')}</option>
                                 {resources.r2.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
                             <button onClick={() => removeBinding('r2', i)} className="text-red-500 hover:text-red-400 px-2">×</button>
@@ -214,7 +216,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
             {/* Environment Variables */}
             <div className="mb-8 border-t border-gray-700 pt-6">
                 <div className="flex justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">环境变量 (Environment Variables)</h3>
+                    <h3 className="text-lg font-bold text-white">{t('config.envVars')}</h3>
                     <button
                         onClick={() => {
                             const newKey = `VAR_${Object.keys(envVars).length + 1}`;
@@ -222,7 +224,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                         }}
                         className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700"
                     >
-                        + 添加变量
+                        + {t('config.addVar')}
                     </button>
                 </div>
 
@@ -230,7 +232,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                     <div key={i} className="flex gap-2 mb-2 items-start">
                         <input
                             className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm w-1/4 font-mono"
-                            placeholder="KEY"
+                            placeholder={t('config.key')}
                             value={key}
                             onChange={e => {
                                 const newKey = e.target.value;
@@ -253,13 +255,13 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                                 });
                             }}
                         >
-                            <option value="plain">文本</option>
-                            <option value="secret">密钥</option>
-                            <option value="json">JSON</option>
+                            <option value="plain">{t('config.typeText')}</option>
+                            <option value="secret">{t('config.typeSecret')}</option>
+                            <option value="json">{t('config.typeJson')}</option>
                         </select>
                         <input
                             className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm flex-1 font-mono"
-                            placeholder="Value"
+                            placeholder={t('config.value')}
                             value={typeof config.value === 'string' ? config.value : JSON.stringify(config.value)}
                             onChange={e => {
                                 let val: any = e.target.value;
@@ -267,20 +269,6 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                                     try {
                                         val = JSON.parse(e.target.value);
                                     } catch (err) {
-                                        // Keep as string if invalid JSON, or handle error?
-                                        // For input field, we keep string, it might be partial.
-                                        // Actually for json type, we should probably allow string input and parse on save?
-                                        // OR just store as string in UI and try parse.
-                                        // But here we're updating state directly.
-                                        // Let's store as string for now if it fails parse, but type ensures structure.
-                                        // Wait, config.value can be object.
-                                        // If user types "{", it's invalid JSON until "}".
-                                        // Simple approach: Store value as string in UI, parse in backend? 
-                                        // Backend expects object for JSON type?
-                                        // Let's strictly treat 'json' type input as string here for simplicity 
-                                        // and let spawner/generator handle string-ified JSON.
-                                        // Actually `generator.js` lines 80-82: `typeof varData.value === 'string' ? ... : JSON.stringify(...)`
-                                        // So passing string is fine!
                                     }
                                 }
                                 setEnvVars({
@@ -302,15 +290,15 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                     </div>
                 ))}
                 {Object.keys(envVars).length === 0 && (
-                    <div className="text-gray-500 text-sm italic">暂无环境变量</div>
+                    <div className="text-gray-500 text-sm italic">{t('config.noEnvVars')}</div>
                 )}
             </div>
             <div>
-                <h3 className="text-lg font-bold text-white mb-4">系统与构建设置 (System & Build Settings)</h3>
+                <h3 className="text-lg font-bold text-white mb-4">{t('config.buildSettings')}</h3>
 
                 <div className="grid grid-cols-2 gap-6 mb-6">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">服务端口 (Port)</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.port')}</label>
                         <input
                             type="number"
                             value={port}
@@ -319,7 +307,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">输出目录 (Output Directory)</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.outputDir')}</label>
                         <input
                             type="text"
                             value={outputDir}
@@ -332,7 +320,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">构建命令 (Build Command)</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.buildCommand')}</label>
                         <input
                             type="text"
                             value={buildCommand}
@@ -342,7 +330,7 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">部署命令 (Deploy Command, Optional)</label>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.deployCommand')}</label>
                         <input
                             type="text"
                             value={deployCommand}
@@ -360,12 +348,12 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                     disabled={saving}
                     className="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded font-medium disabled:opacity-50"
                 >
-                    {saving ? '保存中...' : '保存配置'}
+                    {saving ? t('common.saving') : t('common.save')}
                 </button>
                 {saveSuccess && (
                     <span className="text-sm text-green-400 animate-fade-in flex items-center gap-1.5">
                         <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        配置已保存
+                        {t('common.saved')}
                     </span>
                 )}
             </div>

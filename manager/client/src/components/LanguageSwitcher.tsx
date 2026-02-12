@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LanguageSwitcher: React.FC<{ className?: string }> = ({ className = "" }) => {
-    const { i18n } = useTranslation();
+    const { t, i18n } = useTranslation();
 
     const toggleLanguage = () => {
         const newLang = i18n.language.startsWith('zh') ? 'en' : 'zh';
@@ -13,7 +13,7 @@ const LanguageSwitcher: React.FC<{ className?: string }> = ({ className = "" }) 
         <button
             onClick={toggleLanguage}
             className={`p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)] font-bold ${className}`}
-            title={i18n.language.startsWith('zh') ? "Switch to English" : "切换到中文"}
+            title={i18n.language.startsWith('zh') ? t('theme.switchToEn') : t('theme.switchToZh')}
         >
             {i18n.language.startsWith('zh') ? '中' : 'EN'}
         </button>

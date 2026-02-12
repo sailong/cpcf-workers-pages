@@ -61,7 +61,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 <button
                     onClick={toggleTheme}
                     className="glass border-transparent p-2.5 rounded-xl transition-all active:scale-95 shadow-lg"
-                    title={theme === 'dark' ? '切换亮色' : '切换暗色'}
+                    title={theme === 'dark' ? t('theme.light') : t('theme.dark')}
                 >
                     {theme === 'dark' ? (
                         <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

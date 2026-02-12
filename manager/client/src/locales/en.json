@@ -59,6 +59,30 @@
         "d1Database": "D1 Database",
         "r2Bucket": "R2 Bucket"
     },
+    "resourceList": {
+        "loading": "Loading...",
+        "createError": "Creation failed",
+        "deleteError": "Delete failed",
+        "confirmDelete": "Are you sure you want to delete? This cannot be undone.",
+        "create": "Create",
+        "manage": "Manage",
+        "delete": "Delete",
+        "kv": {
+            "title": "KV Storage",
+            "enterName": "Enter namespace name",
+            "noResources": "No KV namespaces found"
+        },
+        "d1": {
+            "title": "D1 Database",
+            "enterName": "Enter database name",
+            "noResources": "No D1 databases found"
+        },
+        "r2": {
+            "title": "R2 Bucket",
+            "enterName": "Enter bucket name",
+            "noResources": "No R2 buckets found"
+        }
+    },
     "createProjectPage": {
         "title": "New Project",
         "subtitle": "Deploy your code to the global edge network.",
@@ -87,6 +111,62 @@
         "formNotReady": "Form not ready",
         "missingFile": "Missing file",
         "successMessage": "{{type}} created successfully! Redirecting..."
+    },
+    "ide": {
+        "fileTree": {
+            "loading": "Loading...",
+            "noFiles": "No files found"
+        },
+        "tabs": {
+            "code": "Code",
+            "config": "Config",
+            "deploy": "Deploy"
+        },
+        "editor": {
+            "save": "Save",
+            "saving": "Saving...",
+            "saved": "Saved",
+            "selectFile": "Select a file to edit"
+        },
+        "config": {
+            "loading": "Loading configuration...",
+            "bindings": "Resource Bindings",
+            "kvBinding": "KV Namespace Binding",
+            "d1Binding": "D1 Database Binding",
+            "r2Binding": "R2 Bucket Binding",
+            "variableName": "Variable Name",
+            "selectKV": "Select KV Namespace",
+            "selectD1": "Select D1 Database",
+            "selectR2": "Select R2 Bucket",
+            "envVars": "Environment Variables",
+            "addVar": "Add Variable",
+            "key": "KEY",
+            "value": "Value",
+            "typeText": "Text",
+            "typeSecret": "Secret",
+            "typeJson": "JSON",
+            "noEnvVars": "No environment variables",
+            "buildSettings": "System & Build Settings",
+            "port": "Service Port",
+            "outputDir": "Output Directory",
+            "buildCommand": "Build Command",
+            "deployCommand": "Deploy Command (Optional)",
+            "saveSuccess": "Configuration saved"
+        },
+        "deploy": {
+            "deploying": "Deploying...",
+            "deploySuccess": "Deployed Successfully",
+            "deployFailed": "Deployment Failed",
+            "folder": "Folder",
+            "zip": "ZIP",
+            "rebuild": "Rebuild",
+            "startDeploy": "Start Deploy",
+            "deploySuccessDesc": "Project has been updated",
+            "rebuildDesc": "Trigger build using cached source code.",
+            "dragDrop": "Click or drag file here",
+            "buildLogs": "Build Logs",
+            "noLogs": "No logs..."
+        }
     },
     "kvManager": {
         "title": "KV Namespaces",
@@ -234,6 +314,30 @@
         "selectFileFirst": "Please select project file first",
         "buildStartFail": "Build failed to start",
         "autoDetected": "Auto-detected: {{framework}}",
-        "buildSuccess": "Build successful! Ready to deploy."
+        "buildSuccess": "Build successful! Ready to deploy.",
+        "changeFile": "Click to change source directory",
+        "changeZip": "Click to change ZIP file"
+    },
+    "auth": {
+        "passwordMismatch": "Passwords do not match",
+        "passwordLength": "Password must be at least 4 characters",
+        "changePasswordFailed": "Failed to change password",
+        "networkError": "Network connection failed",
+        "changePasswordTitle": "Change Password",
+        "oldPassword": "Old Password",
+        "newPassword": "New Password",
+        "confirmPassword": "Confirm New Password",
+        "changePasswordButton": "Change Password"
+    },
+    "error": {
+        "systemError": "System Error",
+        "unexpectedError": "An unexpected error occurred.",
+        "reloadApp": "Reload Application"
+    },
+    "theme": {
+        "light": "Switch to Light Mode",
+        "dark": "Switch to Dark Mode",
+        "switchToEn": "Switch to English",
+        "switchToZh": "Switch to Chinese"
     }
 }

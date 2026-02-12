@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { FileService } from '../../services';
 import type { FileNode } from '../../types';
 
@@ -16,6 +17,7 @@ interface TreeNode {
 }
 
 const FileTree: React.FC<FileTreeProps> = ({ projectId, onSelect, selectedPath }) => {
+    const { t } = useTranslation();
     const [files, setFiles] = useState<FileNode[]>([]);
     const [loading, setLoading] = useState(false);
     // Tree state: expanded directories set
@@ -95,8 +97,8 @@ const FileTree: React.FC<FileTreeProps> = ({ projectId, onSelect, selectedPath }
         setExpanded(next);
     };
 
-    if (loading) return <div className="p-4 text-gray-500 text-xs text-center">Loading...</div>;
-    if (files.length === 0) return <div className="p-4 text-gray-500 text-xs text-center">No files found.</div>;
+    if (loading) return <div className="p-4 text-gray-500 text-xs text-center">{t('ide.fileTree.loading')}</div>;
+    if (files.length === 0) return <div className="p-4 text-gray-500 text-xs text-center">{t('ide.fileTree.noFiles')}</div>;
 
     const renderNode = (node: TreeNode, depth: number) => {
         const isExpanded = expanded.has(node.path);

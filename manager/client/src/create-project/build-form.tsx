@@ -317,7 +317,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                                     <div className="text-xs text-blue-500 bg-blue-500/10 px-4 py-1.5 rounded-full inline-block font-mono mb-4">
                                         {(file.size / 1024 / 1024).toFixed(2)} MB
                                     </div>
-                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">点击更换源码目录</div>
+                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">{t('buildForm.changeFile')}</div>
                                 </div>
                             ) : (
                                 <div className="transition-transform duration-300 group-hover:scale-105">
@@ -350,7 +350,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                                     <div className="text-xs text-blue-400 bg-blue-500/10 px-4 py-1.5 rounded-full inline-block font-mono mb-4">
                                         {(file.size / 1024 / 1024).toFixed(2)} MB
                                     </div>
-                                    <div className="text-xs text-gray-500 group-hover:text-blue-400 transition-colors">点击更换 ZIP 文件</div>
+                                    <div className="text-xs text-gray-500 group-hover:text-blue-400 transition-colors">{t('buildForm.changeZip')}</div>
                                 </div>
                             ) : (
                                 <div className="transition-transform duration-300 group-hover:scale-105">

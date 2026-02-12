@@ -1,4 +1,6 @@
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
+import { withTranslation, type WithTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 
 interface Props {
     children?: ReactNode;
@@ -9,7 +11,7 @@ interface State {
     error?: Error;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+class ErrorBoundary extends Component<Props & { t: TFunction }, State> {
     public state: State = {
         hasError: false
     };
@@ -27,8 +29,8 @@ class ErrorBoundary extends Component<Props, State> {
             return (
                 <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8">
                     <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 max-w-lg">
-                        <h1 className="text-2xl font-bold text-red-500 mb-4">系统发生错误</h1>
-                        <p className="text-gray-300 mb-4">程序遇到了未预期的错误。</p>
+                        <h1 className="text-2xl font-bold text-red-500 mb-4">{this.props.t('error.systemError')}</h1>
+                        <p className="text-gray-300 mb-4">{this.props.t('error.unexpectedError')}</p>
                         <div className="bg-gray-900 p-4 rounded text-xs font-mono text-red-300 overflow-auto max-h-48">
                             {this.state.error?.toString()}
                         </div>
@@ -36,7 +38,7 @@ class ErrorBoundary extends Component<Props, State> {
                             onClick={() => window.location.reload()}
                             className="mt-6 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-bold"
                         >
-                            重新加载应用
+                            {this.props.t('error.reloadApp')}
                         </button>
                     </div>
                 </div>
@@ -47,4 +49,4 @@ class ErrorBoundary extends Component<Props, State> {
     }
 }
 
-export default ErrorBoundary;
+export default withTranslation()(ErrorBoundary);

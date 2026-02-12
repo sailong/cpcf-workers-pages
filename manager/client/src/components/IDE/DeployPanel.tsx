@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
 import { ProjectService } from '../../services';
 import type { Project } from '../../types';
@@ -11,6 +12,7 @@ interface DeployPanelProps {
 }
 
 const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) => {
+    const { t } = useTranslation();
     const [uploadType, setUploadType] = useState<'folder' | 'zip' | 'rebuild'>('folder');
     const [files, setFiles] = useState<FileList | null>(null);
     const [zipFile, setZipFile] = useState<File | null>(null);
@@ -52,7 +54,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
         setDeploySuccess(false);
         setDeployError(null);
         const startTime = new Date().toLocaleTimeString();
-        onLog(`[${startTime}] 🚀 开始构建任务...`);
+        onLog(`[${startTime}] 🚀 ${t('ide.deploy.deploying')}`);
 
         try {
             if (uploadType === 'rebuild') {
@@ -65,7 +67,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 let fileToUpload = zipFile;
 
                 if (uploadType === 'folder' && files) {
-                    onLog('正在压缩文件...');
+                    onLog(t('pagesForm.processing'));
                     const zip = new JSZip();
                     const fileArray = Array.from(files);
                     if (fileArray.length > 0) {
@@ -89,9 +91,9 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                     fileToUpload = new File([content], "update.zip", { type: "application/zip" });
                 }
 
-                if (!fileToUpload) throw new Error("未选择文件");
+                if (!fileToUpload) throw new Error(t('createProjectPage.missingFile'));
 
-                onLog('正在上传...');
+                onLog(t('r2Manager.uploading'));
                 const formData = new FormData();
                 formData.append('file', fileToUpload);
                 formData.append('buildCommand', buildCommand);
@@ -109,7 +111,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 const decoder = new TextDecoder();
                 let buildId = null;
 
-                if (!reader) throw new Error("连接失败");
+                if (!reader) throw new Error(t('loginPage.connectionFailed'));
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -134,7 +136,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 }
 
                 if (buildId) {
-                    onLog('构建完成，正在部署...');
+                    onLog(t('ide.deploy.deploying'));
                     await ProjectService.deploy(
                         project.id,
                         buildId,
@@ -143,14 +145,14 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                         (err) => { throw new Error(err); }
                     );
                     const endTime = new Date().toLocaleTimeString();
-                    onLog(`[${endTime}] ✅ 部署成功！`);
+                    onLog(`[${endTime}] ✅ ${t('ide.deploy.deploySuccess')}！`);
                     setDeploySuccess(true);
                     onSuccess();
                 }
 
             }
         } catch (e: any) {
-            onLog(`错误: ${e.message}`);
+            onLog(`${t('d1Manager.error')} ${e.message}`);
             setDeployError(e.message);
         } finally {
             setIsDeploying(false);
@@ -163,7 +165,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
             {isDeploying && (
                 <div className="mb-6 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center gap-3 animate-pulse">
                     <span className="text-xl">⏳</span>
-                    <span className="font-medium">正在部署中，请稍候...</span>
+                    <span className="font-medium">{t('ide.deploy.deploying')}</span>
                 </div>
             )}
 
@@ -171,8 +173,8 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                     <span className="text-xl">✅</span>
                     <div>
-                        <div className="font-bold text-sm text-green-300">部署成功</div>
-                        <div className="text-xs opacity-80">更改已立即应用到线上服务</div>
+                        <div className="font-bold text-sm text-green-300">{t('ide.deploy.deploySuccess')}</div>
+                        <div className="text-xs opacity-80">{t('ide.deploy.deploySuccessDesc')}</div>
                     </div>
                 </div>
             )}
@@ -181,16 +183,16 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
                     <span className="text-xl">❌</span>
                     <div>
-                        <div className="font-bold text-sm text-red-300">部署失败</div>
+                        <div className="font-bold text-sm text-red-300">{t('ide.deploy.deployFailed')}</div>
                         <div className="text-xs opacity-80">{deployError}</div>
                     </div>
                 </div>
             )}
 
             <div className="flex gap-4 mb-6">
-                <button onClick={() => setUploadType('folder')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'folder' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>文件夹 (Folder)</button>
-                <button onClick={() => setUploadType('zip')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'zip' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>Zip 压缩包</button>
-                <button onClick={() => setUploadType('rebuild')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'rebuild' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>重新构建 (Rebuild)</button>
+                <button onClick={() => setUploadType('folder')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'folder' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>{t('ide.deploy.folder')}</button>
+                <button onClick={() => setUploadType('zip')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'zip' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>{t('ide.deploy.zip')}</button>
+                <button onClick={() => setUploadType('rebuild')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'rebuild' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>{t('ide.deploy.rebuild')}</button>
             </div>
 
             <div className="border border-dashed border-gray-700 rounded-2xl p-8 text-center mb-6 bg-black/20 hover:bg-black/40 transition-colors">
@@ -206,27 +208,27 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                     <input type="file" accept=".zip" onChange={handleZipSelect} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-600/20 file:text-orange-400 hover:file:bg-orange-600/30 cursor-pointer" />
                 )}
                 {uploadType === 'rebuild' && (
-                    <p className="text-gray-400">使用服务器上缓存的源代码重新触发构建流程。</p>
+                    <p className="text-gray-400">{t('ide.deploy.rebuildDesc')}</p>
                 )}
             </div>
 
             <div className="grid grid-cols-2 gap-6 mb-8">
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">构建命令 (Build Command)</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('ide.config.buildCommand')}</label>
                     <input value={buildCommand} onChange={e => setBuildCommand(e.target.value)} className="input-liquid w-full p-3 font-mono text-sm" placeholder="npm install && npm run build" />
                 </div>
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">输出目录 (Output Directory)</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('ide.config.outputDir')}</label>
                     <input value={outputDir} onChange={e => setOutputDir(e.target.value)} className="input-liquid w-full p-3 font-mono text-sm" placeholder="dist" />
                 </div>
                 <div className="col-span-2">
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">部署命令 (Deploy Command, Optional)</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('ide.config.deployCommand')}</label>
                     <input value={deployCommand} onChange={e => setDeployCommand(e.target.value)} className="input-liquid w-full p-3 font-mono text-sm" placeholder="npx wrangler deploy" />
                 </div>
             </div>
 
             <button onClick={handleDeploy} disabled={isDeploying} className="w-full btn-primary py-3 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                {isDeploying ? '🚀 正在部署...' : '开始部署'}
+                {isDeploying ? `🚀 ${t('ide.deploy.deploying')}` : t('ide.deploy.startDeploy')}
             </button>
         </div >
     );

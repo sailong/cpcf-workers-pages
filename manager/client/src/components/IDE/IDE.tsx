@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Project } from '../../types';
 import { ProjectService, FileService } from '../../services';
 import ConfigPanel from './ConfigPanel';
@@ -15,6 +16,7 @@ interface IDEProps {
 type TabType = 'code' | 'config' | 'deploy';
 
 const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
+    const { t } = useTranslation();
     const [activeTab, setActiveTab] = useState<TabType>('code');
     const [code, setCode] = useState('');
     const [language, setLanguage] = useState('javascript');
@@ -83,7 +85,7 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (e) {
             console.error(e);
-            alert('Save failed');
+            alert(t('ide.editor.saveFailed'));
         } finally {
             setSaving(false);
         }
@@ -95,7 +97,7 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
             <div className="h-12 glass border-b flex justify-between items-center px-4 shadow-sm z-10">
                 <div className="flex items-center gap-4">
                     <button onClick={onClose} className="opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1 text-sm font-bold hover:bg-current/5 px-2 py-1 rounded">
-                        <span>←</span> 返回
+                        <span>←</span> {t('ide.back')}
                     </button>
                     <div className="h-4 w-px bg-current opacity-10"></div>
                     <span className="font-bold tracking-wide">{project.name}</span>
@@ -109,20 +111,20 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                         onClick={() => setActiveTab('code')}
                         className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'code' ? 'bg-blue-500/10 text-blue-500 shadow-sm' : 'opacity-40 hover:opacity-100'}`}
                     >
-                        代码编辑器
+                        {t('ide.tabs.code')}
                     </button>
                     <button
                         onClick={() => setActiveTab('config')}
                         className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'config' ? 'bg-blue-500/10 text-blue-500 shadow-sm' : 'opacity-40 hover:opacity-100'}`}
                     >
-                        项目配置
+                        {t('ide.tabs.config')}
                     </button>
                     {isPages && (
                         <button
                             onClick={() => setActiveTab('deploy')}
                             className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'deploy' ? 'bg-blue-500/10 text-blue-500 shadow-sm' : 'opacity-40 hover:opacity-100'}`}
                         >
-                            部署管理
+                            {t('ide.tabs.deploy')}
                         </button>
                     )}
                 </div>
@@ -138,7 +140,7 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                         {isPages && (
                             <div className="w-64 glass border-r flex flex-col">
                                 <div className="h-9 flex items-center px-4 text-[10px] font-bold opacity-40 uppercase tracking-widest border-b">
-                                    资源管理器
+                                    {t('ide.fileTree.explorer')}
                                 </div>
                                 <FileTree projectId={project.id} onSelect={handleFileSelect} selectedPath={selectedFile} />
                             </div>
@@ -148,13 +150,13 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                             <div className="h-9 glass border-b rounded-none border-0 border-b flex items-center justify-between px-4">
                                 <div className="flex items-center gap-2 text-xs">
                                     <span className="text-blue-400">📄</span>
-                                    <span className="text-gray-400">{selectedFile || (isPages ? '请选择文件' : 'worker.js')}</span>
+                                    <span className="text-gray-400">{selectedFile || (isPages ? t('ide.editor.selectFilePages') : t('ide.editor.selectFileWorker'))}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {saveSuccess && (
                                         <span className="text-xs text-green-400 animate-fade-in flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                                            已保存
+                                            {t('ide.editor.saved')}
                                         </span>
                                     )}
                                     <button
@@ -165,13 +167,13 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                                             : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm'
                                             }`}
                                     >
-                                        {saving ? '保存中...' : '💾 保存更改'}
+                                        {saving ? t('ide.editor.saving') : t('ide.editor.save')}
                                     </button>
                                 </div>
                             </div>
                             <div className="flex-1 relative">
                                 {loading ? (
-                                    <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">正在加载文件内容...</div>
+                                    <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">{t('ide.editor.loading')}</div>
                                 ) : (
                                     <Editor
                                         code={code}
@@ -207,10 +209,10 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                         </div>
                         {/* Logs Panel */}
                         <div className="h-64 glass border-t-2 rounded-none font-mono text-xs flex flex-col shadow-2xl">
-                            <div className="px-4 py-2 glass border-0 border-b text-[10px] font-bold opacity-40 uppercase tracking-widest">构建日志</div>
+                            <div className="px-4 py-2 glass border-0 border-b text-[10px] font-bold opacity-40 uppercase tracking-widest">{t('ide.deploy.buildLogs')}</div>
                             <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-black/5">
                                 {logs.map((log, i) => <div key={i} className="opacity-70 border-b border-current/5 pb-0.5">{log}</div>)}
-                                {logs.length === 0 && <div className="opacity-30 italic">暂无日志...</div>}
+                                {logs.length === 0 && <div className="opacity-30 italic">{t('ide.deploy.noLogs')}</div>}
                             </div>
                         </div>
                     </div>

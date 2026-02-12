@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { authenticatedFetch } from '../api';
 
 interface ChangePasswordModalProps {
@@ -7,6 +8,7 @@ interface ChangePasswordModalProps {
 }
 
 const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSuccess }) => {
+    const { t } = useTranslation();
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -18,10 +20,10 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
         setError('');
 
         if (newPassword !== confirmPassword) {
-            return setError("两次输入的密码不一致");
+            return setError(t('auth.passwordMismatch'));
         }
         if (newPassword.length < 4) {
-            return setError("密码长度至少4位");
+            return setError(t('auth.passwordLength'));
         }
 
         setLoading(true);
@@ -36,10 +38,10 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
                 onSuccess();
             } else {
                 const data = await res.json();
-                setError(data.error || '修改密码失败');
+                setError(data.error || t('auth.changePasswordFailed'));
             }
         } catch (e) {
-            setError('网络连接失败');
+            setError(t('auth.networkError'));
         } finally {
             setLoading(false);
         }
@@ -48,11 +50,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[70] backdrop-blur-sm">
             <div className="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-2xl w-full max-w-md">
-                <h3 className="text-xl font-bold text-white mb-4">修改密码</h3>
+                <h3 className="text-xl font-bold text-white mb-4">{t('auth.changePasswordTitle')}</h3>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-gray-400 text-sm mb-1">旧密码</label>
+                        <label className="block text-gray-400 text-sm mb-1">{t('auth.oldPassword')}</label>
                         <input
                             type="password"
                             value={oldPassword}
@@ -61,7 +63,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-400 text-sm mb-1">新密码</label>
+                        <label className="block text-gray-400 text-sm mb-1">{t('auth.newPassword')}</label>
                         <input
                             type="password"
                             value={newPassword}
@@ -70,7 +72,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-400 text-sm mb-1">确认新密码</label>
+                        <label className="block text-gray-400 text-sm mb-1">{t('auth.confirmPassword')}</label>
                         <input
                             type="password"
                             value={confirmPassword}
@@ -87,14 +89,14 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
                             onClick={onClose}
                             className="px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
                         >
-                            取消
+                            {t('common.cancel')}
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
                             className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium transition-colors disabled:opacity-50"
                         >
-                            {loading ? '保存中...' : '修改密码'}
+                            {loading ? t('common.saving') : t('auth.changePasswordButton')}
                         </button>
                     </div>
                 </form>

@@ -59,6 +59,30 @@
         "d1Database": "D1 数据库",
         "r2Bucket": "R2 存储桶"
     },
+    "resourceList": {
+        "loading": "加载中...",
+        "createError": "创建失败",
+        "deleteError": "删除失败",
+        "confirmDelete": "确定要删除吗？此操作不可恢复。",
+        "create": "创建",
+        "manage": "管理",
+        "delete": "删除",
+        "kv": {
+            "title": "KV 存储",
+            "enterName": "输入命名空间名称",
+            "noResources": "暂无 KV 命名空间"
+        },
+        "d1": {
+            "title": "D1 数据库",
+            "enterName": "输入数据库名称",
+            "noResources": "暂无 D1 数据库"
+        },
+        "r2": {
+            "title": "R2 存储桶",
+            "enterName": "输入存储桶名称",
+            "noResources": "暂无 R2 存储桶"
+        }
+    },
     "createProjectPage": {
         "title": "新建项目",
         "subtitle": "将您的代码部署到全球边缘网络。",
@@ -87,6 +111,73 @@
         "formNotReady": "表单未就绪",
         "missingFile": "缺少文件",
         "successMessage": "{{type}} 创建成功！正在跳转..."
+    },
+    "ide": {
+        "back": "返回",
+        "tabs": {
+            "code": "代码编辑器",
+            "config": "项目配置",
+            "deploy": "部署管理"
+        },
+        "fileTree": {
+            "explorer": "资源管理器",
+            "loading": "加载中...",
+            "noFiles": "暂无文件"
+        },
+        "editor": {
+            "file": "文件",
+            "selectFile": "选择文件",
+            "selectFilePages": "请选择文件",
+            "selectFileWorker": "worker.js",
+            "loading": "正在加载文件内容...",
+            "save": "💾 保存更改",
+            "saving": "保存中...",
+            "saved": "已保存",
+            "saveFailed": "保存失败"
+        },
+        "config": {
+            "bindings": "资源绑定 (Resource Bindings)",
+            "envVars": "环境变量 (Environment Variables)",
+            "systemBuild": "系统与构建设置 (System & Build Settings)",
+            "loading": "正在加载配置...",
+            "save": "保存配置",
+            "saving": "保存中...",
+            "saved": "配置已保存",
+            "saveFailed": "保存失败",
+            "add": "+ 添加",
+            "addVar": "+ 添加变量",
+            "noVars": "暂无环境变量",
+            "kvBinding": "KV 命名空间绑定 (KV Namespace)",
+            "d1Binding": "D1 数据库绑定 (D1 Database)",
+            "r2Binding": "R2 存储桶绑定 (R2 Bucket)",
+            "selectKv": "选择 KV 命名空间",
+            "selectD1": "选择 D1 数据库",
+            "selectR2": "选择 R2 存储桶",
+            "varName": "变量名 (Variable Name)",
+            "key": "KEY",
+            "value": "值 (Value)",
+            "typePlainText": "文本",
+            "typeSecret": "密钥",
+            "typeJson": "JSON",
+            "port": "服务端口 (Port)",
+            "outputDir": "输出目录 (Output Directory)",
+            "buildCommand": "构建命令 (Build Command)",
+            "deployCommand": "部署命令 (Deploy Command, Optional)"
+        },
+        "deploy": {
+            "folder": "文件夹 (Folder)",
+            "zip": "Zip 压缩包",
+            "rebuild": "重新构建 (Rebuild)",
+            "deploying": "正在部署中，请稍候...",
+            "deploySuccess": "部署成功",
+            "deploySuccessDesc": "更改已立即应用到线上服务",
+            "deployFailed": "部署失败",
+            "startDeploy": "开始部署",
+            "rebuildDesc": "使用服务器上缓存的源代码重新触发构建流程。",
+            "dragDrop": "点击上传或将文件拖至此处",
+            "buildLogs": "构建日志",
+            "noLogs": "暂无日志..."
+        }
     },
     "kvManager": {
         "title": "KV 命名空间",
@@ -234,6 +325,30 @@
         "selectFileFirst": "请先选择项目文件",
         "buildStartFail": "构建启动失败",
         "autoDetected": "已自动识别: {{framework}}",
-        "buildSuccess": "构建成功！可以开始部署。"
+        "buildSuccess": "构建成功！可以开始部署。",
+        "changeFile": "点击更换源码目录",
+        "changeZip": "点击更换 ZIP 文件"
+    },
+    "auth": {
+        "passwordMismatch": "两次输入的密码不一致",
+        "passwordLength": "密码长度至少4位",
+        "changePasswordFailed": "修改密码失败",
+        "networkError": "网络连接失败",
+        "changePasswordTitle": "修改密码",
+        "oldPassword": "旧密码",
+        "newPassword": "新密码",
+        "confirmPassword": "确认新密码",
+        "changePasswordButton": "修改密码"
+    },
+    "error": {
+        "systemError": "系统发生错误",
+        "unexpectedError": "程序遇到了未预期的错误。",
+        "reloadApp": "重新加载应用"
+    },
+    "theme": {
+        "light": "切换亮色",
+        "dark": "切换暗色",
+        "switchToEn": "切换到英文",
+        "switchToZh": "切换到中文"
     }
 }
