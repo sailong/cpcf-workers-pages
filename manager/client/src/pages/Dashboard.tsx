@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Project } from '../types';
 import { ProjectService } from '../services';
 import IDE from '../components/IDE/IDE';
@@ -9,6 +10,7 @@ import { useTheme } from '../contexts/ThemeContext';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const { theme, toggleTheme } = useTheme();
     const [projects, setProjects] = useState<Project[]>([]);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -40,7 +42,7 @@ const Dashboard: React.FC = () => {
                     // Handle Port In Use (409)
                     if (e.response && e.response.status === 409) {
                         const confirmForce = window.confirm(
-                            `⚠️ 端口 ${p.port} 正被系统或其他程序占用。\n\n是否强制释放端口并启动？\n(这将强制终止占用该端口的进程)`
+                            t('dashboardPage.forceStart', { port: p.port })
                         );
                         if (confirmForce) {
                             await ProjectService.start(p.id, true);
@@ -55,17 +57,17 @@ const Dashboard: React.FC = () => {
             loadProjects();
         } catch (e: any) {
             console.error(e);
-            alert('操作失败: ' + (e.response?.data?.error || e.message));
+            alert(t('dashboardPage.operationFailed') + ': ' + (e.response?.data?.error || e.message));
         }
     };
 
     const deleteProject = async (id: string) => {
-        if (!confirm('确定要删除该项目吗？\n\n如果项目正在运行，将强制停止并释放端口。\n此操作不可恢复。')) return;
+        if (!confirm(t('dashboardPage.confirmDelete'))) return;
         try {
             await ProjectService.delete(id);
             loadProjects();
         } catch (e: any) {
-            alert('删除失败: ' + (e.response?.data?.error || e.message));
+            alert(t('dashboardPage.deleteError') + ': ' + (e.response?.data?.error || e.message));
         }
     };
 
@@ -79,8 +81,8 @@ const Dashboard: React.FC = () => {
             {/* Header Area */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                 <div>
-                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">Dashboard</h1>
-                    <p className="text-[var(--text-muted)] mt-1 font-medium">Manage your edge deployments.</p>
+                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">{t('dashboard')}</h1>
+                    <p className="text-[var(--text-muted)] mt-1 font-medium">{t('dashboardSubtitle')}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -88,14 +90,14 @@ const Dashboard: React.FC = () => {
                         onClick={() => navigate('/resources')}
                         className="btn-glass min-w-[150px] justify-center"
                     >
-                        <span>Resources</span>
+                        <span>{t('dashboardPage.viewResources')}</span>
                     </button>
 
                     <a
                         href="/create"
                         className="btn-gradient flex items-center gap-2 min-w-[150px] justify-center"
                     >
-                        <span>+ New Project</span>
+                        <span>{t('dashboardPage.newProject')}</span>
                     </a>
 
                     <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
@@ -107,7 +109,7 @@ const Dashboard: React.FC = () => {
                         <button onClick={() => setShowChangePassword(true)} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             🔑
                         </button>
-                        <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-500/20 hover:text-red-500 transition-all text-[var(--text-muted)]" title="Sign Out">
+                        <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-500/20 hover:text-red-500 transition-all text-[var(--text-muted)]" title={t('logout')}>
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         </button>
                     </div>
@@ -156,7 +158,7 @@ const Dashboard: React.FC = () => {
                                         : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
                                         }`}
                                 >
-                                    {p.status === 'running' ? 'Stop' : 'Start'}
+                                    {p.status === 'running' ? t('common.stop') : t('common.start')}
                                 </button>
 
                                 <button onClick={() => setEditingProject(p)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-[var(--text-muted)]">
@@ -172,7 +174,7 @@ const Dashboard: React.FC = () => {
                                         href={`http://${p.name}.localhost:8001`}
                                         target="_blank"
                                         className="ml-auto h-9 w-9 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors"
-                                        title="Open App"
+                                        title={t('common.openApp')}
                                     >
                                         ↗
                                     </a>
@@ -185,9 +187,9 @@ const Dashboard: React.FC = () => {
                 <div className="neo-glass p-20 flex flex-col items-center justify-center text-center">
                     <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-2xl mb-6 blur-md opacity-20 animate-pulse"></div>
                     <div className="absolute w-24 h-24 flex items-center justify-center text-5xl">🚀</div>
-                    <h3 className="text-2xl font-bold text-[var(--text-main)] mt-4">No projects yet</h3>
-                    <p className="text-[var(--text-muted)] mt-2 mb-8 max-w-md">Create your first edge function or static site to get started.</p>
-                    <a href="/create" className="btn-gradient">Create Project</a>
+                    <h3 className="text-2xl font-bold text-[var(--text-main)] mt-4">{t('dashboardPage.noProjects')}</h3>
+                    <p className="text-[var(--text-muted)] mt-2 mb-8 max-w-md">{t('dashboardPage.noProjectsSubtitle')}</p>
+                    <a href="/create" className="btn-gradient">{t('createProject')}</a>
                 </div>
             )}
 

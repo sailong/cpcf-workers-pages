@@ -6,6 +6,8 @@ import Resources from './pages/Resources';
 import CreateProject from './pages/CreateProject';
 import { getToken, removeToken } from './api';
 import { ThemeProvider } from './contexts/ThemeContext';
+import LanguageSwitcher from './components/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactElement }) => {
@@ -38,6 +40,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="min-h-screen font-sans relative">
+      <div className="absolute top-4 right-4 z-50">
+        <LanguageSwitcher />
+      </div>
       {/* Global Fluid Background */}
       <div className="fluid-bg">
         <div className="orb orb-1"></div>

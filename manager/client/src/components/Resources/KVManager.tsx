@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { authenticatedFetch } from '../../api';
 
@@ -8,6 +9,7 @@ interface KVManagerProps {
 }
 
 const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
+    const { t } = useTranslation();
     const [keys, setKeys] = useState<Array<{ name: string }>>([]);
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
     const [value, setValue] = useState<string>('');
@@ -26,7 +28,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
             const data = await res.json();
             setKeys(data.keys || []);
         } catch (err) {
-            setError('加载键列表失败');
+            setError(t('kvManager.loadKeysError'));
         }
     };
 
@@ -40,7 +42,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 setSelectedKey(key);
             }
         } catch (err) {
-            setError('加载值失败');
+            setError(t('kvManager.loadValueError'));
         }
     };
 
@@ -69,10 +71,10 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 setNewValue('');
                 await loadKeys();
             } else {
-                setError('保存失败');
+                setError(t('kvManager.saveError'));
             }
         } catch (err) {
-            setError('保存失败: ' + (err as Error).message);
+            setError(t('kvManager.saveError') + ': ' + (err as Error).message);
         } finally {
             setLoading(false);
         }
@@ -100,7 +102,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 }
             }
         } catch (err) {
-            setError('删除失败');
+            setError(t('kvManager.deleteError'));
         } finally {
             setKeyToDelete(null);
         }
@@ -116,8 +118,8 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 {/* Header */}
                 <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-white">KV 命名空间管理</h2>
-                        <p className="text-purple-200 text-sm">命名空间: {namespace.name}</p>
+                        <h2 className="text-xl font-bold text-white">{t('kvManager.title')}</h2>
+                        <p className="text-purple-200 text-sm">{t('kvManager.namespaceLabel')} {namespace.name}</p>
                     </div>
                     <button onClick={onClose} className="text-white hover:text-gray-200 text-2xl">&times;</button>
                 </div>
@@ -129,10 +131,10 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 <div className="grid grid-cols-2 gap-4 p-6" style={{ height: 'calc(90vh - 150px)' }}>
                     {/* 左侧：键列表 */}
                     <div className="flex flex-col h-full">
-                        <h3 className="text-lg font-semibold text-gray-200 mb-3">键列表 ({keys.length})</h3>
+                        <h3 className="text-lg font-semibold text-gray-200 mb-3">{t('kvManager.keysList')} ({keys.length})</h3>
                         <div className="flex-1 overflow-y-auto bg-gray-900 rounded-lg p-3">
                             {keys.length === 0 ? (
-                                <p className="text-gray-500 text-center py-8">暂无键值对</p>
+                                <p className="text-gray-500 text-center py-8">{t('kvManager.noKeys')}</p>
                             ) : (
                                 keys.map(key => (
                                     <div
@@ -149,7 +151,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                                         <button
                                             onClick={() => requestDelete(key.name)}
                                             className="ml-2 text-red-400 hover:text-red-300"
-                                            title="删除"
+                                            title={t('common.delete')}
                                         >
                                             🗑️
                                         </button>
@@ -162,13 +164,13 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                     {/* 右侧：值编辑 */}
                     <div className="flex flex-col h-full">
                         <h3 className="text-lg font-semibold text-gray-200 mb-3">
-                            {selectedKey ? `查看: ${selectedKey}` : '添加键值对'}
+                            {selectedKey ? `${t('kvManager.viewing')} ${selectedKey}` : t('kvManager.addKeyPair')}
                         </h3>
 
                         {/* 键输入 */}
                         <input
                             type="text"
-                            placeholder="键名"
+                            placeholder={t('kvManager.keyName')}
                             value={newKey}
                             onChange={e => setNewKey(e.target.value)}
                             className="mb-2 px-3 py-2 bg-gray-900 text-gray-200 rounded border border-gray-700 focus:border-purple-500 focus:outline-none"
@@ -176,7 +178,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
 
                         {/* 值输入 */}
                         <textarea
-                            placeholder="值 (可以是字符串或JSON)"
+                            placeholder={t('kvManager.valuePlaceholder')}
                             value={selectedKey ? value : newValue}
                             onChange={e => selectedKey ? setValue(e.target.value) : setNewValue(e.target.value)}
                             className="flex-1 px-3 py-2 bg-gray-900 text-gray-200 rounded border border-gray-700 focus:border-purple-500 focus:outline-none font-mono text-sm mb-3"
@@ -187,7 +189,7 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                             disabled={!newKey || loading}
                             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded font-semibold"
                         >
-                            {loading ? '保存中...' : '保存'}
+                            {loading ? t('common.saving') : t('common.save')}
                         </button>
                     </div>
                 </div>
@@ -196,22 +198,22 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                 {keyToDelete && (
                     <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60]">
                         <div className="bg-gray-800 border border-gray-600 p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4">
-                            <h3 className="text-xl font-bold text-white mb-4">确认删除</h3>
+                            <h3 className="text-xl font-bold text-white mb-4">{t('common.confirmDelete')}</h3>
                             <p className="text-gray-300 mb-6">
-                                确定要永久删除键 <span className="text-red-400 font-mono bg-gray-900 px-1 rounded">{keyToDelete}</span> 吗？
+                                {t('kvManager.confirmDeleteKey', { key: keyToDelete })}
                             </p>
                             <div className="flex justify-end gap-3">
                                 <button
                                     onClick={() => setKeyToDelete(null)}
                                     className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
                                 >
-                                    取消
+                                    {t('common.cancel')}
                                 </button>
                                 <button
                                     onClick={executeDelete}
                                     className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold"
                                 >
-                                    确认删除
+                                    {t('common.confirmDelete')}
                                 </button>
                             </div>
                         </div>

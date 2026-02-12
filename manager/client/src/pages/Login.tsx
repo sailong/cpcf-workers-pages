@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AuthService } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -7,6 +8,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
+    const { t } = useTranslation();
     const { theme, toggleTheme } = useTheme();
     const [password, setPassword] = useState('');
     const [captcha, setCaptcha] = useState('');
@@ -39,12 +41,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             if (res.success && res.token) {
                 onLogin(res.token);
             } else {
-                setError(res.error || 'Login failed');
+                setError(res.error || t('loginPage.loginFailed'));
                 fetchCaptcha();
                 setCaptcha('');
             }
         } catch (err: any) {
-            setError(err.message || 'Connection failed');
+            setError(err.message || t('loginPage.connectionFailed'));
         } finally {
             setLoading(false);
         }
@@ -75,14 +77,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div className="neo-card p-10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
                 <div className="text-center mb-10">
                     <h1 className="text-4xl font-black mb-2 tracking-tight text-[var(--color-primary)]">
-                        Welcome Back
+                        {t('loginPage.welcomeBack')}
                     </h1>
-                    <p className="text-[var(--text-muted)] text-sm font-medium">Sign in to CCFWP Manager</p>
+                    <p className="text-[var(--text-muted)] text-sm font-medium">{t('loginPage.subtitle')}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Username</label>
+                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('loginPage.username')}</label>
                         <input
                             type="text"
                             value="admin"
@@ -93,56 +95,58 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     </div>
 
                     <div>
-                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter password"
-                            className="neo-input w-full"
-                            autoFocus
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Captcha</label>
-                        <div className="flex gap-4">
+                        <div>
+                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('loginPage.password')}</label>
                             <input
-                                type="text"
-                                value={captcha}
-                                onChange={(e) => setCaptcha(e.target.value)}
-                                placeholder="Code"
-                                className="neo-input flex-1"
-                            />
-                            <div
-                                className="w-32 h-[46px] rounded-2xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-black/5 dark:border-white/10 flex items-center justify-center bg-white/50 backdrop-blur-md dark:bg-white/10"
-                                onClick={fetchCaptcha}
-                                dangerouslySetInnerHTML={{ __html: captchaSvg }}
-                                title="Click to refresh"
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                placeholder={t('loginPage.enterPassword')}
+                                className="neo-input w-full"
+                                autoFocus
                             />
                         </div>
+
+                        <div>
+                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('loginPage.captcha')}</label>
+                            <div className="flex gap-4">
+                                <input
+                                    type="text"
+                                    value={captcha}
+                                    onChange={(e) => setCaptcha(e.target.value)}
+                                    placeholder={t('loginPage.code')}
+                                    className="neo-input flex-1"
+                                />
+                                <div
+                                    className="w-32 h-[46px] rounded-2xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-black/5 dark:border-white/10 flex items-center justify-center bg-white/50 backdrop-blur-md dark:bg-white/10"
+                                    onClick={fetchCaptcha}
+                                    dangerouslySetInnerHTML={{ __html: captchaSvg }}
+                                    title={t('loginPage.refreshCaptcha')}
+                                />
+                            </div>
+                        </div>
+
+                        {error && (
+                            <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-2xl text-sm text-center font-medium backdrop-blur-md">
+                                {error === 'Login failed' ? t('loginPage.authFailed') : error}
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full btn-gradient py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl"
+                        >
+                            {loading ? t('loginPage.verifying') : t('loginPage.signIn')}
+                        </button>
                     </div>
-
-                    {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-2xl text-sm text-center font-medium backdrop-blur-md">
-                            {error === 'Login failed' ? 'Authentication failed' : error}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full btn-gradient py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl"
-                    >
-                        {loading ? 'Verifying...' : 'Sign In'}
-                    </button>
                 </form>
             </div>
 
             <div className="absolute bottom-6 text-center text-gray-600 text-xs">
-                &copy; {new Date().getFullYear()} CCFWP Manager. All rights reserved.
+                &copy; {new Date().getFullYear()} {t('loginPage.copyright')}
             </div>
-        </div>
+        </div >
     );
 };
 

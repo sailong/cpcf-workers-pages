@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import D1List from '../components/Resources/D1List';
@@ -9,6 +10,7 @@ type Tab = 'kv' | 'd1' | 'r2';
 
 const Resources: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const { theme, toggleTheme } = useTheme();
     const [activeTab, setActiveTab] = useState<Tab>('kv');
 
@@ -17,8 +19,8 @@ const Resources: React.FC = () => {
             <div className="max-w-7xl mx-auto p-6 md:p-10">
                 <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                     <div>
-                        <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">Resources</h1>
-                        <p className="text-[var(--text-muted)] mt-1 font-medium">Manage your KV, D1, and R2 storage.</p>
+                        <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">{t('resources')}</h1>
+                        <p className="text-[var(--text-muted)] mt-1 font-medium">{t('resourcesPage.subtitle')}</p>
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -26,7 +28,7 @@ const Resources: React.FC = () => {
                             onClick={() => navigate('/')}
                             className="btn-glass px-4 py-2 text-sm"
                         >
-                            <span>← Back</span>
+                            <span>{t('common.back')}</span>
                         </button>
 
                         <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
@@ -45,19 +47,19 @@ const Resources: React.FC = () => {
                         active={activeTab === 'kv'}
                         onClick={() => setActiveTab('kv')}
                         icon="📦"
-                        label="KV Storage"
+                        label={t('resourcesPage.kvStorage')}
                     />
                     <TabButton
                         active={activeTab === 'd1'}
                         onClick={() => setActiveTab('d1')}
                         icon="🗄️"
-                        label="D1 Database"
+                        label={t('resourcesPage.d1Database')}
                     />
                     <TabButton
                         active={activeTab === 'r2'}
                         onClick={() => setActiveTab('r2')}
                         icon="🪣"
-                        label="R2 Bucket"
+                        label={t('resourcesPage.r2Bucket')}
                     />
                 </div>
 

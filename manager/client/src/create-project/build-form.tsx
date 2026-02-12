@@ -1,4 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
 import { getToken } from '../api';
 import { analyzeFiles, analyzeZip } from '../utils/projectAnalyzer';
@@ -9,6 +10,7 @@ import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types'
  * 内部管理源码文件、框架选择、构建配置、构建日志等全部状态
  */
 const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast }, ref) => {
+    const { t } = useTranslation();
     // 文件上传状态
     const [uploadType, setUploadType] = useState<'folder' | 'zip'>('folder');
     const [file, setFile] = useState<File | null>(null);
@@ -30,11 +32,11 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
     useImperativeHandle(ref, () => ({
         getPayload: async (): Promise<Partial<CreateProjectPayload> | null> => {
             if (!file) {
-                setError('请先选择项目文件');
+                setError(t('buildForm.selectFileFirst'));
                 return null;
             }
             if (!buildId) {
-                setError('请先完成构建');
+                setError(t('buildForm.buildFirst'));
                 return null;
             }
             return {
@@ -67,10 +69,10 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
 
     /** 执行构建 */
     const handleBuild = async () => {
-        if (!file) return setError('请先选择项目文件');
+        if (!file) return setError(t('buildForm.selectFileFirst'));
 
         setIsBuilding(true);
-        setBuildLogs(['开始构建流程...', '正在上传文件...']);
+        setBuildLogs([t('buildForm.building'), t('pagesForm.processing')]);
         setBuildId(null);
         setError('');
 
@@ -113,7 +115,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             } else if (data.type === 'result') {
                                 if (data.success) {
                                     setBuildId(data.buildId);
-                                    setBuildLogs(prev => [...prev, '构建成功！可以开始部署。']);
+                                    setBuildLogs(prev => [...prev, t('buildForm.buildSuccess')]);
                                 }
                             }
                         } catch (e) {
@@ -123,7 +125,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                 }
             }
         } catch (e) {
-            setError('构建启动失败');
+            setError(t('buildForm.buildStartFail'));
             console.error(e);
         } finally {
             setIsBuilding(false);
@@ -156,14 +158,14 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
                             if (analysis.outputDir) setOutputDir(analysis.outputDir);
                             if (analysis.deployCommand) setDeployCommand(analysis.deployCommand);
-                            showToast(`已自动识别: ${analysis.framework}`);
+                            showToast(t('buildForm.autoDetected', { framework: analysis.framework }));
                         }
                     });
                 } else {
-                    setError('请拖入 ZIP 文件');
+                    setError(t('pagesForm.zipError'));
                 }
             } else {
-                setError('文件夹请点击选择 (浏览器限制，直接拖拽可能有兼容性问题)');
+                setError(t('pagesForm.folderCompat'));
             }
         }
     };
@@ -213,7 +215,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                 if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
                 if (analysis.outputDir) setOutputDir(analysis.outputDir);
                 if (analysis.deployCommand) setDeployCommand(analysis.deployCommand);
-                showToast(`已自动识别: ${analysis.framework}`);
+                showToast(t('buildForm.autoDetected', { framework: analysis.framework }));
             }
 
             const content = await zip.generateAsync({ type: 'blob' });
@@ -221,7 +223,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
             setFile(zipFile);
         } catch (err) {
             console.error(err);
-            setError('文件夹打包失败');
+            setError(t('pagesForm.packError'));
         } finally {
             setProcessing(false);
         }
@@ -239,7 +241,10 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
             if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
             if (analysis.outputDir) setOutputDir(analysis.outputDir);
             if (analysis.deployCommand) setDeployCommand(analysis.deployCommand);
-            showToast(`已自动识别: ${analysis.framework}`);
+            if (analysis.buildCommand) setBuildCommand(analysis.buildCommand);
+            if (analysis.outputDir) setOutputDir(analysis.outputDir);
+            if (analysis.deployCommand) setDeployCommand(analysis.deployCommand);
+            showToast(t('buildForm.autoDetected', { framework: analysis.framework }));
         }
     };
 
@@ -247,7 +252,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
         <div>
             {/* 源码上传区 */}
             <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
-                源码上传
+                {t('buildForm.sourceUpload')}
             </label>
 
             {/* 上传方式切换 */}
@@ -259,8 +264,8 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">📁 上传文件夹</div>
-                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">推荐 (自动打包)</div>
+                    <div className="font-bold flex items-center justify-center gap-2">📁 {t('buildForm.folder')}</div>
+                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">{t('buildForm.folderDesc')}</div>
                 </button>
                 <button
                     onClick={() => { setUploadType('zip'); setFile(null); }}
@@ -269,8 +274,8 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">📦 上传 ZIP</div>
-                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">源代码压缩包</div>
+                    <div className="font-bold flex items-center justify-center gap-2">📦 {t('buildForm.zip')}</div>
+                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">{t('buildForm.zipDesc')}</div>
                 </button>
             </div>
 
@@ -303,7 +308,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             {processing ? (
                                 <div className="text-center">
                                     <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                                    <div className="font-bold text-lg">正在打包文件...</div>
+                                    <div className="font-bold text-lg">{t('buildForm.processing')}</div>
                                 </div>
                             ) : file ? (
                                 <div className="animate-in fade-in zoom-in duration-300">
@@ -317,9 +322,9 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             ) : (
                                 <div className="transition-transform duration-300 group-hover:scale-105">
                                     <div className="text-6xl mb-4 opacity-30 group-hover:opacity-100 group-hover:drop-shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all">📂</div>
-                                    <div className="font-bold text-xl mb-2 opacity-60">上传源码文件夹</div>
+                                    <div className="font-bold text-xl mb-2 opacity-60">{t('buildForm.uploadSourceFolder')}</div>
                                     <div className="text-sm opacity-40 max-w-xs mx-auto leading-relaxed">
-                                        请上传包含 (package.json) 的完整项目
+                                        {t('buildForm.uploadSourceFolderDesc')}
                                     </div>
                                 </div>
                             )}
@@ -350,8 +355,8 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             ) : (
                                 <div className="transition-transform duration-300 group-hover:scale-105">
                                     <div className="text-6xl mb-4 opacity-30 group-hover:opacity-100 transition-opacity">🤐</div>
-                                    <div className="text-gray-300 font-bold text-xl mb-2">上传源码 ZIP 压缩包</div>
-                                    <div className="text-sm text-gray-500">点击上传或将 ZIP 文件拖至此处</div>
+                                    <div className="text-gray-300 font-bold text-xl mb-2">{t('buildForm.uploadSourceZip')}</div>
+                                    <div className="text-sm text-gray-500">{t('buildForm.uploadSourceZipDesc')}</div>
                                 </div>
                             )}
                         </label>
@@ -362,12 +367,12 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
             {/* 构建配置 */}
             <div className="mt-12 space-y-8 border-t border-current/5 pt-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <h3 className="text-xl font-bold flex items-center gap-3">
-                    <span className="text-2xl">🛠️</span> 构建配置
+                    <span className="text-2xl">🛠️</span> {t('buildForm.buildConfig')}
                 </h3>
 
                 <div className="grid md:grid-cols-2 gap-8">
                     <div>
-                        <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">框架预设</label>
+                        <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">{t('buildForm.frameworkPreset')}</label>
                         <select
                             value={framework}
                             onChange={e => handleFrameworkChange(e.target.value)}
@@ -381,7 +386,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         </select>
                     </div>
                     <div>
-                        <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">输出目录</label>
+                        <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">{t('buildForm.outputDir')}</label>
                         <input
                             type="text"
                             value={outputDir}
@@ -393,7 +398,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                 </div>
 
                 <div>
-                    <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">构建命令 (Build Command)</label>
+                    <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">{t('buildForm.buildCommand')}</label>
                     <div className="relative group">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500/50 font-mono text-sm group-focus-within:text-blue-400 transition-colors">$</span>
                         <input
@@ -407,7 +412,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                 </div>
 
                 <div>
-                    <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">部署命令 (Deploy Command, Optional)</label>
+                    <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">{t('buildForm.deployCommand')}</label>
                     <div className="relative group">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500/50 font-mono text-sm group-focus-within:text-blue-400 transition-colors">$</span>
                         <input
@@ -418,7 +423,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             className="neo-input w-full pl-8 pr-4 py-4 font-mono text-sm"
                         />
                     </div>
-                    <p className="text-[10px] text-gray-500 mt-2 ml-1 italic opacity-60">此命令将在构建成功后自动执行</p>
+                    <p className="text-[10px] text-gray-500 mt-2 ml-1 italic opacity-60">{t('buildForm.deployCommandHint')}</p>
                 </div>
 
                 {/* 构建日志控制台 */}
@@ -430,14 +435,14 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                                 <div className="w-3 h-3 rounded-full bg-amber-500/50"></div>
                                 <div className="w-3 h-3 rounded-full bg-green-500/50"></div>
                             </div>
-                            <span className="opacity-40 ml-2 font-bold tracking-tight">LOGS_TERMINAL</span>
+                            <span className="opacity-40 ml-2 font-bold tracking-tight">{t('buildForm.logsTerminal')}</span>
                         </div>
-                        {isBuilding && <span className="text-blue-500 animate-pulse flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> RUNNING</span>}
-                        {buildId && <span className="text-green-500 flex items-center gap-2">SUCCESS</span>}
+                        {isBuilding && <span className="text-blue-500 animate-pulse flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> {t('buildForm.running')}</span>}
+                        {buildId && <span className="text-green-500 flex items-center gap-2">{t('buildForm.success')}</span>}
                     </div>
                     <div className="h-60 overflow-y-auto p-5 space-y-1.5 bg-black/5">
                         {buildLogs.length === 0 ? (
-                            <div className="opacity-30 italic">Waiting for build initialization...</div>
+                            <div className="opacity-30 italic">{t('buildForm.waitingLogs')}</div>
                         ) : (
                             buildLogs.map((log, i) => (
                                 <div key={i} className="opacity-70 break-all leading-relaxed whitespace-pre-wrap"><span className="opacity-20 mr-2">{i + 1}</span>{log}</div>
@@ -456,9 +461,9 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             : 'btn-primary'
                             } disabled:opacity-30 disabled:cursor-not-allowed`}
                     >
-                        {isBuilding ? '进行中...' : (buildId ? '重新构建' : '▶ 启动构建流程')}
+                        {isBuilding ? t('buildForm.building') : (buildId ? t('buildForm.reBuild') : t('buildForm.startBuild'))}
                     </button>
-                    {!buildId && file && !isBuilding && <p className="text-[10px] text-blue-500 opacity-60 text-center mt-3 animate-bounce">请先完成构建以进行下一步</p>}
+                    {!buildId && file && !isBuilding && <p className="text-[10px] text-blue-500 opacity-60 text-center mt-3 animate-bounce">{t('buildForm.buildFirst')}</p>}
                 </div>
             </div>
         </div>

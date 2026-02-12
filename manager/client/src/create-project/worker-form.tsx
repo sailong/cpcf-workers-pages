@@ -1,4 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import { useTranslation } from 'react-i18next';
 import Editor from '../components/IDE/Editor';
 import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types';
 
@@ -9,6 +10,7 @@ type CodeSource = 'editor' | 'upload';
  * 内部管理编辑器/上传切换、代码内容、文件等状态
  */
 const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) => {
+    const { t } = useTranslation();
     const [codeSource, setCodeSource] = useState<CodeSource>('editor');
     const [code, setCode] = useState(`export default {
   async fetch(request, env, ctx) {
@@ -23,11 +25,11 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
         getPayload: async (): Promise<Partial<CreateProjectPayload> | null> => {
             if (codeSource === 'editor') {
                 if (!code.trim()) {
-                    setError('代码不能为空');
+                    setError(t('workerForm.codeEmpty'));
                     return null;
                 }
                 if (!filename.trim()) {
-                    setError('文件名不能为空');
+                    setError(t('workerForm.filenameEmpty'));
                     return null;
                 }
                 return {
@@ -40,7 +42,7 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
             } else {
                 // 上传模式
                 if (!file) {
-                    setError('请选择文件');
+                    setError(t('workerForm.fileEmpty'));
                     return null;
                 }
                 // 需要先上传文件，但上传逻辑在父组件统一处理
@@ -57,7 +59,7 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
     return (
         <div>
             <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
-                代码来源 *
+                {t('workerForm.codeSource')}
             </label>
             <div className="flex gap-4 mb-8">
                 <button
@@ -67,7 +69,7 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                         : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">✏️ 在线编写</div>
+                    <div className="font-bold flex items-center justify-center gap-2">{t('workerForm.editor')}</div>
                 </button>
                 <button
                     onClick={() => setCodeSource('upload')}
@@ -76,7 +78,7 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                         : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">📁 上传文件</div>
+                    <div className="font-bold flex items-center justify-center gap-2">{t('workerForm.upload')}</div>
                 </button>
             </div>
 
@@ -84,7 +86,7 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                 <div className="space-y-6">
                     <div>
                         <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1 tracking-widest">
-                            文件名 *
+                            {t('workerForm.filename')}
                         </label>
                         <input
                             type="text"
@@ -130,8 +132,8 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                         ) : (
                             <div>
                                 <div className="text-5xl mb-4 opacity-30">📁</div>
-                                <div className="font-bold text-lg mb-1 opacity-60">点击选择代码文件</div>
-                                <div className="text-xs opacity-40">支持 .js, .ts 格式</div>
+                                <div className="font-bold text-lg mb-1 opacity-60">{t('workerForm.selectFile')}</div>
+                                <div className="text-xs opacity-40">{t('workerForm.fileSupport')}</div>
                             </div>
                         )}
                     </label>

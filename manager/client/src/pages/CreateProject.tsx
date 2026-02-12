@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
@@ -12,6 +13,7 @@ type ProjectMode = 'worker' | 'pages' | 'build';
 
 const CreateProject: React.FC = () => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const { theme, toggleTheme } = useTheme();
 
     // Shared State
@@ -36,18 +38,18 @@ const CreateProject: React.FC = () => {
     /** Create Logic */
     const handleCreate = async () => {
         if (!name.trim()) {
-            setError('项目名称不能为空');
+            setError(t('createProjectPage.nameEmpty'));
             return;
         }
 
         const nameRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
         if (!nameRegex.test(name)) {
-            setError('名称无效：仅允许字母、数字、连字符，且不能以连字符开头或结尾。');
+            setError(t('createProjectPage.nameInvalid'));
             return;
         }
 
         if (!formRef.current) {
-            setError('表单未就绪');
+            setError(t('createProjectPage.formNotReady'));
             return;
         }
 
@@ -70,10 +72,10 @@ const CreateProject: React.FC = () => {
                     port: customPort || undefined,
                 };
                 await api.post('/projects', payload);
-                setSuccessMsg('Worker 创建成功！正在跳转...');
+                setSuccessMsg(t('createProjectPage.successMessage', { type: 'Worker' }));
                 setTimeout(() => navigate('/'), 1500);
             } else {
-                if (!fileToUpload) throw new Error('缺少文件');
+                if (!fileToUpload) throw new Error(t('createProjectPage.missingFile'));
                 const formData = new FormData();
                 formData.append('file', fileToUpload);
 
@@ -91,11 +93,11 @@ const CreateProject: React.FC = () => {
 
                 await api.post('/projects', payload);
                 const typeLabel = subPayload.type === 'worker' ? 'Worker' : 'Pages';
-                setSuccessMsg(`${typeLabel} 创建成功！正在跳转...`);
+                setSuccessMsg(t('createProjectPage.successMessage', { type: typeLabel }));
                 setTimeout(() => navigate('/'), 1500);
             }
         } catch (err: any) {
-            setError(err.response?.data?.error || err.message || '创建失败');
+            setError(err.response?.data?.error || err.message || t('createProjectPage.error'));
             console.error(err);
             setCreating(false);
         }
@@ -107,8 +109,8 @@ const CreateProject: React.FC = () => {
         <div className="min-h-screen p-6 md:p-10 font-sans transition-colors duration-300">
             <header className="max-w-4xl mx-auto w-full flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
                 <div>
-                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">New Project</h1>
-                    <p className="text-[var(--text-muted)] mt-1 font-medium">Deploy your code to the global edge network.</p>
+                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">{t('createProjectPage.title')}</h1>
+                    <p className="text-[var(--text-muted)] mt-1 font-medium">{t('createProjectPage.subtitle')}</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -116,7 +118,7 @@ const CreateProject: React.FC = () => {
                         onClick={() => navigate('/')}
                         className="btn-glass"
                     >
-                        <span>← Back</span>
+                        <span>{t('common.back')}</span>
                     </button>
 
                     <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
@@ -132,12 +134,12 @@ const CreateProject: React.FC = () => {
             <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
                 {/* 1. Type Selection */}
                 <div className="neo-card p-8">
-                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">1. Select Project Type</label>
+                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">{t('createProjectPage.step1')}</label>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {[
-                            { id: 'worker', label: 'Worker', icon: '⚡️', desc: 'High-performance edge functions' },
-                            { id: 'pages', label: 'Pages', icon: '📄', desc: 'Static site hosting' },
-                            { id: 'build', label: 'Build', icon: '🛠️', desc: 'CI/CD Pipelines' }
+                            { id: 'worker', label: t('createProjectPage.worker'), icon: '⚡️', desc: t('createProjectPage.workerDesc') },
+                            { id: 'pages', label: t('createProjectPage.pages'), icon: '📄', desc: t('createProjectPage.pagesDesc') },
+                            { id: 'build', label: t('createProjectPage.build'), icon: '🛠️', desc: t('createProjectPage.buildDesc') }
                         ].map(m => (
                             <button
                                 key={m.id}
@@ -162,25 +164,25 @@ const CreateProject: React.FC = () => {
 
                 {/* 2. Basic Info */}
                 <div className="neo-card p-8 space-y-6">
-                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-2 ml-1 tracking-widest">2. Basic Information</label>
+                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-2 ml-1 tracking-widest">{t('createProjectPage.step2')}</label>
                     <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Project Name</label>
+                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('createProjectPage.projectName')}</label>
                             <input
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                placeholder={mode === 'worker' ? 'my-awesome-worker' : 'my-static-site'}
+                                placeholder={mode === 'worker' ? t('createProjectPage.projectNamePlaceholder.worker') : t('createProjectPage.projectNamePlaceholder.pages')}
                                 className="neo-input w-full"
                             />
                         </div>
                         <div>
-                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Internal Port (Optional)</label>
+                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('createProjectPage.internalPort')}</label>
                             <input
                                 type="number"
                                 value={customPort}
                                 onChange={(e) => setCustomPort(e.target.value ? parseInt(e.target.value) : '')}
-                                placeholder="Auto-assigned if empty"
+                                placeholder={t('createProjectPage.portPlaceholder')}
                                 className="neo-input w-full"
                             />
                         </div>
@@ -189,7 +191,7 @@ const CreateProject: React.FC = () => {
 
                 {/* 3. Detailed Config */}
                 <div className="neo-card p-8">
-                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">3. Configuration</label>
+                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">{t('createProjectPage.step3')}</label>
                     {mode === 'worker' && <WorkerForm ref={formRef} setError={setError} showToast={showToast} />}
                     {mode === 'pages' && <PagesForm ref={formRef} setError={setError} showToast={showToast} />}
                     {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} />}
@@ -207,7 +209,7 @@ const CreateProject: React.FC = () => {
                         disabled={isCreateDisabled}
                         className="w-full btn-gradient text-xl py-4 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {creating ? '🚀 Deploying...' : 'Create & Deploy'}
+                        {creating ? t('createProjectPage.deploying') : t('createProjectPage.createDeploy')}
                     </button>
                 </div>
             </div>
@@ -225,7 +227,7 @@ const CreateProject: React.FC = () => {
                         <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
                             <span className="text-4xl">🎉</span>
                         </div>
-                        <h3 className="text-2xl font-bold mb-2">创建成功!</h3>
+                        <h3 className="text-2xl font-bold mb-2">{t('createProjectPage.success')}</h3>
                         <p className="opacity-60 mb-6">{successMsg}</p>
                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
                     </div>

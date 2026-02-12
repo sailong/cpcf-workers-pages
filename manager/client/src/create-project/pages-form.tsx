@@ -1,4 +1,5 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
+import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
 import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types';
 
@@ -7,6 +8,7 @@ import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types'
  * 内部管理文件夹/ZIP 上传切换、拖拽、文件打包等状态
  */
 const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast }, ref) => {
+    const { t } = useTranslation();
     const [uploadType, setUploadType] = useState<'folder' | 'zip'>('folder');
     const [file, setFile] = useState<File | null>(null);
     const [processing, setProcessing] = useState(false);
@@ -16,7 +18,7 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
     useImperativeHandle(ref, () => ({
         getPayload: async (): Promise<Partial<CreateProjectPayload> | null> => {
             if (!file) {
-                setError('请选择文件');
+                setError(t('workerForm.fileEmpty'));
                 return null;
             }
             return {
@@ -48,11 +50,11 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                 if (droppedFile.name.endsWith('.zip')) {
                     setFile(droppedFile);
                 } else {
-                    setError('请拖入 ZIP 文件');
+                    setError(t('pagesForm.zipError'));
                 }
             } else {
                 // 浏览器限制，文件夹拖拽兼容性问题
-                setError('文件夹请点击选择 (浏览器限制，直接拖拽可能有兼容性问题)');
+                setError(t('pagesForm.folderCompat'));
             }
         }
     };
@@ -101,7 +103,7 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
             setFile(zipFile);
         } catch (err) {
             console.error(err);
-            setError('文件夹打包失败');
+            setError(t('pagesForm.packError'));
         } finally {
             setProcessing(false);
         }
@@ -117,7 +119,7 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
     return (
         <div>
             <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
-                上传方式 *
+                {t('pagesForm.uploadMethod')}
             </label>
 
             <div className="flex gap-4 mb-8">
@@ -128,8 +130,8 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">📁 上传文件夹</div>
-                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">推荐 (自动打包)</div>
+                    <div className="font-bold flex items-center justify-center gap-2">📁 {t('pagesForm.folder')}</div>
+                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">{t('pagesForm.folderDesc')}</div>
                 </button>
                 <button
                     onClick={() => setUploadType('zip')}
@@ -138,8 +140,8 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         : 'border-transparent glass hover:bg-current/5 opacity-60'
                         }`}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">📦 上传 ZIP</div>
-                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">压缩包上传</div>
+                    <div className="font-bold flex items-center justify-center gap-2">📦 {t('pagesForm.zip')}</div>
+                    <div className="text-[10px] opacity-40 text-center mt-1 uppercase tracking-widest">{t('pagesForm.zipDesc')}</div>
                 </button>
             </div>
 
@@ -172,7 +174,7 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             {processing ? (
                                 <div className="text-center">
                                     <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                                    <div className="font-bold text-lg">正在打包文件...</div>
+                                    <div className="font-bold text-lg">{t('pagesForm.processing')}</div>
                                 </div>
                             ) : file ? (
                                 <div className="animate-in fade-in zoom-in duration-300">
@@ -181,14 +183,14 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                                     <div className="text-xs text-blue-500 bg-blue-500/10 px-4 py-1.5 rounded-full inline-block font-mono mb-4">
                                         {(file.size / 1024 / 1024).toFixed(2)} MB
                                     </div>
-                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">点击更换目录</div>
+                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">{t('workerForm.selectFile')}</div>
                                 </div>
                             ) : (
                                 <div className="transition-transform duration-300 group-hover:scale-105">
                                     <div className="text-6xl mb-4 opacity-30 group-hover:opacity-100 group-hover:drop-shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all">📂</div>
-                                    <div className="font-bold text-xl mb-2 opacity-60">选择项目构建目录</div>
+                                    <div className="font-bold text-xl mb-2 opacity-60">{t('pagesForm.selectProjectDir')}</div>
                                     <div className="text-sm opacity-40 max-w-xs mx-auto leading-relaxed">
-                                        上传包含 (dist/build/out) 产物的文件夹
+                                        {t('pagesForm.uploadDist')}
                                     </div>
                                 </div>
                             )}
@@ -214,13 +216,13 @@ const PagesForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                                     <div className="text-xs text-blue-500 bg-blue-500/10 px-4 py-1.5 rounded-full inline-block font-mono mb-4">
                                         {(file.size / 1024).toFixed(2)} KB
                                     </div>
-                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">点击更换 ZIP 文件</div>
+                                    <div className="text-xs opacity-40 group-hover:text-blue-500 transition-colors">{t('workerForm.selectFile')}</div>
                                 </div>
                             ) : (
                                 <div className="transition-transform duration-300 group-hover:scale-105">
                                     <div className="text-6xl mb-4 opacity-30 group-hover:opacity-100 transition-opacity">🤐</div>
-                                    <div className="font-bold text-xl mb-2 opacity-60">选择 ZIP 压缩包</div>
-                                    <div className="text-sm opacity-40">点击上传或将文件拖至此处</div>
+                                    <div className="font-bold text-xl mb-2 opacity-60">{t('pagesForm.selectZip')}</div>
+                                    <div className="text-sm opacity-40">{t('pagesForm.dragDrop')}</div>
                                 </div>
                             )}
                         </label>

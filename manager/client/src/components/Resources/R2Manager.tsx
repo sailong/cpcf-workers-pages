@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { authenticatedFetch } from '../../api';
 
@@ -15,6 +16,7 @@ interface R2Object {
 }
 
 const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
+    const { t } = useTranslation();
     const [files, setFiles] = useState<R2Object[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -40,7 +42,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
             // data.objects is the array
             setFiles(data.objects || []);
         } catch (err: any) {
-            setError(err.message || '加载文件失败');
+            setError(err.message || t('r2Manager.loadError'));
         } finally {
             setLoading(false);
         }
@@ -69,10 +71,9 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
             if (!res.ok) throw new Error(await res.text());
 
             await loadFiles();
-            // Reset input
             if (fileInputRef.current) fileInputRef.current.value = '';
         } catch (err: any) {
-            setError('上传失败: ' + err.message);
+            setError(t('r2Manager.uploadError') + ': ' + err.message);
         } finally {
             setUploading(false);
         }
@@ -83,7 +84,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
         // For consistency use window.confirm or custom modal. 
         // D1Manager doesn't seem to use a complex delete modal for rows, but App does for resources.
         // Let's stick to window.confirm for now or simple UI toggle.
-        if (!window.confirm(`确定要删除 ${key} 吗？`)) return;
+        if (!window.confirm(t('r2Manager.deleteConfirm', { key }))) return;
 
         try {
             const res = await authenticatedFetch(`/api/resources/r2/${bucket.id}/files/${encodeURIComponent(key)}`, {
@@ -93,7 +94,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
             if (!res.ok) throw new Error(await res.text());
             await loadFiles();
         } catch (err: any) {
-            setError('删除失败: ' + err.message);
+            setError(t('r2Manager.deleteError') + ': ' + err.message);
         }
     };
 
@@ -114,7 +115,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                 <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gray-950/50 rounded-t-xl">
                     <h2 className="text-2xl font-bold text-gray-100 flex items-center gap-3">
                         <span className="bg-yellow-500/10 text-yellow-500 p-2 rounded-lg text-xl">🪣</span>
-                        R2 文件管理: <span className="text-yellow-500 font-mono">{bucket.name}</span>
+                        {t('r2Manager.title')}: <span className="text-yellow-500 font-mono">{bucket.name}</span>
                     </h2>
                     <div className="flex items-center gap-3">
                         <input
@@ -131,7 +132,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                                 : 'bg-yellow-600 hover:bg-yellow-500 text-black shadow-lg shadow-yellow-900/20'
                                 }`}
                         >
-                            {uploading ? '⏳ 上传中...' : '📤 上传文件'}
+                            {uploading ? `⏳ ${t('r2Manager.uploading')}` : `📤 ${t('r2Manager.upload')}`}
                         </button>
                         <button
                             onClick={onClose}
@@ -153,17 +154,17 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                     {loading && files.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                             <div className="w-8 h-8 border-2 border-gray-600 border-t-yellow-500 rounded-full animate-spin mb-4"></div>
-                            <p>正在加载文件列表...</p>
+                            <p>{t('d1Manager.loading')}</p>
                         </div>
                     ) : (
                         <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-900">
                             <table className="w-full text-sm text-left">
                                 <thead className="bg-gray-800/80 text-gray-400 font-medium border-b border-gray-700 uppercase text-xs sticky top-0 backdrop-blur-sm">
                                     <tr>
-                                        <th className="px-6 py-3 w-1/2">文件名 (Key)</th>
-                                        <th className="px-6 py-3">大小 (Size)</th>
-                                        <th className="px-6 py-3">上传时间 (Uploaded)</th>
-                                        <th className="px-6 py-3 text-right">操作 (Actions)</th>
+                                        <th className="px-6 py-3 w-1/2">{t('r2Manager.key')}</th>
+                                        <th className="px-6 py-3">{t('r2Manager.size')}</th>
+                                        <th className="px-6 py-3">{t('r2Manager.uploaded')}</th>
+                                        <th className="px-6 py-3 text-right">{t('r2Manager.actions')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-800">
@@ -171,7 +172,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                                         <tr>
                                             <td colSpan={4} className="p-16 text-center text-gray-600">
                                                 <div className="text-4xl mb-4 opacity-30">📭</div>
-                                                <p>暂无文件，点击右上角上传</p>
+                                                <p>{t('r2Manager.noFiles')}, {t('r2Manager.uploadHint')}</p>
                                             </td>
                                         </tr>
                                     ) : (
@@ -194,13 +195,13 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                                                             className="text-blue-400 hover:text-blue-300 text-xs font-medium hover:underline flex items-center gap-1"
                                                             download
                                                         >
-                                                            ⬇️ 下载
+                                                            ⬇️ {t('r2Manager.download')}
                                                         </a>
                                                         <button
                                                             onClick={() => handleDelete(obj.key)}
                                                             className="text-red-500 hover:text-red-400 text-xs font-medium hover:underline flex items-center gap-1"
                                                         >
-                                                            🗑️ 删除
+                                                            🗑️ {t('r2Manager.delete')}
                                                         </button>
                                                     </div>
                                                 </td>
@@ -214,8 +215,8 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                 </div>
 
                 <div className="px-6 py-3 border-t border-gray-800 bg-gray-900 text-xs text-gray-500 flex justify-between">
-                    <span>提示: 列表可能会有短暂延迟 (本地模拟环境)</span>
-                    <span>共 {files.length} 个文件</span>
+                    <span>{t('r2Manager.tips')}</span>
+                    <span>{t('r2Manager.fileCount', { count: files.length })}</span>
                 </div>
             </div>
         </div>,

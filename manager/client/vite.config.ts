@@ -11,5 +11,16 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'monaco-editor': ['@monaco-editor/react'],
+          'vendor': ['react', 'react-dom', 'react-router-dom', 'i18next', 'react-i18next']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
   }
 })
