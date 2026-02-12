@@ -30,12 +30,36 @@ module.exports = function (req, res, next) {
 
     // Remove port
     const hostname = host.split(':')[0];
+    let prefix = null;
+    let autoMatched = false;
+
+    // 1. Try Standard Suffix Match
     const domainSuffix = '.' + ROOT_DOMAIN;
-
     if (hostname.endsWith(domainSuffix)) {
-        const prefix = hostname.slice(0, -domainSuffix.length);
-        console.log(`[ProxyRouter] Match! Prefix: ${prefix}, Suffix: ${domainSuffix}`);
+        prefix = hostname.slice(0, -domainSuffix.length);
+        console.log(`[ProxyRouter] Standard Match! Prefix: ${prefix}, Suffix: ${domainSuffix}`);
+    }
 
+    // 2. Dynamic Domain Mode (Only if ROOT_DOMAIN is localhost)
+    // Allows accessing via ANY domain/IP if configured as localhost
+    if (!prefix && ROOT_DOMAIN === 'localhost') {
+        // Regex to find "name-type." at the start of hostname
+        // This handles:
+        //   project-worker.localhost
+        //   project-pages.127.0.0.1
+        //   project-worker.192.168.1.5
+        //   project-pages.custom.local
+        const match = hostname.match(/^(.*)-(worker|pages)\./);
+        if (match) {
+            // match[1] is name, match[2] is type
+            // reconstruct prefix as "name-type" for the logic below
+            prefix = `${match[1]}-${match[2]}`;
+            autoMatched = true;
+            console.log(`[ProxyRouter] Dynamic Match! Prefix: ${prefix}, Host: ${hostname}`);
+        }
+    }
+
+    if (prefix) {
         let projectName = prefix;
         let projectType = null;
 

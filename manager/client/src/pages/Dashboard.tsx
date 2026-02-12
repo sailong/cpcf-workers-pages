@@ -29,10 +29,18 @@ const Dashboard: React.FC = () => {
         try {
             const res = await fetch('/api/config');
             const data = await res.json();
-            setRootDomain(data.rootDomain);
+
+            // Requirement:
+            // 1. If ROOT_DOMAIN is set (not localhost), use it.
+            // 2. If ROOT_DOMAIN is 'localhost', use current browser hostname.
+            if (data.rootDomain === 'localhost') {
+                setRootDomain(window.location.hostname);
+            } else {
+                setRootDomain(data.rootDomain);
+            }
         } catch (e) {
             console.error("Failed to load config", e);
-            setRootDomain('localhost');
+            setRootDomain(window.location.hostname || 'localhost');
         }
     };
 
