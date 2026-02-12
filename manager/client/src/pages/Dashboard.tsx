@@ -86,14 +86,14 @@ const Dashboard: React.FC = () => {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => navigate('/resources')}
-                        className="btn-glass"
+                        className="btn-glass min-w-[150px] justify-center"
                     >
                         <span>Resources</span>
                     </button>
 
                     <a
                         href="/create"
-                        className="btn-gradient flex items-center gap-2"
+                        className="btn-gradient flex items-center gap-2 min-w-[150px] justify-center"
                     >
                         <span>+ New Project</span>
                     </a>
@@ -107,8 +107,8 @@ const Dashboard: React.FC = () => {
                         <button onClick={() => setShowChangePassword(true)} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             🔑
                         </button>
-                        <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-500/20 hover:text-red-500 transition-all text-[var(--text-muted)]">
-                            🚪
+                        <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-500/20 hover:text-red-500 transition-all text-[var(--text-muted)]" title="Sign Out">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         </button>
                     </div>
                 </div>
@@ -130,8 +130,8 @@ const Dashboard: React.FC = () => {
                             <div className="flex justify-between items-start">
                                 <div>
                                     <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide border ${p.type === 'worker'
-                                            ? 'border-orange-500/30 text-orange-500 bg-orange-500/10'
-                                            : 'border-blue-500/30 text-blue-500 bg-blue-500/10'
+                                        ? 'border-orange-500/30 text-orange-500 bg-orange-500/10'
+                                        : 'border-blue-500/30 text-blue-500 bg-blue-500/10'
                                         }`}>
                                         {p.type}
                                     </span>
@@ -142,8 +142,8 @@ const Dashboard: React.FC = () => {
                                 </div>
 
                                 <div className={`w-3 h-3 rounded-full shadow-lg transition-all duration-500 ${p.status === 'running'
-                                        ? 'bg-emerald-500 shadow-emerald-500/50 scale-100'
-                                        : 'bg-gray-400/30 scale-75'
+                                    ? 'bg-emerald-500 shadow-emerald-500/50 scale-100'
+                                    : 'bg-gray-400/30 scale-75'
                                     }`} />
                             </div>
 
@@ -151,31 +151,32 @@ const Dashboard: React.FC = () => {
                             <div className="flex items-center gap-2 mt-auto pt-4 border-t border-[var(--glass-border)] opacity-80 group-hover:opacity-100 transition-opacity">
                                 <button
                                     onClick={() => toggleProject(p)}
-                                    className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all ${p.status === 'running'
-                                            ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
-                                            : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                                    className={`px-4 h-9 rounded-xl font-bold text-xs transition-all flex items-center justify-center ${p.status === 'running'
+                                        ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                                        : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
                                         }`}
                                 >
                                     {p.status === 'running' ? 'Stop' : 'Start'}
+                                </button>
+
+                                <button onClick={() => setEditingProject(p)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-[var(--text-muted)]">
+                                    ⚙️
+                                </button>
+
+                                <button onClick={() => deleteProject(p.id)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
+                                    🗑
                                 </button>
 
                                 {p.status === 'running' && (
                                     <a
                                         href={`http://${p.name}.localhost:8001`}
                                         target="_blank"
-                                        className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                        className="ml-auto h-9 w-9 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                        title="Open App"
                                     >
                                         ↗
                                     </a>
                                 )}
-
-                                <button onClick={() => setEditingProject(p)} className="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-[var(--text-muted)]">
-                                    ⚙️
-                                </button>
-
-                                <button onClick={() => deleteProject(p.id)} className="p-2.5 rounded-xl hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
-                                    🗑
-                                </button>
                             </div>
                         </div>
                     ))}

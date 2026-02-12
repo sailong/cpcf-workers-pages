@@ -91,7 +91,7 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                             value={filename}
                             onChange={(e) => setFilename(e.target.value)}
                             placeholder="worker.js"
-                            className="input-liquid w-full p-4 font-mono"
+                            className="neo-input w-full p-4 font-mono"
                         />
                     </div>
                     <div className="border border-current/10 rounded-2xl overflow-hidden glass shadow-2xl">

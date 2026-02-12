@@ -371,7 +371,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         <select
                             value={framework}
                             onChange={e => handleFrameworkChange(e.target.value)}
-                            className="input-liquid w-full p-3.5 appearance-none"
+                            className="neo-input w-full p-3.5 appearance-none"
                             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(156, 163, 175, 1)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25rem' }}
                         >
                             <option value="Other">Other / Custom</option>
@@ -387,7 +387,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             value={outputDir}
                             onChange={e => setOutputDir(e.target.value)}
                             placeholder="dist"
-                            className="input-liquid w-full p-3.5"
+                            className="neo-input w-full p-3.5"
                         />
                     </div>
                 </div>
@@ -401,7 +401,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             value={buildCommand}
                             onChange={e => setBuildCommand(e.target.value)}
                             placeholder="npm install && npm run build"
-                            className="input-liquid w-full pl-8 pr-4 py-4 font-mono text-sm"
+                            className="neo-input w-full pl-8 pr-4 py-4 font-mono text-sm"
                         />
                     </div>
                 </div>
@@ -415,7 +415,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                             value={deployCommand}
                             onChange={e => setDeployCommand(e.target.value)}
                             placeholder="npx wrangler deploy --dry-run"
-                            className="input-liquid w-full pl-8 pr-4 py-4 font-mono text-sm"
+                            className="neo-input w-full pl-8 pr-4 py-4 font-mono text-sm"
                         />
                     </div>
                     <p className="text-[10px] text-gray-500 mt-2 ml-1 italic opacity-60">此命令将在构建成功后自动执行</p>

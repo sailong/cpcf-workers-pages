@@ -143,8 +143,8 @@ const CreateProject: React.FC = () => {
                                 key={m.id}
                                 onClick={() => setMode(m.id as ProjectMode)}
                                 className={`relative p-6 rounded-2xl border transition-all text-left group overflow-hidden ${mode === m.id
-                                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-lg shadow-indigo-500/10'
-                                        : 'border-transparent bg-white/5 hover:bg-white/10 hover:border-white/20'
+                                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-lg shadow-indigo-500/10'
+                                    : ' hover:border-white/50 border border-black/5 hover:border-black/10 shadow-sm dark:bg-white/5 dark:border-white/5 dark:hover:bg-white/10 dark:hover:border-white/10'
                                     }`}
                             >
                                 <div className={`text-4xl mb-4 transition-transform duration-300 ${mode === m.id ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`}>{m.icon}</div>

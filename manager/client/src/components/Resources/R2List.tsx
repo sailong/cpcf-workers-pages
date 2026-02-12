@@ -43,42 +43,47 @@ const R2List: React.FC = () => {
     };
 
     return (
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-            <h2 className="text-xl font-bold text-gray-200 mb-4 flex items-center gap-2">
-                <span className="text-yellow-500">🪣</span> R2 存储桶
+        <div className="neo-card p-6">
+            <h2 className="text-xl font-black text-[var(--text-main)] mb-6 flex items-center gap-2">
+                <span className="text-yellow-500">🪣</span> R2 Bucket
             </h2>
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mb-6">
                 <input
                     value={newName}
                     onChange={e => setNewName(e.target.value)}
-                    placeholder="输入存储桶名称"
-                    className="flex-1 bg-gray-950 border border-gray-700 rounded px-3 py-2 text-sm text-gray-300"
+                    placeholder="Enter bucket name"
+                    className="neo-input flex-1"
                 />
                 <button
                     onClick={handleCreate}
-                    className="bg-yellow-600 hover:bg-yellow-500 px-4 py-2 rounded text-sm text-white"
+                    className="btn-gradient px-4 py-2 text-sm"
                 >
-                    创建
+                    Create
                 </button>
             </div>
 
             {loading ? (
-                <div className="text-center text-gray-500 py-4">加载中...</div>
+                <div className="text-center text-[var(--text-muted)] py-8 font-medium animate-pulse">Loading buckets...</div>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                     {resources.map(r => (
-                        <div key={r.id} className="bg-gray-800 p-3 rounded flex justify-between items-center group hover:bg-gray-750 transition-colors">
+                        <div key={r.id} className="neo-glass p-4 rounded-2xl flex justify-between items-center group hover:border-white/50 dark:hover:bg-blue-900/40 transition-all border border-transparent hover:border-black/5 dark:hover:border-blue-500/30">
                             <div>
-                                <div className="text-gray-200 text-sm font-medium">{r.name}</div>
-                                <div className="text-xs text-gray-500 font-mono">{r.id}</div>
+                                <div className="text-[var(--text-main)] font-bold">{r.name}</div>
+                                <div className="text-xs text-[var(--text-muted)] font-mono mt-0.5 opacity-60">{r.id}</div>
                             </div>
-                            <div className="flex gap-2 opacity-80 group-hover:opacity-100">
-                                <button onClick={() => setManaging(r)} className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300">管理</button>
-                                <button onClick={() => handleDelete(r.id)} className="text-xs bg-red-900/50 hover:bg-red-900 text-red-400 px-2 py-1 rounded">删除</button>
+                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => setManaging(r)} className="text-xs btn-glass px-3 py-1.5 h-8 bg-white/50 hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/20">Manage</button>
+                                <button onClick={() => handleDelete(r.id)} className="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-500 px-3 py-1.5 rounded-xl transition-colors font-bold h-8 flex items-center">Delete</button>
                             </div>
                         </div>
                     ))}
-                    {resources.length === 0 && <div className="text-center text-gray-600 text-sm py-4">暂无 R2 存储桶</div>}
+                    {resources.length === 0 && (
+                        <div className="text-center py-10 opacity-50">
+                            <div className="text-4xl mb-2">🪣</div>
+                            <div className="text-[var(--text-muted)] font-medium">No R2 buckets found</div>
+                        </div>
+                    )}
                 </div>
             )}
 
