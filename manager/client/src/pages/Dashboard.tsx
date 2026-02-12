@@ -16,12 +16,25 @@ const Dashboard: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showChangePassword, setShowChangePassword] = useState(false);
+    const [rootDomain, setRootDomain] = useState<string>('');
 
     useEffect(() => {
+        loadConfig();
         loadProjects();
         const interval = setInterval(loadProjects, 5000);
         return () => clearInterval(interval);
     }, []);
+
+    const loadConfig = async () => {
+        try {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            setRootDomain(data.rootDomain);
+        } catch (e) {
+            console.error("Failed to load config", e);
+            setRootDomain('localhost');
+        }
+    };
 
     const loadProjects = async () => {
         try {
@@ -173,7 +186,7 @@ const Dashboard: React.FC = () => {
 
                                 {p.status === 'running' && (
                                     <a
-                                        href={`http://${p.name}.localhost:8001`}
+                                        href={`${window.location.protocol}//${p.name}-${p.type}.${rootDomain || 'localhost'}${window.location.port ? ':' + window.location.port : ''}`}
                                         target="_blank"
                                         className="ml-auto h-9 w-9 flex items-center justify-center rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors"
                                         title={t('common.openApp')}

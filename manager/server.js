@@ -38,6 +38,12 @@ app.use('/api', require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/build', require('./routes/build'));
 app.use('/api/upload', require('./routes/upload'));
+app.get('/api/config', (req, res) => {
+    res.json({
+        rootDomain: process.env.ROOT_DOMAIN || 'localhost',
+        managerPort: process.env.MANAGER_SERVICE_PORT || 3000,
+    });
+});
 
 // Resource Routes
 app.use('/api/resources/kv', require('./routes/resources-kv'));
