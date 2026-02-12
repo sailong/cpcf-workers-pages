@@ -20,7 +20,7 @@
 1.  **构建镜像**
     将 `your-username` 替换为你的 Docker Hub 用户名。
     ```bash
-    # 在项目根目录下执行
+    # 在项目根目录下执行 (兼容当前架构)
     docker build -t your-username/ccfwp:latest .
     ```
 
