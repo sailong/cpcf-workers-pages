@@ -105,7 +105,7 @@ const CreateProject: React.FC = () => {
 
     return (
         <div className="min-h-screen p-6 md:p-10 font-sans transition-colors duration-300">
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+            <header className="max-w-4xl mx-auto w-full flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
                 <div>
                     <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">New Project</h1>
                     <p className="text-[var(--text-muted)] mt-1 font-medium">Deploy your code to the global edge network.</p>

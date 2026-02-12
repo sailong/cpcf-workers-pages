@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { authenticatedFetch } from '../../api';
 
 interface D1ManagerProps {
@@ -122,9 +123,9 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
         setSqlInput(sql);
     };
 
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+    return createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
                 <div className="p-6 border-b border-gray-800 flex justify-between items-center">
                     <div>
@@ -326,7 +327,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
 
             {/* Structure Modal */}
             {showStructureModal && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-8">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-8">
                     <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
                         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-850">
                             <h3 className="font-bold text-white flex items-center gap-2">
@@ -370,7 +371,8 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 }
 

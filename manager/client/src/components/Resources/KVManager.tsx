@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { authenticatedFetch } from '../../api';
 
 interface KVManagerProps {
@@ -109,9 +110,9 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
         loadKeys();
     }, [namespace.id]);
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden relative">
+    return createPortal(
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100]">
+            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden relative border border-gray-700">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex justify-between items-center">
                     <div>
@@ -217,7 +218,8 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

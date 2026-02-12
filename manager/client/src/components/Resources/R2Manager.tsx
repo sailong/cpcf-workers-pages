@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { authenticatedFetch } from '../../api';
 
 interface R2ManagerProps {
@@ -106,8 +107,8 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     };
 
-    return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-8">
+    return createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-8">
             <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gray-950/50 rounded-t-xl">
@@ -217,7 +218,8 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                     <span>共 {files.length} 个文件</span>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
