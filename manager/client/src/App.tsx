@@ -40,9 +40,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="min-h-screen font-sans relative">
-      <div className="absolute top-4 right-4 z-50">
-        <LanguageSwitcher />
-      </div>
+      {/* LanguageSwitcher removed from global layout */}
       {/* Global Fluid Background */}
       <div className="fluid-bg">
         <div className="orb orb-1"></div>

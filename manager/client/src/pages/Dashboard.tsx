@@ -7,6 +7,7 @@ import ChangePasswordModal from '../components/ChangePasswordModal';
 import { useNavigate } from 'react-router-dom';
 import { removeToken } from '../api';
 import { useTheme } from '../contexts/ThemeContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -103,6 +104,7 @@ const Dashboard: React.FC = () => {
                     <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
 
                     <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
+                        <LanguageSwitcher />
                         <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             {theme === 'dark' ? '🌙' : '☀️'}
                         </button>

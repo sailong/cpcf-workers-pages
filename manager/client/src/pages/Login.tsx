@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AuthService } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 interface LoginProps {
     onLogin: (token: string) => void;
@@ -55,7 +56,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     return (
         <div className="min-h-screen flex items-center justify-center p-4 font-sans relative overflow-hidden transition-colors duration-300">
             {/* Theme Toggle in Login */}
-            <div className="absolute top-6 right-6 z-50">
+            <div className="absolute top-6 right-6 z-50 flex gap-2">
+                <LanguageSwitcher className="glass border-transparent" />
                 <button
                     onClick={toggleTheme}
                     className="glass border-transparent p-2.5 rounded-xl transition-all active:scale-95 shadow-lg"

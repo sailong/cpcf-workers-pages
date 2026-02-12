@@ -1,34 +1,22 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-const LanguageSwitcher: React.FC = () => {
+const LanguageSwitcher: React.FC<{ className?: string }> = ({ className = "" }) => {
     const { i18n } = useTranslation();
 
-    const changeLanguage = (lng: string) => {
-        i18n.changeLanguage(lng);
+    const toggleLanguage = () => {
+        const newLang = i18n.language.startsWith('zh') ? 'en' : 'zh';
+        i18n.changeLanguage(newLang);
     };
 
     return (
-        <div className="flex space-x-2">
-            <button
-                onClick={() => changeLanguage('en')}
-                className={`px-3 py-1 rounded transition-colors ${i18n.language.startsWith('en')
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-            >
-                English
-            </button>
-            <button
-                onClick={() => changeLanguage('zh')}
-                className={`px-3 py-1 rounded transition-colors ${i18n.language.startsWith('zh')
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    }`}
-            >
-                中文
-            </button>
-        </div>
+        <button
+            onClick={toggleLanguage}
+            className={`p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)] font-bold ${className}`}
+            title={i18n.language.startsWith('zh') ? "Switch to English" : "切换到中文"}
+        >
+            {i18n.language.startsWith('zh') ? '中' : 'EN'}
+        </button>
     );
 };
 
