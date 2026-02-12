@@ -71,7 +71,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     )}
                 </button>
             </div>
-            {/* Background Decoration - Orbs are now global in App.tsx */}\n            <div className="neo-card p-10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
+            {/* Background Decoration - Orbs are now global in App.tsx */}
+            <div className="neo-card p-10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
                 <div className="text-center mb-10">
                     <h1 className="text-4xl font-black mb-2 tracking-tight text-[var(--color-primary)]">
                         Welcome Back
