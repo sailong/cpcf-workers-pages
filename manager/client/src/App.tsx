@@ -36,7 +36,21 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(timer);
   }, []);
 
-  return <div className="min-h-screen font-sans relative">{children}</div>;
+  return (
+    <div className="min-h-screen font-sans relative">
+      {/* Global Fluid Background */}
+      <div className="fluid-bg">
+        <div className="orb orb-1"></div>
+        <div className="orb orb-2"></div>
+        <div className="orb orb-3"></div>
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        {children}
+      </div>
+    </div>
+  );
 };
 
 function App() {

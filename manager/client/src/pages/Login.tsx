@@ -71,73 +71,69 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     )}
                 </button>
             </div>
-            {/* Background Decoration */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/10 rounded-full blur-[120px] pointer-events-none"></div>
-
-            <div className="glass-card p-10 w-full max-w-md relative z-10">
+            {/* Background Decoration - Orbs are now global in App.tsx */}\n            <div className="neo-card p-10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500">
                 <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold mb-2 tracking-tight">
-                        欢迎回来
+                    <h1 className="text-4xl font-black mb-2 tracking-tight text-[var(--color-primary)]">
+                        Welcome Back
                     </h1>
-                    <p className="opacity-40 text-sm font-medium">Sign in to CCFWP Manager</p>
+                    <p className="text-[var(--text-muted)] text-sm font-medium">Sign in to CCFWP Manager</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-gray-400 text-xs font-bold uppercase mb-2 ml-1">用户名</label>
+                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Username</label>
                         <input
                             type="text"
                             value="admin"
                             readOnly
                             disabled
-                            className="input-liquid w-full p-3 opacity-50 cursor-not-allowed"
+                            className="neo-input w-full opacity-50 cursor-not-allowed"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-gray-400 text-xs font-bold uppercase mb-2 ml-1">密码</label>
+                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Password</label>
                         <input
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="请输入密码"
-                            className="input-liquid w-full p-3"
+                            placeholder="Enter password"
+                            className="neo-input w-full"
                             autoFocus
                         />
                     </div>
 
                     <div>
-                        <label className="block text-gray-400 text-xs font-bold uppercase mb-2 ml-1">验证码</label>
+                        <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Captcha</label>
                         <div className="flex gap-4">
                             <input
                                 type="text"
                                 value={captcha}
                                 onChange={(e) => setCaptcha(e.target.value)}
-                                placeholder="验证码"
-                                className="input-liquid flex-1 p-3"
+                                placeholder="Code"
+                                className="neo-input flex-1"
                             />
                             <div
-                                className="w-32 h-[46px] rounded-xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-black/5 dark:border-white/10 flex items-center justify-center bg-white/50 backdrop-blur-md dark:bg-transparent dark:invert"
+                                className="w-32 h-[46px] rounded-2xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-black/5 dark:border-white/10 flex items-center justify-center bg-white/50 backdrop-blur-md dark:bg-white/10"
                                 onClick={fetchCaptcha}
                                 dangerouslySetInnerHTML={{ __html: captchaSvg }}
-                                title="点击刷新"
+                                title="Click to refresh"
                             />
                         </div>
                     </div>
 
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm text-center">
-                            {error === 'Login failed' ? '登录失败，请检查密码或验证码' : error === 'Connection failed' ? '连接失败' : error}
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-2xl text-sm text-center font-medium backdrop-blur-md">
+                            {error === 'Login failed' ? 'Authentication failed' : error}
                         </div>
                     )}
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full btn-primary py-3.5 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                        className="w-full btn-gradient py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl"
                     >
-                        {loading ? '验证中...' : '登 录'}
+                        {loading ? 'Verifying...' : 'Sign In'}
                     </button>
                 </form>
             </div>

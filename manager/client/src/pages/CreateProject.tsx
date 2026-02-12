@@ -105,113 +105,109 @@ const CreateProject: React.FC = () => {
 
     return (
         <div className="min-h-screen p-6 md:p-10 font-sans transition-colors duration-300">
-            <header className="max-w-7xl mx-auto flex justify-between items-center mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight mb-2">新建项目</h1>
-                    <p className="text-muted-foreground text-sm font-medium tracking-wide uppercase">部署您的代码到全球边缘网络</p>
+                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">New Project</h1>
+                    <p className="text-[var(--text-muted)] mt-1 font-medium">Deploy your code to the global edge network.</p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/')} className="glass-button px-5 py-2.5 rounded-xl font-medium flex items-center gap-2">
-                        <span className="text-lg">⬅️</span>
-                        <span>返回控制台</span>
-                    </button>
-
-                    <div className="h-6 w-px bg-current opacity-10 mx-2"></div>
-
+                <div className="flex items-center gap-3">
                     <button
-                        onClick={toggleTheme}
-                        className="opacity-60 hover:opacity-100 transition-all p-2"
-                        title={theme === 'dark' ? '切换亮色' : '切换暗色'}
+                        onClick={() => navigate('/')}
+                        className="btn-glass"
                     >
-                        {theme === 'dark' ? (
-                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l.707.707M6.343 6.343l.707-.707" />
-                                <circle cx="12" cy="12" r="4" />
-                            </svg>
-                        ) : (
-                            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                            </svg>
-                        )}
+                        <span>← Back</span>
                     </button>
+
+                    <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
+
+                    <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
+                        <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
+                            {theme === 'dark' ? '🌙' : '☀️'}
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            <div className="max-w-4xl mx-auto">
-                <div className="grid gap-8">
-                    <div className="glass-card p-8">
-                        <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">选择项目类型</label>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {[
-                                { id: 'worker', label: 'Worker', icon: '⚡️', desc: '高性能边缘计算函数' },
-                                { id: 'pages', label: 'Pages', icon: '📄', desc: '静态网站托管' },
-                                { id: 'build', label: 'Build', icon: '🛠️', desc: 'CI/CD 构建流水线' }
-                            ].map(m => (
-                                <button
-                                    key={m.id}
-                                    onClick={() => setMode(m.id as ProjectMode)}
-                                    className={`relative p-6 rounded-2xl border-2 transition-all text-left group overflow-hidden ${mode === m.id
-                                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
-                                        : 'border-transparent glass opacity-60 hover:opacity-100 hover:bg-current/5'
-                                        }`}
-                                >
-                                    <div className={`text-3xl mb-3 transition-transform duration-300 ${mode === m.id ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`}>{m.icon}</div>
-                                    <div className="font-bold text-lg capitalize mb-1">{m.label}</div>
-                                    <div className="text-xs opacity-60 font-medium leading-relaxed">{m.desc}</div>
-                                    {mode === m.id && (
-                                        <div className="absolute top-2 right-2 text-blue-400">
-                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                        </div>
-                                    )}
-                                </button>
-                            ))}
-                        </div>
+            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+                {/* 1. Type Selection */}
+                <div className="neo-card p-8">
+                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">1. Select Project Type</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {[
+                            { id: 'worker', label: 'Worker', icon: '⚡️', desc: 'High-performance edge functions' },
+                            { id: 'pages', label: 'Pages', icon: '📄', desc: 'Static site hosting' },
+                            { id: 'build', label: 'Build', icon: '🛠️', desc: 'CI/CD Pipelines' }
+                        ].map(m => (
+                            <button
+                                key={m.id}
+                                onClick={() => setMode(m.id as ProjectMode)}
+                                className={`relative p-6 rounded-2xl border transition-all text-left group overflow-hidden ${mode === m.id
+                                        ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-lg shadow-indigo-500/10'
+                                        : 'border-transparent bg-white/5 hover:bg-white/10 hover:border-white/20'
+                                    }`}
+                            >
+                                <div className={`text-4xl mb-4 transition-transform duration-300 ${mode === m.id ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`}>{m.icon}</div>
+                                <div className={`font-bold text-lg capitalize mb-1 ${mode === m.id ? 'text-[var(--color-primary)]' : 'text-[var(--text-main)]'}`}>{m.label}</div>
+                                <div className="text-xs text-[var(--text-muted)] leading-relaxed">{m.desc}</div>
+                                {mode === m.id && (
+                                    <div className="absolute top-3 right-3 text-[var(--color-primary)]">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                                    </div>
+                                )}
+                            </button>
+                        ))}
                     </div>
+                </div>
 
-                    <div className="glass-card p-8 space-y-6">
+                {/* 2. Basic Info */}
+                <div className="neo-card p-8 space-y-6">
+                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-2 ml-1 tracking-widest">2. Basic Information</label>
+                    <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1">项目名称</label>
+                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Project Name</label>
                             <input
                                 type="text"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder={mode === 'worker' ? 'my-awesome-worker' : 'my-static-site'}
-                                className="input-liquid w-full p-4 text-lg"
+                                className="neo-input w-full"
                             />
                         </div>
                         <div>
-                            <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1">内部端口 (可选)</label>
+                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">Internal Port (Optional)</label>
                             <input
                                 type="number"
                                 value={customPort}
                                 onChange={(e) => setCustomPort(e.target.value ? parseInt(e.target.value) : '')}
-                                placeholder="留空则自动分配"
-                                className="input-liquid w-full p-4"
+                                placeholder="Auto-assigned if empty"
+                                className="neo-input w-full"
                             />
                         </div>
                     </div>
-
-                    <div className="glass-card p-8">
-                        <label className="block text-gray-500 text-xs font-bold uppercase mb-6 ml-1">详细配置</label>
-                        {mode === 'worker' && <WorkerForm ref={formRef} setError={setError} showToast={showToast} />}
-                        {mode === 'pages' && <PagesForm ref={formRef} setError={setError} showToast={showToast} />}
-                        {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} />}
-                    </div>
                 </div>
 
-                <div className="mt-8 mb-20">
+                {/* 3. Detailed Config */}
+                <div className="neo-card p-8">
+                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">3. Configuration</label>
+                    {mode === 'worker' && <WorkerForm ref={formRef} setError={setError} showToast={showToast} />}
+                    {mode === 'pages' && <PagesForm ref={formRef} setError={setError} showToast={showToast} />}
+                    {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} />}
+                </div>
+
+                {/* 4. Action */}
+                <div className="pb-20">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-6 py-4 rounded-xl flex items-center gap-3 mb-6">
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-2xl flex items-center gap-3 mb-6 backdrop-blur-md">
                             <span className="text-xl">⚠️</span><span>{error}</span>
                         </div>
                     )}
                     <button
                         onClick={handleCreate}
                         disabled={isCreateDisabled}
-                        className="w-full btn-primary py-4 text-xl font-bold shadow-xl shadow-blue-900/30 disabled:opacity-50"
+                        className="w-full btn-gradient text-xl py-4 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {creating ? '🚀 创建部署中...' : '立即创建项目'}
+                        {creating ? '🚀 Deploying...' : 'Create & Deploy'}
                     </button>
                 </div>
             </div>

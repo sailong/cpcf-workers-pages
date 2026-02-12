@@ -75,102 +75,118 @@ const Dashboard: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen p-6 md:p-10 font-sans transition-colors duration-300">
-            <header className="max-w-7xl mx-auto flex justify-between items-center mb-12">
+        <div className="max-w-7xl mx-auto p-6 md:p-10 animate-in fade-in zoom-in duration-500">
+            {/* Header Area */}
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">控制台</h1>
-                    <p className="text-muted-foreground text-sm mt-1">Cloudflare Workers & Pages Manager</p>
+                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">Dashboard</h1>
+                    <p className="text-[var(--text-muted)] mt-1 font-medium">Manage your edge deployments.</p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/resources')} className="glass-button px-5 py-2.5 rounded-xl font-medium flex items-center gap-2">
-                        <span className="text-lg">📦</span>
-                        <span>资源管理</span>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => navigate('/resources')}
+                        className="btn-glass"
+                    >
+                        <span>Resources</span>
                     </button>
 
-                    <a href="/create" className="btn-primary px-5 py-2.5 flex items-center gap-2 text-white shadow-lg shadow-blue-500/20">
-                        <span className="text-lg">+</span>
-                        <span>新建项目</span>
+                    <a
+                        href="/create"
+                        className="btn-gradient flex items-center gap-2"
+                    >
+                        <span>+ New Project</span>
                     </a>
 
-                    <div className="h-6 w-px bg-current opacity-10 mx-2"></div>
+                    <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
 
-                    <button onClick={toggleTheme} className="opacity-60 hover:opacity-100 transition-all p-2" title={theme === 'dark' ? '切换亮色' : '切换暗色'}>
-                        {theme === 'dark' ? (
-                            <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m12.728 0l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" /></svg>
-                        ) : (
-                            <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-                        )}
-                    </button>
-
-                    <button onClick={() => setShowChangePassword(true)} className="opacity-60 hover:opacity-100 transition-opacity p-2" title="修改密码">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                    </button>
-                    <button onClick={handleLogout} className="opacity-60 hover:opacity-100 peer hover:text-red-500 transition-all p-2" title="退出登录">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                    </button>
+                    <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
+                        <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
+                            {theme === 'dark' ? '🌙' : '☀️'}
+                        </button>
+                        <button onClick={() => setShowChangePassword(true)} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
+                            🔑
+                        </button>
+                        <button onClick={handleLogout} className="p-2 rounded-xl hover:bg-red-500/20 hover:text-red-500 transition-all text-[var(--text-muted)]">
+                            🚪
+                        </button>
+                    </div>
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map(p => (
-                    <div key={p.id} className="glass-card p-6 flex flex-col justify-between group h-48 relative overflow-hidden">
-                        {/* Status Dot */}
-                        <div className={`absolute top-4 right-4 w-2.5 h-2.5 rounded-full shadow-lg ${p.status === 'running' ? 'bg-green-500 shadow-green-500/50 animate-pulse' : 'bg-gray-600'}`} />
+            {/* Stats / Overview - Optional Bento Item */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="neo-card p-6">
+                    <span className="text-sm text-[var(--text-muted)] uppercase tracking-wider font-bold">Total Projects</span>
+                    <span className="text-4xl font-black mt-2">{projects.length}</span>
+                </div>
+            </div> */}
 
-                        <div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wide border ${p.type === 'worker'
-                                    ? 'border-blue-500/30 text-blue-400 bg-blue-500/10'
-                                    : 'border-purple-500/30 text-purple-400 bg-purple-500/10'
-                                    }`}>
-                                    {p.type}
-                                </span>
-                            </div>
-                            <h3 className="text-xl font-bold mb-1 truncate pr-8">{p.name}</h3>
-                            <div className="text-xs opacity-50 font-mono flex items-center gap-3">
-                                <span>:{p.port}</span>
-                                <span className="opacity-50">|</span>
-                                <span>{p.id.substring(0, 8)}</span>
-                            </div>
-                        </div>
+            {/* Projects Grid - Bento Style */}
+            {projects.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {projects.map(p => (
+                        <div key={p.id} className="neo-card p-6 h-56 justify-between group">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wide border ${p.type === 'worker'
+                                            ? 'border-orange-500/30 text-orange-500 bg-orange-500/10'
+                                            : 'border-blue-500/30 text-blue-500 bg-blue-500/10'
+                                        }`}>
+                                        {p.type}
+                                    </span>
+                                    <h3 className="text-2xl font-bold mt-3 text-[var(--text-main)] truncate pr-4">{p.name}</h3>
+                                    <div className="text-xs text-[var(--text-muted)] font-mono mt-1 opacity-60">
+                                        :{p.port} • {p.id.substring(0, 8)}
+                                    </div>
+                                </div>
 
-                        <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/5">
-                            <div className="flex gap-2">
-                                <button onClick={() => toggleProject(p)} className={`p-2 rounded-lg transition-colors ${p.status === 'running'
-                                    ? 'bg-amber-500/10 text-amber-500 hover:bg-amber-500/20'
-                                    : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'
-                                    }`} title={p.status === 'running' ? '停止' : '启动'}>
-                                    {p.status === 'running'
-                                        ? <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                        : <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                    }
+                                <div className={`w-3 h-3 rounded-full shadow-lg transition-all duration-500 ${p.status === 'running'
+                                        ? 'bg-emerald-500 shadow-emerald-500/50 scale-100'
+                                        : 'bg-gray-400/30 scale-75'
+                                    }`} />
+                            </div>
+
+                            {/* Action Bar - Reveals on Hover (or always visible in cleaner way) */}
+                            <div className="flex items-center gap-2 mt-auto pt-4 border-t border-[var(--glass-border)] opacity-80 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={() => toggleProject(p)}
+                                    className={`flex-1 py-2 rounded-xl font-bold text-sm transition-all ${p.status === 'running'
+                                            ? 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                                            : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                                        }`}
+                                >
+                                    {p.status === 'running' ? 'Stop' : 'Start'}
                                 </button>
-                                <button onClick={() => setEditingProject(p)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 transition-colors" title="编辑">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                </button>
+
                                 {p.status === 'running' && (
-                                    <a href={`http://${p.name}.localhost:8001`} target="_blank" className="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-colors" title="打开应用">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                    <a
+                                        href={`http://${p.name}.localhost:8001`}
+                                        target="_blank"
+                                        className="p-2.5 rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors"
+                                    >
+                                        ↗
                                     </a>
                                 )}
+
+                                <button onClick={() => setEditingProject(p)} className="p-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-[var(--text-muted)]">
+                                    ⚙️
+                                </button>
+
+                                <button onClick={() => deleteProject(p.id)} className="p-2.5 rounded-xl hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
+                                    🗑
+                                </button>
                             </div>
-
-                            <button onClick={() => deleteProject(p.id)} className="text-gray-600 hover:text-red-500 transition-colors" title="删除">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
                         </div>
-                    </div>
-                ))}
-            </div>
-
-            {projects.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-32 text-gray-600">
-                    <div className="w-20 h-20 bg-[#1c1c1e] rounded-full flex items-center justify-center mb-6 shadow-inner">
-                        <span className="text-4xl opacity-50">🚀</span>
-                    </div>
-                    <h3 className="text-xl font-medium text-gray-400">暂无项目</h3>
-                    <p className="text-sm mt-2 opacity-50">点击右上方新建项目开始</p>
+                    ))}
+                </div>
+            ) : (
+                <div className="neo-glass p-20 flex flex-col items-center justify-center text-center">
+                    <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-2xl mb-6 blur-md opacity-20 animate-pulse"></div>
+                    <div className="absolute w-24 h-24 flex items-center justify-center text-5xl">🚀</div>
+                    <h3 className="text-2xl font-bold text-[var(--text-main)] mt-4">No projects yet</h3>
+                    <p className="text-[var(--text-muted)] mt-2 mb-8 max-w-md">Create your first edge function or static site to get started.</p>
+                    <a href="/create" className="btn-gradient">Create Project</a>
                 </div>
             )}
 
