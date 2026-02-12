@@ -3,25 +3,29 @@
 # ==========================================
 FROM node:20-slim AS frontend-builder
 
-# 【关键】全局设置淘宝源和 pnpm 路径
+# 【Config】Use Aliyun Mirror for System Packages (Debian Bookworm)
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
+
+# 【Config】Global Settings for pnpm and npm mirror
 ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
-    PNPM_HOME="/root/.local/share/pnpm"
+    PNPM_HOME="/root/.local/share/pnpm" \
+    ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
+    PHANTOMJS_CDNURL=https://npmmirror.com/mirrors/phantomjs/
+
 ENV PATH="$PNPM_HOME:$PATH"
 
 WORKDIR /app
 
-# Copy Frontend Dependencies
-COPY manager/client/package.json ./manager/client/
-COPY manager/client/package-lock.json* ./manager/client/
+# Copy Frontend Dependencies and Source
+# We copy everything including node_modules if they exist locally
+COPY manager/client ./manager/client
 
-# Install pnpm and Frontend Dependencies
+# Install/Rebuild Frontend Dependencies
+# Install Dependencies
 WORKDIR /app/manager/client
 RUN npm install -g pnpm && \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm install --no-frozen-lockfile
-
-# Copy Frontend Source
-COPY manager/client ./
 
 # Build Frontend (outputs to dist/)
 RUN pnpm run build
@@ -32,26 +36,25 @@ RUN pnpm run build
 # ==========================================
 FROM node:20-slim
 
-# 【核心修复区】解决卡死问题的三大法宝
-# 1. CI=true: 告诉工具这是自动构建，绝对不要弹出交互式问答
-# 2. WRANGLER_SEND_METRICS=false: 显式禁止 Wrangler 发送统计
-# 3. 配置 npm 淘宝源
+# 【Config】Env Vars
 ENV CI=true \
     WRANGLER_SEND_METRICS=false \
     NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
-    ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ \
-    PHANTOMJS_CDNURL=https://npmmirror.com/mirrors/phantomjs/ \
-    PNPM_HOME="/root/.local/share/pnpm"
+    PNPM_HOME="/root/.local/share/pnpm" \
+    # Force build from source for better-sqlite3 if binaries fail, or use mirror
+    # npm_config_better_sqlite3_binary_host=https://github.com/WiseLibs/better-sqlite3/releases/download/
+    # Actually, let's try to build to be safe with arch mismatch
+    PYTHON=/usr/bin/python3
+
 ENV PATH="$PNPM_HOME:$PATH"
 
-# Install system dependencies
-# 更新 ca-certificates 防止 SSL 报错，安装编译工具
-# psmisc 用于 fuser 命令 (端口管理)
-RUN apt-get update && \
+# 【Config】System Dependencies with Aliyun Mirror
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
+    apt-get update && \
     apt-get install -y ca-certificates python3 build-essential psmisc && \
     rm -rf /var/lib/apt/lists/*
 
-# 【优化】改用 pnpm 全局安装 (解决 npm 容易卡住的问题)
+# Install pnpm globally
 RUN npm install -g pnpm && \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm add -g wrangler && \
@@ -59,31 +62,25 @@ RUN npm install -g pnpm && \
 
 WORKDIR /app
 
-# Copy Backend Dependencies first for caching
-COPY manager/package.json manager/package-lock.json* ./manager/
+# Copy Backend Code AND node_modules
+COPY manager/ ./manager/
 
 # Install Backend Dependencies
 WORKDIR /app/manager
-# 使用 pnpm 安装后端生产依赖
+# We need to rebuild better-sqlite3 specifically because it's native and arch-dependent
+# If copying from Mac -> Linux, the binary will be wrong.
 RUN pnpm install --prod --registry=https://registry.npmmirror.com
 
-# Copy Backend Code (server.js, utils/, etc.)
-COPY manager/ ./
-
-# Copy Built Frontend from Stage 1 to Backend's client/dist folder
-# The server.js serves files from 'client/dist' relative to __dirname
+# Copy Built Frontend from Stage 1
 COPY --from=frontend-builder /app/manager/client/dist ./client/dist
 
 # Expose ports
-# 8001: Manager UI & API
-# 9100: R2 Admin Service
 EXPOSE 8001
 EXPOSE 9100
 
 # Environment Variables
 ENV NODE_ENV=production
 ENV MANAGER_SERVICE_PORT=8001
-
 
 # Start command
 CMD ["node", "server.js"]

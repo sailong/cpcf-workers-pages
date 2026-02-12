@@ -39,11 +39,16 @@
 
 1.  **创建构建实例 (首次需要)**
     ```bash
-    docker buildx create --use
+    # 创建并启动一个新的构建器实例，支持多架构
+    docker buildx create --use --name mybuilder --driver docker-container --bootstrap
     ```
 
 2.  **构建并直接推送**
-    这条命令会自动构建两种架构的镜像，并合并推送到 Docker Hub。
+    这条命令会自动构建 `linux/amd64` (x86_64) 和 `linux/arm64` (Apple Silicon) 两种架构的镜像，并合并推送到 Docker Hub。
+    
+    > **注意**: 
+    > *   由于我们优化了 Dockerfile，`better-sqlite3` 等原生依赖会在容器内根据目标架构自动编译，因此兼容性得到了保证。
+    > *   跨架构构建 (例如在 Mac 上构建 amd64 镜像) 需要 QEMU 模拟，速度会比本地构建慢，这是正常的。
     
     ```bash
     docker buildx build \
@@ -70,6 +75,9 @@ services:
       - NODE_ENV=production
       - MANAGER_SERVICE_PORT=8001
       - R2_ADMIN_PORT=9100
+      # 域名配置 (默认: localhost)
+      # 公网部署时设置为你的域名 (例如 ccfwp.example.com)
+      # - ROOT_DOMAIN=localhost
     restart: unless-stopped
 ```
 

@@ -8,6 +8,7 @@ docker-compose.dev.yml
 
 # Dependencies (Installed inside container)
 **/node_modules
+# **/node_modules
 **/npm-debug.log
 
 # Build Artifacts
