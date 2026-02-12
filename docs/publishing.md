@@ -75,9 +75,7 @@ services:
       - NODE_ENV=production
       - MANAGER_SERVICE_PORT=8001
       - R2_ADMIN_PORT=9100
-      # 域名配置 (默认: localhost)
-      # 公网部署时设置为你的域名 (例如 ccfwp.example.com)
-      # - ROOT_DOMAIN=localhost
+
     restart: unless-stopped
 ```
 

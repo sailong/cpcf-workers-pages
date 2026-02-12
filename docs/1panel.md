@@ -43,8 +43,6 @@ services:
       - NODE_ENV=production
       - MANAGER_SERVICE_PORT=8001
       - R2_ADMIN_PORT=9100
-      # 【关键配置】设置为你的实际域名
-      - ROOT_DOMAIN=ccfwp.example.com 
     restart: unless-stopped
 ```
 

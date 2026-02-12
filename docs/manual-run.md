@@ -54,7 +54,7 @@ npm run build
 | :--- | :--- | :--- |
 | `MANAGER_SERVICE_PORT` | `3000` | 后端服务监听端口 |
 | `R2_ADMIN_PORT` | `9099` | R2 管理界面端口 (可选) |
-| `ROOT_DOMAIN` | `localhost` | 根域名 (用于生成子域访问链接) |
+
 
 ## 4. 启动服务 (Start Server)
 
@@ -117,7 +117,7 @@ pm2 start server.js --name "cf-platform" --env MANAGER_SERVICE_PORT=8001
 启动成功后，打开浏览器访问：
 
 *   **管理面板**: `http://localhost:3000` (或您配置的端口)
-*   如果配置了 `ROOT_DOMAIN` (例如 `example.com`)，访问 `http://example.com:3000`
+
 
 ## 6. 数据备份
 

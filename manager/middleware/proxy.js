@@ -2,7 +2,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const projectService = require('../services/project-service');
 
 const MANAGER_SERVICE_PORT = process.env.MANAGER_SERVICE_PORT || 3000;
-const ROOT_DOMAIN = process.env.ROOT_DOMAIN || 'localhost';
+
 
 // Internal proxy instance
 const dynamicProxy = createProxyMiddleware({
@@ -25,7 +25,7 @@ const dynamicProxy = createProxyMiddleware({
 });
 
 module.exports = function (req, res, next) {
-    const host = req.headers.host;
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
     if (!host) return next();
 
     // Remove port
@@ -33,30 +33,20 @@ module.exports = function (req, res, next) {
     let prefix = null;
     let autoMatched = false;
 
-    // 1. Try Standard Suffix Match
-    const domainSuffix = '.' + ROOT_DOMAIN;
-    if (hostname.endsWith(domainSuffix)) {
-        prefix = hostname.slice(0, -domainSuffix.length);
-        console.log(`[ProxyRouter] Standard Match! Prefix: ${prefix}, Suffix: ${domainSuffix}`);
-    }
+    // Universal Dynamic Match
+    // Matches any host starting with "project-type." regardless of the domain suffix.
+    // Supports:
+    // - project-worker.example.com
+    // - project-pages.127.0.0.1
+    // - project-worker.localhost
+    const match = hostname.match(/^(.*)-(worker|pages)\./);
 
-    // 2. Dynamic Domain Mode (Only if ROOT_DOMAIN is localhost)
-    // Allows accessing via ANY domain/IP if configured as localhost
-    if (!prefix && ROOT_DOMAIN === 'localhost') {
-        // Regex to find "name-type." at the start of hostname
-        // This handles:
-        //   project-worker.localhost
-        //   project-pages.127.0.0.1
-        //   project-worker.192.168.1.5
-        //   project-pages.custom.local
-        const match = hostname.match(/^(.*)-(worker|pages)\./);
-        if (match) {
-            // match[1] is name, match[2] is type
-            // reconstruct prefix as "name-type" for the logic below
-            prefix = `${match[1]}-${match[2]}`;
-            autoMatched = true;
-            console.log(`[ProxyRouter] Dynamic Match! Prefix: ${prefix}, Host: ${hostname}`);
-        }
+    // Debug log to trace routing decisons
+    console.log(`[ProxyRouter] Host=${hostname} (Origin: ${req.headers['x-forwarded-host'] ? 'X-Forwarded-Host' : 'Direct'}). Match? ${match ? 'YES' : 'NO'}`);
+
+    if (match) {
+        // match[1] is name, match[2] is type
+        prefix = `${match[1]}-${match[2]}`;
     }
 
     if (prefix) {

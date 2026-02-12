@@ -16,33 +16,13 @@ const Dashboard: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showChangePassword, setShowChangePassword] = useState(false);
-    const [rootDomain, setRootDomain] = useState<string>('');
+    const [rootDomain, setRootDomain] = useState<string>(window.location.hostname);
 
     useEffect(() => {
-        loadConfig();
         loadProjects();
         const interval = setInterval(loadProjects, 5000);
         return () => clearInterval(interval);
     }, []);
-
-    const loadConfig = async () => {
-        try {
-            const res = await fetch('/api/config');
-            const data = await res.json();
-
-            // Requirement:
-            // 1. If ROOT_DOMAIN is set (not localhost), use it.
-            // 2. If ROOT_DOMAIN is 'localhost', use current browser hostname.
-            if (data.rootDomain === 'localhost') {
-                setRootDomain(window.location.hostname);
-            } else {
-                setRootDomain(data.rootDomain);
-            }
-        } catch (e) {
-            console.error("Failed to load config", e);
-            setRootDomain(window.location.hostname || 'localhost');
-        }
-    };
 
     const loadProjects = async () => {
         try {
