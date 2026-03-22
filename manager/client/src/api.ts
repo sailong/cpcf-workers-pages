@@ -6,7 +6,10 @@ export const setToken = (token: string) => localStorage.setItem('auth_token', to
 export const removeToken = () => localStorage.removeItem('auth_token');
 
 const instance = axios.create({
-    baseURL: '/api'
+    baseURL: '/api',
+    headers: {
+        'Content-Type': 'application/json',
+    }
 });
 
 // Request interceptor for API calls
@@ -20,7 +23,7 @@ instance.interceptors.request.use(
         return config;
     },
     error => {
-        Promise.reject(error);
+        return Promise.reject(error);
     }
 );
 
@@ -70,6 +73,8 @@ const api = {
     // For manual handling
     axiosInstance: instance
 };
+
+export { api };
 
 export const authenticatedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     const token = getToken();

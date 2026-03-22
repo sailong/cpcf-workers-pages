@@ -187,10 +187,10 @@ const Dashboard: React.FC = () => {
                     ))}
                 </div>
             ) : (
-                <div className="neo-glass p-20 flex flex-col items-center justify-center text-center">
+                <div className="neo-glass p-20 flex flex-col items-center justify-center text-center relative">
                     <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center shadow-2xl mb-6 blur-md opacity-20 animate-pulse"></div>
-                    <div className="absolute w-24 h-24 flex items-center justify-center text-5xl">🚀</div>
-                    <h3 className="text-2xl font-bold text-[var(--text-main)] mt-4">{t('dashboardPage.noProjects')}</h3>
+                    <div className="relative w-24 h-24 flex items-center justify-center text-5xl -mt-24 mb-6">🚀</div>
+                    <h3 className="text-2xl font-bold text-[var(--text-main)]">{t('dashboardPage.noProjects')}</h3>
                     <p className="text-[var(--text-muted)] mt-2 mb-8 max-w-md">{t('dashboardPage.noProjectsSubtitle')}</p>
                     <a href="/create" className="btn-gradient">{t('createProject')}</a>
                 </div>

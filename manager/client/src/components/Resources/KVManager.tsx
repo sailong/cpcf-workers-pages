@@ -113,105 +113,159 @@ const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
     }, [namespace.id]);
 
     return createPortal(
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-[100]">
-            <div className="bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl max-h-[90vh] overflow-hidden relative border border-gray-700">
-                {/* Header */}
-                <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 flex justify-between items-center">
-                    <div>
-                        <h2 className="text-xl font-bold text-white">{t('kvManager.title')}</h2>
-                        <p className="text-purple-200 text-sm">{t('kvManager.namespaceLabel')} {namespace.name}</p>
-                    </div>
-                    <button onClick={onClose} className="text-white hover:text-gray-200 text-2xl">&times;</button>
-                </div>
-
-                {error && (
-                    <div className="bg-red-500 text-white px-4 py-2 m-4 rounded">{error}</div>
-                )}
-
-                <div className="grid grid-cols-2 gap-4 p-6" style={{ height: 'calc(90vh - 150px)' }}>
-                    {/* 左侧：键列表 */}
-                    <div className="flex flex-col h-full">
-                        <h3 className="text-lg font-semibold text-gray-200 mb-3">{t('kvManager.keysList')} ({keys.length})</h3>
-                        <div className="flex-1 overflow-y-auto bg-gray-900 rounded-lg p-3">
-                            {keys.length === 0 ? (
-                                <p className="text-gray-500 text-center py-8">{t('kvManager.noKeys')}</p>
-                            ) : (
-                                keys.map(key => (
-                                    <div
-                                        key={key.name}
-                                        className={`p-2 mb-2 rounded flex justify-between items-center ${selectedKey === key.name ? 'bg-purple-700' : 'bg-gray-800 hover:bg-gray-700'
-                                            }`}
-                                    >
-                                        <button
-                                            onClick={() => loadValue(key.name)}
-                                            className="flex-1 text-left text-gray-200 truncate"
-                                        >
-                                            {key.name}
-                                        </button>
-                                        <button
-                                            onClick={() => requestDelete(key.name)}
-                                            className="ml-2 text-red-400 hover:text-red-300"
-                                            title={t('common.delete')}
-                                        >
-                                            🗑️
-                                        </button>
-                                    </div>
-                                ))
-                            )}
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+                {/* Header - Purple Theme */}
+                <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-card)]/50">
+                    <div className="flex items-center gap-3">
+                        <span className="w-10 h-10 rounded-lg bg-[var(--kv-theme-light)] text-[var(--kv-theme)] flex items-center justify-center text-xl">
+                            🗄️
+                        </span>
+                        <div>
+                            <h2 className="text-xl font-bold text-[var(--text-main)]">{t('kvManager.title')}</h2>
+                            <p className="text-sm text-[var(--text-muted)] mt-0.5">{t('kvManager.namespaceLabel')} <span className="text-[var(--kv-theme)] font-mono">{namespace.name}</span></p>
                         </div>
                     </div>
+                    <button 
+                        onClick={onClose} 
+                        className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+                    >
+                        ✕
+                    </button>
+                </div>
 
-                    {/* 右侧：值编辑 */}
-                    <div className="flex flex-col h-full">
-                        <h3 className="text-lg font-semibold text-gray-200 mb-3">
-                            {selectedKey ? `${t('kvManager.viewing')} ${selectedKey}` : t('kvManager.addKeyPair')}
-                        </h3>
+                {/* Error Banner */}
+                {error && (
+                    <div className="bg-red-900/20 border border-red-700/50 text-red-300 px-4 py-3 mx-6 mt-4 rounded-lg text-sm flex items-center gap-2">
+                        ⚠️ {error}
+                    </div>
+                )}
 
-                        {/* 键输入 */}
-                        <input
-                            type="text"
-                            placeholder={t('kvManager.keyName')}
-                            value={newKey}
-                            onChange={e => setNewKey(e.target.value)}
-                            className="mb-2 px-3 py-2 bg-gray-900 text-gray-200 rounded border border-gray-700 focus:border-purple-500 focus:outline-none"
-                        />
+                {/* Content */}
+                <div className="flex-1 overflow-hidden p-6">
+                    <div className="grid grid-cols-2 gap-6 h-full" style={{ height: 'calc(90vh - 180px)' }}>
+                        {/* 左侧：键列表 */}
+                        <div className="flex flex-col h-full">
+                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span>📝</span> {t('kvManager.keysList')} ({keys.length})
+                            </h3>
+                            <div className="flex-1 overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-color)] rounded-lg p-3">
+                                {keys.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
+                                        <span className="text-3xl mb-2 opacity-30">📝</span>
+                                        <p>{t('kvManager.noKeys')}</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {keys.map(key => (
+                                            <div
+                                                key={key.name}
+                                                className={`p-2.5 rounded-lg flex justify-between items-center transition-all ${
+                                                    selectedKey === key.name 
+                                                        ? 'bg-[var(--kv-theme)] text-white shadow-md' 
+                                                        : 'bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] border border-[var(--border-color)]'
+                                                }`}
+                                            >
+                                                <button
+                                                    onClick={() => loadValue(key.name)}
+                                                    className="flex-1 text-left truncate font-mono text-sm"
+                                                >
+                                                    {key.name}
+                                                </button>
+                                                <button
+                                                    onClick={() => requestDelete(key.name)}
+                                                    className={`ml-2 p-1.5 rounded-md transition-colors ${
+                                                        selectedKey === key.name 
+                                                            ? 'hover:bg-white/20 text-white/80' 
+                                                            : 'text-red-400 hover:bg-red-900/20 hover:text-red-500'
+                                                    }`}
+                                                    title={t('common.delete')}
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
 
-                        {/* 值输入 */}
-                        <textarea
-                            placeholder={t('kvManager.valuePlaceholder')}
-                            value={selectedKey ? value : newValue}
-                            onChange={e => selectedKey ? setValue(e.target.value) : setNewValue(e.target.value)}
-                            className="flex-1 px-3 py-2 bg-gray-900 text-gray-200 rounded border border-gray-700 focus:border-purple-500 focus:outline-none font-mono text-sm mb-3"
-                        />
+                        {/* 右侧：值编辑 */}
+                        <div className="flex flex-col h-full">
+                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <span>✏️</span> {selectedKey ? t('kvManager.viewing') + ' ' + selectedKey : t('kvManager.addKeyPair')}
+                            </h3>
 
-                        <button
-                            onClick={saveKeyValue}
-                            disabled={!newKey || loading}
-                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white rounded font-semibold"
-                        >
-                            {loading ? t('common.saving') : t('common.save')}
-                        </button>
+                            {/* 键输入 */}
+                            <div className="mb-3">
+                                <label className="text-xs text-[var(--text-muted)] mb-1.5 block">{t('kvManager.keyName')}</label>
+                                <input
+                                    type="text"
+                                    placeholder={t('kvManager.keyName')}
+                                    value={newKey}
+                                    onChange={e => setNewKey(e.target.value)}
+                                    className="w-full px-3 py-2.5 bg-[var(--bg-input)] text-[var(--text-main)] rounded-lg border border-[var(--border-color)] focus:border-[var(--kv-theme)] focus:ring-2 focus:ring-[var(--kv-theme-light)] focus:outline-none transition-all font-mono text-sm"
+                                />
+                            </div>
+
+                            {/* 值输入 */}
+                            <div className="flex-1 mb-3">
+                                <label className="text-xs text-[var(--text-muted)] mb-1.5 block">{t('kvManager.valuePlaceholder')}</label>
+                                <textarea
+                                    placeholder={t('kvManager.valuePlaceholder')}
+                                    value={selectedKey ? value : newValue}
+                                    onChange={e => selectedKey ? setValue(e.target.value) : setNewValue(e.target.value)}
+                                    className="w-full h-full min-h-[120px] px-3 py-2.5 bg-[var(--bg-input)] text-[var(--text-main)] rounded-lg border border-[var(--border-color)] focus:border-[var(--kv-theme)] focus:ring-2 focus:ring-[var(--kv-theme-light)] focus:outline-none transition-all font-mono text-sm resize-none"
+                                />
+                            </div>
+
+                            {/* 保存按钮 */}
+                            <button
+                                onClick={saveKeyValue}
+                                disabled={!newKey || loading}
+                                className="px-4 py-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{
+                                    backgroundColor: !newKey || loading ? 'var(--bg-hover)' : 'var(--kv-theme)',
+                                    color: 'white'
+                                }}
+                            >
+                                {loading ? (
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                        {t('common.saving')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>💾</span> {t('common.save')}
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Delete Confirmation Modal */}
                 {keyToDelete && (
-                    <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[60]">
-                        <div className="bg-gray-800 border border-gray-600 p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4">
-                            <h3 className="text-xl font-bold text-white mb-4">{t('common.confirmDelete')}</h3>
-                            <p className="text-gray-300 mb-6">
+                    <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[110]">
+                        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4">
+                            <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">{t('common.confirmDelete')}</h3>
+                            <p className="text-[var(--text-muted)] mb-6">
                                 {t('kvManager.confirmDeleteKey', { key: keyToDelete })}
                             </p>
                             <div className="flex justify-end gap-3">
                                 <button
                                     onClick={() => setKeyToDelete(null)}
-                                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded"
+                                    className="px-4 py-2 rounded-lg font-medium transition-colors"
+                                    style={{
+                                        backgroundColor: 'var(--bg-hover)',
+                                        color: 'var(--text-muted)'
+                                    }}
                                 >
                                     {t('common.cancel')}
                                 </button>
                                 <button
                                     onClick={executeDelete}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded font-bold"
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition-colors"
                                 >
                                     {t('common.confirmDelete')}
                                 </button>

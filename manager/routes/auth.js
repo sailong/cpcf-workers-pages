@@ -16,7 +16,6 @@ router.get('/captcha', (req, res) => {
         ignoreChars: '0o1i',
         noise: 2,
         color: true,
-        // background: '#111827' // Removed to support transparency
     });
 
     // Sign the captcha text into a token (avoid session state)
@@ -57,9 +56,25 @@ router.post('/login', (req, res) => {
 
     if (password === authService.getPassword()) {
         const token = jwt.sign({ role: 'admin' }, authService.getJwtSecret(), { expiresIn: '7d' });
-        return res.json({ success: true, token });
+        
+        // 检查是否使用默认密码，提示用户修改
+        const requirePasswordChange = authService.isDefaultPassword();
+        
+        return res.json({ 
+            success: true, 
+            token,
+            requirePasswordChange
+        });
     }
     res.status(401).json({ error: "用户名或密码错误" });
+});
+
+// Check if using default password
+router.get('/password-status', (req, res) => {
+    res.json({
+        isDefaultPassword: authService.isDefaultPassword(),
+        rules: authService.PASSWORD_RULES
+    });
 });
 
 // Change Password
@@ -73,8 +88,13 @@ router.post('/change-password', (req, res) => {
         return res.status(400).json({ error: "旧密码错误" });
     }
 
-    if (!newPassword || newPassword.length < 4) {
-        return res.status(400).json({ error: "新密码长度至少4位" });
+    // 验证新密码复杂度
+    const validation = authService.validatePasswordStrength(newPassword);
+    if (!validation.valid) {
+        return res.status(400).json({ 
+            error: "密码不符合要求", 
+            details: validation.errors 
+        });
     }
 
     authService.setPassword(newPassword);

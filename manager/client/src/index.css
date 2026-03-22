@@ -33,6 +33,38 @@
     radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
   --bg-base: #f1f5f9;
   /* Slate-100 */
+
+  /* 5. Component Variables - Light Mode */
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
+  
+  /* Card & Surface */
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-hover: rgba(255, 255, 255, 0.95);
+  --bg-input: rgba(241, 245, 249, 0.8);
+  
+  /* Borders */
+  --border-color: rgba(203, 213, 225, 0.6);
+  --border-color-hover: rgba(148, 163, 184, 0.8);
+
+  /* Status Colors */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Resource Theme Colors */
+  --kv-theme: #a855f7;      /* Purple - KV Store */
+  --kv-theme-light: rgba(168, 85, 247, 0.15);
+  --d1-theme: #3b82f6;      /* Blue - Database */
+  --d1-theme-light: rgba(59, 130, 246, 0.15);
+  --r2-theme: #eab308;      /* Yellow - Object Storage */
+  --r2-theme-light: rgba(234, 179, 8, 0.15);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 /* Dark Mode Overrides */
@@ -49,6 +81,14 @@
 
   --bg-base: #020617;
   /* Slate-950 */
+
+  /* Component Variables - Dark Mode */
+  --bg-card: rgba(15, 23, 42, 0.8);
+  --bg-hover: rgba(30, 41, 59, 0.9);
+  --bg-input: rgba(30, 41, 59, 0.6);
+  
+  --border-color: rgba(148, 163, 184, 0.2);
+  --border-color-hover: rgba(148, 163, 184, 0.4);
 }
 
 @layer base {
@@ -197,7 +237,7 @@
     /* subtle brand highlight */
   }
 
-  /* Add subtle shine effect on hover */
+  /* Add subtle shine effect on hover - only visible on hover */
   .neo-card::after {
     content: '';
     position: absolute;
@@ -205,13 +245,15 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
     transition: 0.5s;
     pointer-events: none;
+    opacity: 0;
   }
 
   .neo-card:hover::after {
     left: 100%;
+    opacity: 1;
   }
 
   /* Glass Inputs */

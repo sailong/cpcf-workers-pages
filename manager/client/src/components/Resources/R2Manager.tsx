@@ -111,12 +111,17 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
     return createPortal(
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-8">
             <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col">
-                {/* Header */}
+                {/* Header - Yellow Theme */}
                 <div className="flex items-center justify-between p-6 border-b border-[var(--border-color)] bg-[var(--bg-card)]/50 rounded-t-xl">
-                    <h2 className="text-2xl font-bold text-[var(--text-main)] flex items-center gap-3">
-                        <span className="bg-yellow-500/10 text-yellow-500 p-2 rounded-lg text-xl">🪣</span>
-                        {t('r2Manager.title')}: <span className="text-yellow-500 font-mono">{bucket.name}</span>
-                    </h2>
+                    <div className="flex items-center gap-3">
+                        <span className="w-10 h-10 rounded-lg bg-[var(--r2-theme-light)] text-[var(--r2-theme)] flex items-center justify-center text-xl">
+                            🪣
+                        </span>
+                        <div>
+                            <h2 className="text-xl font-bold text-[var(--text-main)]">{t('r2Manager.title')}</h2>
+                            <p className="text-sm text-[var(--text-muted)] mt-0.5">Bucket: <span className="text-[var(--r2-theme)] font-mono">{bucket.name}</span></p>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-3">
                         <input
                             type="file"
@@ -127,12 +132,23 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploading}
-                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2 ${uploading
-                                ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
-                                : 'bg-yellow-600 hover:bg-yellow-500 text-slate-900 shadow-lg shadow-yellow-900/20'
-                                }`}
+                            className="px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                                backgroundColor: uploading ? 'var(--bg-hover)' : 'var(--r2-theme)',
+                                color: uploading ? 'var(--text-muted)' : '#0f172a',
+                                boxShadow: uploading ? 'none' : '0 4px 12px rgba(234, 179, 8, 0.25)'
+                            }}
                         >
-                            {uploading ? `⏳ ${t('r2Manager.uploading')}` : `📤 ${t('r2Manager.upload')}`}
+                            {uploading ? (
+                                <>
+                                    <span className="w-4 h-4 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin"></span>
+                                    {t('r2Manager.uploading')}
+                                </>
+                            ) : (
+                                <>
+                                    <span>📤</span> {t('r2Manager.upload')}
+                                </>
+                            )}
                         </button>
                         <button
                             onClick={onClose}

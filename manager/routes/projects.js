@@ -7,6 +7,8 @@ const projectService = require('../services/project-service');
 const runtimeService = require('../services/runtime-service');
 const config = require('../config');
 const killPort = require('../utils/port-killer');
+const { validateCommand, safeShellExec } = require('../utils/safe-exec');
+const { createSSEManager, createTempFileCleaner } = require('../utils/sse-helper');
 
 // Helper to access runtime
 const runtime = runtimeService.runtime;
@@ -272,20 +274,12 @@ router.post('/:id/rebuild', async (req, res) => {
 
     projectService.save();
 
-    // Set SSE Headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    if (res.flushHeaders) res.flushHeaders();
-
-    const sendLog = (data) => {
-        res.write(`data: ${JSON.stringify({ type: 'log', content: data })}\n\n`);
-        if (res.flush) res.flush();
-    };
-    const sendError = (msg) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: msg })}\n\n`);
-    };
-    const sendResult = (result) => res.write(`data: ${JSON.stringify({ type: 'result', ...result })}\n\n`);
+    // 创建 SSE 管理器（带超时和心跳）
+    const sse = createSSEManager(res, {
+        timeout: 30 * 60 * 1000,
+        heartbeatInterval: 30 * 1000,
+        onClose: () => console.log('[Rebuild] SSE connection closed')
+    });
 
     try {
         let relativeRoot = path.dirname(project.mainFile);
@@ -300,54 +294,53 @@ router.post('/:id/rebuild', async (req, res) => {
         const { flattenDirectory } = require('../utils/fs-helper');
         flattenDirectory(sourceDir);
 
-        sendLog(`Starting rebuild for project: ${project.name}`);
-        sendLog(`Work directory: ${sourceDir}`);
+        sse.sendLog(`Starting rebuild for project: ${project.name}`);
+        sse.sendLog(`Work directory: ${sourceDir}`);
 
         const runCmd = async (cmd, cwd) => {
-            sendLog(`> ${cmd}`);
-            const child = require('child_process').spawn(cmd, {
-                cwd,
-                shell: true,
-                env: { ...process.env, CI: 'true', FORCE_COLOR: '1' }
-            });
-
-            child.stdout.on('data', d => sendLog(d.toString()));
-            child.stderr.on('data', d => sendLog(d.toString()));
-
-            await new Promise((resolve, reject) => {
-                child.on('close', code => {
-                    if (code === 0) resolve();
-                    else reject(new Error(`Command failed with code ${code}`));
-                });
-                child.on('error', err => reject(err));
-            });
+            // 安全验证命令
+            const validation = validateCommand(cmd);
+            if (!validation.valid) {
+                throw new Error(`不安全的命令被拒绝: ${validation.error}`);
+            }
+            
+            sse.sendLog(`> ${cmd}`);
+            
+            try {
+                await safeShellExec(cmd, { cwd, timeout: 600000 }, 
+                    (out) => sse.sendLog(out),
+                    (err) => sse.sendLog(err)
+                );
+            } catch (e) {
+                throw new Error(`命令执行失败: ${e.message}`);
+            }
         };
 
         // 0. Deep Cleanup: Remove .wrangler cache to prevent accumulation of temp files
         const wranglerDir = path.join(sourceDir, '.wrangler');
         if (fs.existsSync(wranglerDir)) {
-            sendLog("🧹 Cleaning up .wrangler cache and temporary files...");
+            sse.sendLog("🧹 Cleaning up .wrangler cache and temporary files...");
             try {
                 fs.rmSync(wranglerDir, { recursive: true, force: true });
             } catch (err) {
-                sendLog(`⚠️ Warning: Failed to clean .wrangler directory: ${err.message}`);
+                sse.sendLog(`⚠️ Warning: Failed to clean .wrangler directory: ${err.message}`);
             }
         }
 
         // 1. Check Dependencies
         if (fs.existsSync(path.join(sourceDir, 'package.json')) && !fs.existsSync(path.join(sourceDir, 'node_modules'))) {
-            sendLog("📦 Missing node_modules, installing dependencies...");
+            sse.sendLog("📦 Missing node_modules, installing dependencies...");
             const installCmd = fs.existsSync(path.join(sourceDir, 'yarn.lock')) ? 'yarn install' : 'npm install';
             await runCmd(installCmd, sourceDir);
         }
 
         // 2. Build Command
         if (buildCommand) {
-            sendLog("🚀 Running build command...");
+            sse.sendLog("🚀 Running build command...");
             await runCmd(buildCommand, sourceDir);
-            sendLog("✅ Build successful.");
+            sse.sendLog("✅ Build successful.");
         } else {
-            sendLog("ℹ️ No build command specified, skipping build step.");
+            sse.sendLog("ℹ️ No build command specified, skipping build step.");
         }
 
         // 3. Sync to Dist (if it's a build-flow project with dist folder)
@@ -359,37 +352,36 @@ router.post('/:id/rebuild', async (req, res) => {
             }
 
             if (fs.existsSync(distDir)) {
-                sendLog("🧹 Clearing old deployment artifacts...");
+                sse.sendLog("🧹 Clearing old deployment artifacts...");
                 fs.rmSync(distDir, { recursive: true, force: true });
             }
             fs.mkdirSync(distDir, { recursive: true });
 
             // Simple copy (now into a fresh directory)
             fs.cpSync(artifactSource, distDir, { recursive: true });
-            sendLog("✨ Sync complete.");
+            sse.sendLog("✨ Sync complete.");
         }
 
         // 4. Restart Project
         if (project.status === 'running') {
-            sendLog("🔄 Restarting project to apply changes...");
+            sse.sendLog("🔄 Restarting project to apply changes...");
             try {
                 await runtime.stop(project.id);
-                // Assign assigned port if wrangler dev didn't keep it (though it should)
                 await runtime.start(project);
-                sendLog("🚀 Project restarted successfully!");
+                sse.sendLog("🚀 Project restarted successfully!");
             } catch (reErr) {
-                sendLog(`⚠️ Restart error: ${reErr.message}`);
+                sse.sendLog(`⚠️ Restart error: ${reErr.message}`);
                 throw reErr;
             }
         }
 
-        sendResult({ success: true });
-        res.end();
+        sse.sendResult({ success: true });
+        sse.close();
 
     } catch (e) {
         console.error("Rebuild error:", e);
-        sendError(e.message);
-        res.end();
+        sse.sendError(e.message);
+        sse.close();
     }
 });
 
@@ -401,20 +393,12 @@ router.post('/:id/deploy', async (req, res) => {
     const { buildId, outputDir } = req.body;
     if (!buildId) return res.status(400).json({ error: "buildId is required" });
 
-    // Set SSE Headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    if (res.flushHeaders) res.flushHeaders();
-
-    const sendLog = (data) => {
-        res.write(`data: ${JSON.stringify({ type: 'log', content: data })}\n\n`);
-        if (res.flush) res.flush();
-    };
-    const sendError = (msg) => {
-        res.write(`data: ${JSON.stringify({ type: 'error', content: msg })}\n\n`);
-    };
-    const sendResult = (result) => res.write(`data: ${JSON.stringify({ type: 'result', ...result })}\n\n`);
+    // 创建 SSE 管理器（带超时和心跳）
+    const sse = createSSEManager(res, {
+        timeout: 30 * 60 * 1000,
+        heartbeatInterval: 30 * 1000,
+        onClose: () => console.log('[Deploy] SSE connection closed')
+    });
 
     try {
         const tempBuildPath = path.join(config.TEMP_BUILD_DIR, buildId);
@@ -428,25 +412,28 @@ router.post('/:id/deploy', async (req, res) => {
         if (relativeRoot === '.') relativeRoot = project.mainFile;
         const projectRootPath = path.join(config.UPLOADS_DIR, relativeRoot);
 
+        // 创建临时文件清理器
+        const cleaner = createTempFileCleaner([tempBuildPath]);
+
         // 1. Reset Source Directory: Ensure IDE and build are perfectly synced with latest upload
         const sourceDir = path.join(projectRootPath, 'source');
         if (fs.existsSync(sourceDir)) {
-            sendLog("🧹 Clearing old source code...");
+            sse.sendLog("🧹 Clearing old source code...");
             fs.rmSync(sourceDir, { recursive: true, force: true });
         }
         fs.mkdirSync(sourceDir, { recursive: true });
 
         // Copy new source from temp build
-        sendLog("🚚 Syncing new source code to project...");
+        sse.sendLog("🚚 Syncing new source code to project...");
         fs.cpSync(tempBuildPath, sourceDir, { recursive: true });
 
         // 2. Reset Dist Directory: Ensure a clean deployment environment
         const distDir = path.join(projectRootPath, 'dist');
-        sendLog("🚚 Syncing build artifacts to deployment directory...");
+        sse.sendLog("🚚 Syncing build artifacts to deployment directory...");
 
         // Clear dist directory before syncing to ensure no stale files remain
         if (fs.existsSync(distDir)) {
-            sendLog("🧹 Clearing old deployment artifacts...");
+            sse.sendLog("🧹 Clearing old deployment artifacts...");
             fs.rmSync(distDir, { recursive: true, force: true });
         }
         fs.mkdirSync(distDir, { recursive: true });
@@ -455,24 +442,24 @@ router.post('/:id/deploy', async (req, res) => {
         fs.cpSync(artifactSource, distDir, { recursive: true });
 
         // Clean up temp build
-        try { fs.rmSync(tempBuildPath, { recursive: true, force: true }); } catch { }
-        sendLog("✨ Sync complete.");
+        await cleaner.cleanup();
+        sse.sendLog("✨ Sync complete.");
 
         // 4. Restart Project
         if (project.status === 'running') {
-            sendLog("🔄 Restarting project to apply changes...");
+            sse.sendLog("🔄 Restarting project to apply changes...");
             await runtime.stop(project.id);
             await runtime.start(project);
-            sendLog("🚀 Project restarted successfully!");
+            sse.sendLog("🚀 Project restarted successfully!");
         }
 
-        sendResult({ success: true });
-        res.end();
+        sse.sendResult({ success: true });
+        sse.close();
 
     } catch (e) {
         console.error("Deploy error:", e);
-        sendError(e.message);
-        res.end();
+        sse.sendError(e.message);
+        sse.close();
     }
 });
 

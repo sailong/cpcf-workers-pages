@@ -162,26 +162,38 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {saveSuccess && (
-                                        <span className="text-xs text-green-400 animate-fade-in flex items-center gap-1">
-                                            <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                                        <span className="text-xs text-[var(--color-success)] animate-fade-in flex items-center gap-1">
+                                            <span className="w-1.5 h-1.5 bg-[var(--color-success)] rounded-full"></span>
                                             {t('ide.editor.saved')}
                                         </span>
                                     )}
                                     <button
                                         onClick={handleSaveCode}
                                         disabled={saving || (isPages && !selectedFile)}
-                                        className={`text-xs px-3 py-1.5 rounded transition-colors flex items-center gap-1.5 ${saving || (isPages && !selectedFile)
-                                            ? 'bg-[#2d2d2d] text-gray-600 cursor-not-allowed'
-                                            : 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm'
+                                        className={`text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-medium ${saving || (isPages && !selectedFile)
+                                            ? 'bg-[var(--bg-hover)] text-[var(--text-muted)] cursor-not-allowed'
+                                            : 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-sm hover:shadow-md'
                                             }`}
                                     >
-                                        {saving ? t('ide.editor.saving') : t('ide.editor.save')}
+                                        {saving ? (
+                                            <>
+                                                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                                                {t('ide.editor.saving')}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>💾</span> {t('ide.editor.save')}
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
                             <div className="flex-1 relative">
                                 {loading ? (
-                                    <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">{t('ide.editor.loading')}</div>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--text-muted)]">
+                                        <div className="w-8 h-8 border-2 border-[var(--border-color)] border-t-[var(--primary)] rounded-full animate-spin mb-3"></div>
+                                        {t('ide.editor.loading')}
+                                    </div>
                                 ) : (
                                     <Editor
                                         code={code}
