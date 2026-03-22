@@ -20,6 +20,9 @@ function createSSEManager(res, options = {}) {
         onClose = null
     } = options;
 
+    // 获取 request 对象
+    const req = res.req;
+
     let timeoutId = null;
     let heartbeatId = null;
     let isClosed = false;
