@@ -126,24 +126,24 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
     };
 
     return createPortal(
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
-            <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
                 {/* Header */}
-                <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+                <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-100">{t('d1Manager.title')}</h2>
-                        <p className="text-sm text-gray-500 mt-1">{t('d1Manager.database')} <span className="text-purple-400 font-mono">{dbName}</span></p>
+                        <h2 className="text-xl font-bold text-[var(--text-main)]">{t('d1Manager.title')}</h2>
+                        <p className="text-sm text-[var(--text-muted)] mt-1">{t('d1Manager.database')} <span className="text-purple-400 font-mono">{dbName}</span></p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">×</button>
+                    <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] text-2xl">×</button>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex bg-gray-800/50 border-b border-gray-800">
+                <div className="flex bg-[var(--bg-card)]/50 border-b border-[var(--border-color)]">
                     <button
                         onClick={() => setActiveTab('console')}
                         className={`px-6 py-3 font-medium text-sm transition-all ${activeTab === 'console'
-                            ? 'bg-gray-900 text-purple-400 border-b-2 border-purple-400'
-                            : 'text-gray-500 hover:text-gray-300'
+                            ? 'bg-[var(--bg-base)] text-purple-500 border-b-2 border-purple-500'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                             }`}
                     >
                         {t('d1Manager.consoleTab')}
@@ -151,8 +151,8 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                     <button
                         onClick={() => setActiveTab('tables')}
                         className={`px-6 py-3 font-medium text-sm transition-all ${activeTab === 'tables'
-                            ? 'bg-gray-900 text-purple-400 border-b-2 border-purple-400'
-                            : 'text-gray-500 hover:text-gray-300'
+                            ? 'bg-[var(--bg-base)] text-purple-500 border-b-2 border-purple-500'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
                             }`}
                     >
                         {t('d1Manager.tablesTab')} ({tables.length})
@@ -165,13 +165,13 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                         <div className="space-y-4">
                             {/* Quick Actions */}
                             <div className="flex flex-wrap gap-2">
-                                <button onClick={() => quickSQL('CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  name TEXT,\n  email TEXT\n);')} className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded">
+                                <button onClick={() => quickSQL('CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  name TEXT,\n  email TEXT\n);')} className="text-xs bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-purple-500 text-[var(--text-muted)] px-3 py-1.5 rounded transition-colors">
                                     {t('d1Manager.createTableExample')}
                                 </button>
-                                <button onClick={() => quickSQL('SELECT * FROM ')} className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded">
+                                <button onClick={() => quickSQL('SELECT * FROM ')} className="text-xs bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-purple-500 text-[var(--text-muted)] px-3 py-1.5 rounded transition-colors">
                                     {t('d1Manager.selectQuery')}
                                 </button>
-                                <button onClick={() => quickSQL('INSERT INTO ')} className="text-xs bg-gray-800 hover:bg-gray-700 px-3 py-1.5 rounded">
+                                <button onClick={() => quickSQL('INSERT INTO ')} className="text-xs bg-[var(--bg-card)] border border-[var(--border-color)] hover:border-purple-500 text-[var(--text-muted)] px-3 py-1.5 rounded transition-colors">
                                     {t('d1Manager.insertInsert')}
                                 </button>
                             </div>
@@ -181,7 +181,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                                 value={sqlInput}
                                 onChange={e => setSqlInput(e.target.value)}
                                 placeholder={t('d1Manager.sqlPlaceholder')}
-                                className="w-full bg-gray-950 border border-gray-700 rounded-lg p-4 font-mono text-sm h-40 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                                className="w-full bg-[var(--bg-input)] text-[var(--text-main)] border border-[var(--border-color)] rounded-lg p-4 font-mono text-sm h-40 resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none placeholder-[var(--text-muted)]"
                             />
 
                             <button
@@ -201,17 +201,17 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
 
                             {/* Query Result */}
                             {queryResult && (
-                                <div className="bg-gray-950 border border-gray-800 rounded-lg overflow-hidden">
-                                    <div className="bg-gray-800 px-4 py-2 text-sm text-gray-400">
+                                <div className="bg-[var(--bg-base)] border border-[var(--border-color)] rounded-lg overflow-hidden">
+                                    <div className="bg-[var(--bg-card)] px-4 py-2 text-sm text-[var(--text-muted)] border-b border-[var(--border-color)]">
                                         {t('d1Manager.queryResult')} {queryResult.rows ? `(${queryResult.rows.length} ${t('d1Manager.rows')})` : ''}
                                     </div>
                                     {queryResult.rows && queryResult.rows.length > 0 ? (
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-sm">
-                                                <thead className="bg-gray-800/50">
+                                                <thead className="bg-[var(--bg-card)]">
                                                     <tr>
                                                         {queryResult.columns.map((col, i) => (
-                                                            <th key={i} className="px-4 py-2 text-left text-gray-400 font-medium">
+                                                            <th key={i} className="px-4 py-2 text-left text-[var(--text-muted)] font-medium">
                                                                 {col}
                                                             </th>
                                                         ))}
@@ -243,8 +243,8 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                     {activeTab === 'tables' && (
                         <div className="grid md:grid-cols-3 gap-6">
                             {/* Tables List */}
-                            <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
-                                <h3 className="font-semibold mb-3 text-sm text-gray-400">{t('d1Manager.tableList')}</h3>
+                            <div className="bg-[var(--bg-base)] border border-[var(--border-color)] rounded-lg p-4">
+                                <h3 className="font-semibold mb-3 text-sm text-[var(--text-muted)]">{t('d1Manager.tableList')}</h3>
                                 {tables.length === 0 ? (
                                     <div className="text-center py-8 text-gray-600 text-sm">
                                         {t('d1Manager.noTables')}<br />
@@ -258,7 +258,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                                                     onClick={() => loadTableData(table.name)}
                                                     className={`flex-1 text-left px-3 py-2 rounded text-sm transition-all truncate ${selectedTable === table.name
                                                         ? 'bg-purple-600 text-white'
-                                                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                                                        : 'bg-[var(--bg-card)] hover:bg-[var(--bg-card)]/80 text-[var(--text-muted)]'
                                                         }`}
                                                 >
                                                     📋 {table.name}
@@ -277,7 +277,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                             </div>
 
                             {/* Table Data */}
-                            <div className="md:col-span-2 bg-gray-950 border border-gray-800 rounded-lg overflow-hidden">
+                            <div className="md:col-span-2 bg-[var(--bg-base)] border border-[var(--border-color)] rounded-lg overflow-hidden">
                                 {!selectedTable ? (
                                     <div className="p-8 text-center text-gray-600 text-sm">
                                         {t('d1Manager.selectToView')}
@@ -290,15 +290,15 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                                     </div>
                                 ) : tableData && tableData.rows && tableData.rows.length > 0 ? (
                                     <>
-                                        <div className="bg-gray-800 px-4 py-2 text-sm text-gray-400">
+                                        <div className="bg-[var(--bg-card)] px-4 py-2 text-sm text-[var(--text-muted)]">
                                             {selectedTable} ({tableData.rows.length} {t('d1Manager.rows')})
                                         </div>
                                         <div className="overflow-x-auto max-h-96">
                                             <table className="w-full text-sm">
-                                                <thead className="bg-gray-800/50 sticky top-0">
+                                                <thead className="bg-[var(--bg-card)] sticky top-0">
                                                     <tr>
                                                         {tableData.columns.map((col, i) => (
-                                                            <th key={i} className="px-4 py-2 text-left text-gray-400 font-medium">
+                                                            <th key={i} className="px-4 py-2 text-left text-[var(--text-muted)] font-medium">
                                                                 {col}
                                                             </th>
                                                         ))}
@@ -306,9 +306,9 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                                                 </thead>
                                                 <tbody>
                                                     {tableData.rows.map((row, i) => (
-                                                        <tr key={i} className="border-t border-gray-800 hover:bg-gray-900/50">
+                                                        <tr key={i} className="border-t border-[var(--border-color)] hover:bg-[var(--bg-card)]/50">
                                                             {row.map((cell, j) => (
-                                                                <td key={j} className="px-4 py-2 text-gray-300 font-mono">
+                                                                <td key={j} className="px-4 py-2 text-[var(--text-main)] font-mono">
                                                                     {cell === null ? <span className="text-gray-600 italic">NULL</span> : String(cell)}
                                                                 </td>
                                                             ))}
@@ -329,18 +329,18 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
 
             {/* Structure Modal */}
             {showStructureModal && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-8">
-                    <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-                        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-850">
-                            <h3 className="font-bold text-white flex items-center gap-2">
+                <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-8">
+                    <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+                        <div className="p-4 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-card)]">
+                            <h3 className="font-bold text-[var(--text-main)] flex items-center gap-2">
                                 <span className="text-purple-400">ℹ️</span>
                                 {t('d1Manager.structureTitle')} {structureTable}
                             </h3>
-                            <button onClick={() => setShowStructureModal(false)} className="text-gray-500 hover:text-white">✕</button>
+                            <button onClick={() => setShowStructureModal(false)} className="text-[var(--text-muted)] hover:text-[var(--text-main)]">✕</button>
                         </div>
                         <div className="flex-1 overflow-auto p-0">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-gray-400 uppercase bg-gray-800/50 sticky top-0">
+                                <thead className="text-xs text-[var(--text-muted)] uppercase bg-[var(--bg-base)] sticky top-0">
                                     <tr>
                                         <th className="px-6 py-3">{t('d1Manager.cid')}</th>
                                         <th className="px-6 py-3">{t('d1Manager.name')}</th>
@@ -350,25 +350,25 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                                         <th className="px-6 py-3">{t('d1Manager.pk')}</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-800">
+                                <tbody className="divide-y divide-[var(--border-color)]">
                                     {structureData.map((col: any) => (
-                                        <tr key={col.cid} className="bg-gray-950/50 hover:bg-gray-900">
-                                            <td className="px-6 py-3 text-gray-500 font-mono">{col.cid}</td>
-                                            <td className="px-6 py-3 font-bold text-gray-200 font-mono">{col.name}</td>
+                                        <tr key={col.cid} className="bg-[var(--bg-card)] hover:bg-[var(--bg-base)]">
+                                            <td className="px-6 py-3 text-[var(--text-muted)] font-mono">{col.cid}</td>
+                                            <td className="px-6 py-3 font-bold text-[var(--text-main)] font-mono">{col.name}</td>
                                             <td className="px-6 py-3 text-yellow-500 font-mono">{col.type}</td>
-                                            <td className="px-6 py-3 text-gray-400">{col.notnull ? '✅' : '❌'}</td>
-                                            <td className="px-6 py-3 text-gray-400 font-mono">{col.dflt_value === null ? 'NULL' : col.dflt_value}</td>
-                                            <td className="px-6 py-3 text-gray-400">{col.pk ? '🔑' : ''}</td>
+                                            <td className="px-6 py-3 text-[var(--text-muted)]">{col.notnull ? '✅' : '❌'}</td>
+                                            <td className="px-6 py-3 text-[var(--text-muted)] font-mono">{col.dflt_value === null ? 'NULL' : col.dflt_value}</td>
+                                            <td className="px-6 py-3 text-[var(--text-muted)]">{col.pk ? '🔑' : ''}</td>
                                         </tr>
                                     ))}
                                     {structureData.length === 0 && (
-                                        <tr><td colSpan={6} className="px-6 py-8 text-center text-gray-500">{t('d1Manager.loading')}</td></tr>
+                                        <tr><td colSpan={6} className="px-6 py-8 text-center text-[var(--text-muted)]">{t('d1Manager.loading')}</td></tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
-                        <div className="p-4 border-t border-gray-800 bg-gray-850 text-right">
-                            <button onClick={() => setShowStructureModal(false)} className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded">{t('d1Manager.close')}</button>
+                        <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-card)] text-right">
+                            <button onClick={() => setShowStructureModal(false)} className="px-4 py-2 bg-[var(--bg-base)] hover:bg-[var(--bg-base)]/80 text-[var(--text-main)] border border-[var(--border-color)] rounded">{t('d1Manager.close')}</button>
                         </div>
                     </div>
                 </div>

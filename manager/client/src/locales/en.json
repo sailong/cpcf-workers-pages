@@ -161,11 +161,8 @@
             "zip": "ZIP",
             "rebuild": "Rebuild",
             "startDeploy": "Start Deploy",
-            "deploySuccessDesc": "Project has been updated",
             "rebuildDesc": "Trigger build using cached source code.",
-            "dragDrop": "Click or drag file here",
-            "buildLogs": "Build Logs",
-            "noLogs": "No logs..."
+            "dragDrop": "Click or drag file here"
         }
     },
     "kvManager": {

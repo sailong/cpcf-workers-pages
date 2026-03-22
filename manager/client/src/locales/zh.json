@@ -174,9 +174,7 @@
             "deployFailed": "部署失败",
             "startDeploy": "开始部署",
             "rebuildDesc": "使用服务器上缓存的源代码重新触发构建流程。",
-            "dragDrop": "点击上传或将文件拖至此处",
-            "buildLogs": "构建日志",
-            "noLogs": "暂无日志..."
+            "dragDrop": "点击上传或将文件拖至此处"
         }
     },
     "kvManager": {

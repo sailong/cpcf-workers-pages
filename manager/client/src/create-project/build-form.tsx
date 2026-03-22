@@ -251,7 +251,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
     return (
         <div>
             {/* 源码上传区 */}
-            <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
+            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
                 {t('buildForm.sourceUpload')}
             </label>
 
@@ -282,10 +282,10 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
             {/* 拖拽上传区域 */}
             <div
                 className={`relative border-2 border-dashed rounded-2xl transition-all duration-300 ease-in-out group overflow-hidden ${isDragging
-                    ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
+                    ? 'border-[var(--primary)] bg-[var(--primary)]/10 scale-[1.01]'
                     : file
-                        ? 'border-blue-500/30 bg-blue-500/5'
-                        : 'border-current/10 glass hover:border-blue-500/30'
+                        ? 'border-[var(--primary)]/30 bg-[var(--primary)]/5'
+                        : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:border-[var(--primary)]/30'
                     }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -372,7 +372,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
 
                 <div className="grid md:grid-cols-2 gap-8">
                     <div>
-                        <label className="block text-gray-500 text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">{t('buildForm.frameworkPreset')}</label>
+                        <label className="block text-[var(--text-muted)] text-[10px] font-bold uppercase mb-2 ml-1 tracking-[0.2em]">{t('buildForm.frameworkPreset')}</label>
                         <select
                             value={framework}
                             onChange={e => handleFrameworkChange(e.target.value)}
@@ -440,7 +440,7 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
                         {isBuilding && <span className="text-blue-500 animate-pulse flex items-center gap-2"><span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span> {t('buildForm.running')}</span>}
                         {buildId && <span className="text-green-500 flex items-center gap-2">{t('buildForm.success')}</span>}
                     </div>
-                    <div className="h-60 overflow-y-auto p-5 space-y-1.5 bg-black/5">
+                    <div className="h-60 overflow-y-auto p-5 space-y-1.5 bg-[var(--bg-base)] text-[var(--text-muted)]">
                         {buildLogs.length === 0 ? (
                             <div className="opacity-30 italic">{t('buildForm.waitingLogs')}</div>
                         ) : (

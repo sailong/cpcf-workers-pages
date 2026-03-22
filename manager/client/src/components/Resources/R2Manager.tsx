@@ -109,11 +109,11 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
     };
 
     return createPortal(
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-8">
-            <div className="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-8">
+            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col">
                 {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gray-950/50 rounded-t-xl">
-                    <h2 className="text-2xl font-bold text-gray-100 flex items-center gap-3">
+                <div className="flex items-center justify-between p-6 border-b border-[var(--border-color)] bg-[var(--bg-card)]/50 rounded-t-xl">
+                    <h2 className="text-2xl font-bold text-[var(--text-main)] flex items-center gap-3">
                         <span className="bg-yellow-500/10 text-yellow-500 p-2 rounded-lg text-xl">🪣</span>
                         {t('r2Manager.title')}: <span className="text-yellow-500 font-mono">{bucket.name}</span>
                     </h2>
@@ -129,14 +129,14 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                             disabled={uploading}
                             className={`px-4 py-2 rounded-lg font-medium text-sm transition-all flex items-center gap-2 ${uploading
                                 ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
-                                : 'bg-yellow-600 hover:bg-yellow-500 text-black shadow-lg shadow-yellow-900/20'
+                                : 'bg-yellow-600 hover:bg-yellow-500 text-slate-900 shadow-lg shadow-yellow-900/20'
                                 }`}
                         >
                             {uploading ? `⏳ ${t('r2Manager.uploading')}` : `📤 ${t('r2Manager.upload')}`}
                         </button>
                         <button
                             onClick={onClose}
-                            className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                            className="p-2 hover:bg-[var(--bg-base)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
                         >
                             ✕
                         </button>
@@ -144,7 +144,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-auto p-6 bg-gray-950">
+                <div className="flex-1 overflow-auto p-6 bg-[var(--bg-base)]">
                     {error && (
                         <div className="bg-red-900/20 border border-red-800 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm flex items-center gap-2">
                             ⚠️ {error}
@@ -157,9 +157,9 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                             <p>{t('d1Manager.loading')}</p>
                         </div>
                     ) : (
-                        <div className="border border-gray-800 rounded-lg overflow-hidden bg-gray-900">
+                        <div className="border border-[var(--border-color)] rounded-lg overflow-hidden bg-[var(--bg-card)]">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-gray-800/80 text-gray-400 font-medium border-b border-gray-700 uppercase text-xs sticky top-0 backdrop-blur-sm">
+                                <thead className="bg-[var(--bg-card)]/80 text-[var(--text-muted)] font-medium border-b border-[var(--border-color)] uppercase text-xs sticky top-0 backdrop-blur-sm">
                                     <tr>
                                         <th className="px-6 py-3 w-1/2">{t('r2Manager.key')}</th>
                                         <th className="px-6 py-3">{t('r2Manager.size')}</th>
@@ -167,7 +167,7 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                                         <th className="px-6 py-3 text-right">{t('r2Manager.actions')}</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-800">
+                                <tbody className="divide-y divide-[var(--border-color)]">
                                     {files.length === 0 ? (
                                         <tr>
                                             <td colSpan={4} className="p-16 text-center text-gray-600">
@@ -177,8 +177,8 @@ const R2Manager: React.FC<R2ManagerProps> = ({ bucket, onClose }) => {
                                         </tr>
                                     ) : (
                                         files.map((obj) => (
-                                            <tr key={obj.key} className="hover:bg-gray-800/50 group transition-colors">
-                                                <td className="px-6 py-4 font-mono text-gray-300 break-all flex items-center gap-3">
+                                            <tr key={obj.key} className="hover:bg-[var(--bg-base)]/50 group transition-colors">
+                                                <td className="px-6 py-4 font-mono text-[var(--text-main)] break-all flex items-center gap-3">
                                                     <span className="opacity-50 text-lg">📄</span>
                                                     {obj.key}
                                                 </td>

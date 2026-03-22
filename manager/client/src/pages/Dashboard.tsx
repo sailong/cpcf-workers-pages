@@ -148,7 +148,7 @@ const Dashboard: React.FC = () => {
 
                                 <div className={`w-3 h-3 rounded-full shadow-lg transition-all duration-500 ${p.status === 'running'
                                     ? 'bg-emerald-500 shadow-emerald-500/50 scale-100'
-                                    : 'bg-gray-400/30 scale-75'
+                                    : 'bg-[var(--text-muted)]/30 scale-75'
                                     }`} />
                             </div>
 
@@ -164,11 +164,11 @@ const Dashboard: React.FC = () => {
                                     {p.status === 'running' ? t('common.stop') : t('common.start')}
                                 </button>
 
-                                <button onClick={() => setEditingProject(p)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-[var(--text-muted)]">
+                                <button onClick={() => setEditingProject(p)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-slate-900/5 dark:hover:bg-white/10 transition-colors text-[var(--text-muted)]">
                                     ⚙️
                                 </button>
 
-                                <button onClick={() => deleteProject(p.id)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-red-500/10 text-gray-400 hover:text-red-500 transition-colors">
+                                <button onClick={() => deleteProject(p.id)} className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-red-500/10 text-[var(--text-muted)] hover:text-red-500 transition-colors">
                                     🗑
                                 </button>
 

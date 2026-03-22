@@ -195,7 +195,7 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 <button onClick={() => setUploadType('rebuild')} className={`px-4 py-2 rounded-xl border transition-all ${uploadType === 'rebuild' ? 'bg-orange-500/10 border-orange-500 text-orange-400' : 'border-gray-700 hover:border-gray-500'}`}>{t('ide.deploy.rebuild')}</button>
             </div>
 
-            <div className="border border-dashed border-gray-700 rounded-2xl p-8 text-center mb-6 bg-black/20 hover:bg-black/40 transition-colors">
+            <div className="border border-dashed border-gray-700 rounded-2xl p-8 text-center mb-6 bg-slate-900/20 hover:bg-slate-900/40 transition-colors">
                 {uploadType === 'folder' && (
                     <input type="file"
                         // @ts-ignore

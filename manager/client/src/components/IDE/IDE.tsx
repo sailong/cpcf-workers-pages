@@ -94,42 +94,50 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
     return (
         <div className="fixed inset-0 z-50 flex flex-col font-sans transition-colors duration-300">
             {/* Flat Header */}
-            <div className="h-12 glass border-b flex justify-between items-center px-4 shadow-sm z-10">
+            <div className="h-12 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex justify-between items-center px-4 shadow-sm z-10">
                 <div className="flex items-center gap-4">
-                    <button onClick={onClose} className="opacity-60 hover:opacity-100 transition-opacity flex items-center gap-1 text-sm font-bold hover:bg-current/5 px-2 py-1 rounded">
+                    <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors flex items-center gap-1 text-sm font-bold hover:bg-[var(--bg-hover)] px-2 py-1 rounded">
                         <span>←</span> {t('ide.back')}
                     </button>
-                    <div className="h-4 w-px bg-current opacity-10"></div>
-                    <span className="font-bold tracking-wide">{project.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${project.type === 'worker' ? 'border-blue-500/30 bg-blue-500/10 text-blue-500' : 'border-purple-500/30 bg-purple-500/10 text-purple-500'
+                    <div className="h-4 w-px bg-[var(--border-color)]"></div>
+                    <span className="font-bold tracking-wide text-[var(--text-main)]">{project.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${project.type === 'worker'
+                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-500'
+                        : 'border-purple-500/30 bg-purple-500/10 text-purple-500'
                         }`}>
-                        {project.type}
+                        {project.type === 'worker' ? t('createProjectPage.worker') : t('createProjectPage.pages')}
                     </span>
                 </div>
-                <div className="flex glass rounded-lg p-0.5 border-transparent">
+                <div className="flex bg-[var(--bg-hover)] rounded-lg p-0.5 border border-[var(--border-color)]">
                     <button
                         onClick={() => setActiveTab('code')}
-                        className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'code' ? 'bg-blue-500/10 text-blue-500 shadow-sm' : 'opacity-40 hover:opacity-100'}`}
+                        className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'code'
+                            ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
                     >
                         {t('ide.tabs.code')}
                     </button>
                     <button
                         onClick={() => setActiveTab('config')}
-                        className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'config' ? 'bg-blue-500/10 text-blue-500 shadow-sm' : 'opacity-40 hover:opacity-100'}`}
+                        className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'config'
+                            ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
                     >
                         {t('ide.tabs.config')}
                     </button>
                     {isPages && (
                         <button
                             onClick={() => setActiveTab('deploy')}
-                            className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'deploy' ? 'bg-blue-500/10 text-blue-500 shadow-sm' : 'opacity-40 hover:opacity-100'}`}
+                            className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'deploy'
+                                ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
+                                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
                         >
                             {t('ide.tabs.deploy')}
                         </button>
                     )}
                 </div>
                 <div className="w-20 flex justify-end">
-                    {/* Placeholder for right side actions or just empty to balance */}
+                    {/* Placeholder for right side actions */}
                 </div>
             </div>
 
@@ -138,19 +146,19 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                 {activeTab === 'code' && (
                     <>
                         {isPages && (
-                            <div className="w-64 glass border-r flex flex-col">
-                                <div className="h-9 flex items-center px-4 text-[10px] font-bold opacity-40 uppercase tracking-widest border-b">
+                            <div className="w-64 bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
+                                <div className="h-9 flex items-center px-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest border-b border-[var(--border-color)] bg-[var(--bg-base)]">
                                     {t('ide.fileTree.explorer')}
                                 </div>
                                 <FileTree projectId={project.id} onSelect={handleFileSelect} selectedPath={selectedFile} />
                             </div>
                         )}
-                        <div className="flex-1 flex flex-col glass rounded-none border-0 border-l">
+                        <div className="flex-1 flex flex-col bg-[var(--bg-card)]">
                             {/* Editor Toolbar */}
-                            <div className="h-9 glass border-b rounded-none border-0 border-b flex items-center justify-between px-4">
+                            <div className="h-9 border-b border-[var(--border-color)] flex items-center justify-between px-4 bg-[var(--bg-base)]">
                                 <div className="flex items-center gap-2 text-xs">
                                     <span className="text-blue-400">📄</span>
-                                    <span className="text-gray-400">{selectedFile || (isPages ? t('ide.editor.selectFilePages') : t('ide.editor.selectFileWorker'))}</span>
+                                    <span className="text-[var(--text-muted)] font-mono">{selectedFile || (isPages ? t('ide.editor.selectFilePages') : 'worker.js')}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {saveSuccess && (
@@ -195,7 +203,7 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                 )}
 
                 {activeTab === 'deploy' && (
-                    <div className="flex-1 flex flex-col glass border-0 overflow-hidden">
+                    <div className="flex-1 flex flex-col bg-[var(--bg-base)] overflow-hidden">
                         <div className="flex-1 p-8 overflow-y-auto">
                             <div className="max-w-4xl mx-auto">
                                 <DeployPanel
@@ -208,11 +216,11 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                             </div>
                         </div>
                         {/* Logs Panel */}
-                        <div className="h-64 glass border-t-2 rounded-none font-mono text-xs flex flex-col shadow-2xl">
-                            <div className="px-4 py-2 glass border-0 border-b text-[10px] font-bold opacity-40 uppercase tracking-widest">{t('ide.deploy.buildLogs')}</div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-black/5">
-                                {logs.map((log, i) => <div key={i} className="opacity-70 border-b border-current/5 pb-0.5">{log}</div>)}
-                                {logs.length === 0 && <div className="opacity-30 italic">{t('ide.deploy.noLogs')}</div>}
+                        <div className="h-64 bg-[var(--bg-card)] border-t border-[var(--border-color)] font-mono text-xs flex flex-col shadow-2xl">
+                            <div className="px-4 py-2 bg-[var(--bg-base)] border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('ide.deploy.buildLogs')}</div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-[var(--bg-card)] text-[var(--text-muted)]">
+                                {logs.map((log, i) => <div key={i} className="border-b border-[var(--border-color)] pb-0.5">{log}</div>)}
+                                {logs.length === 0 && <div className="opacity-50 italic">{t('ide.deploy.noLogs')}</div>}
                             </div>
                         </div>
                     </div>
