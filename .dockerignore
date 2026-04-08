@@ -45,6 +45,8 @@ coverage/
 examples/
 manager/tests/
 tmp/
+test/
+.workbuddy/
 
 # Gemini AI
 .gemini/
