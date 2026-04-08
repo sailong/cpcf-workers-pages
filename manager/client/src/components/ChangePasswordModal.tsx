@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { authenticatedFetch } from '../api';
+import { AuthService } from '../services/auth';
 
 interface ChangePasswordModalProps {
     onClose: () => void;
@@ -28,20 +28,10 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
 
         setLoading(true);
         try {
-            const res = await authenticatedFetch('/api/change-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ oldPassword, newPassword })
-            });
-
-            if (res.ok) {
-                onSuccess();
-            } else {
-                const data = await res.json();
-                setError(data.error || t('auth.changePasswordFailed'));
-            }
-        } catch (e) {
-            setError(t('auth.networkError'));
+            await AuthService.changePassword(oldPassword, newPassword);
+            onSuccess();
+        } catch (e: any) {
+            setError(e.response?.data?.error || e.message || t('auth.changePasswordFailed'));
         } finally {
             setLoading(false);
         }
@@ -49,52 +39,56 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
 
     return (
         <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-[70] backdrop-blur-sm">
-            <div className="bg-gray-800 border border-gray-700 p-6 rounded-xl shadow-2xl w-full max-w-md">
-                <h3 className="text-xl font-bold text-white mb-4">{t('auth.changePasswordTitle')}</h3>
+            <div className="neo-glass p-6 rounded-xl shadow-2xl w-full max-w-md mx-4">
+                <h3 className="text-xl font-bold text-[var(--text-main)] mb-4">{t('auth.changePasswordTitle')}</h3>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-gray-400 text-sm mb-1">{t('auth.oldPassword')}</label>
+                        <label className="block text-[var(--text-muted)] text-sm mb-1">{t('auth.oldPassword')}</label>
                         <input
                             type="password"
                             value={oldPassword}
                             onChange={e => setOldPassword(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-orange-500 outline-none"
+                            className="neo-input w-full"
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-400 text-sm mb-1">{t('auth.newPassword')}</label>
+                        <label className="block text-[var(--text-muted)] text-sm mb-1">{t('auth.newPassword')}</label>
                         <input
                             type="password"
                             value={newPassword}
                             onChange={e => setNewPassword(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-orange-500 outline-none"
+                            className="neo-input w-full"
                         />
                     </div>
                     <div>
-                        <label className="block text-gray-400 text-sm mb-1">{t('auth.confirmPassword')}</label>
+                        <label className="block text-[var(--text-muted)] text-sm mb-1">{t('auth.confirmPassword')}</label>
                         <input
                             type="password"
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
-                            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white focus:border-orange-500 outline-none"
+                            className="neo-input w-full"
                         />
                     </div>
 
-                    {error && <div className="text-red-400 text-sm">{error}</div>}
+                    {error && (
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-xl text-sm text-center font-medium backdrop-blur-md">
+                            {error}
+                        </div>
+                    )}
 
                     <div className="flex justify-end gap-3 mt-6">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                            className="btn-glass"
                         >
                             {t('common.cancel')}
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium transition-colors disabled:opacity-50"
+                            className="btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? t('common.saving') : t('auth.changePasswordButton')}
                         </button>

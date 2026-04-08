@@ -463,7 +463,26 @@ router.post('/:id/deploy', async (req, res) => {
     }
 });
 
-// 9. Update Project Config (Bindings, Env Vars, Port)
+// 9. Get Full Project Config (for tests)
+router.get('/:id/full-config', (req, res) => {
+    const project = projectService.getById(req.params.id);
+    if (!project) return res.status(404).json({ error: "Project not found" });
+    
+    res.json({
+        id: project.id,
+        name: project.name,
+        type: project.type,
+        port: project.port,
+        bindings: project.bindings || {},
+        envVars: project.envVars || {},
+        buildCommand: project.buildCommand || '',
+        outputDir: project.outputDir || '',
+        deployCommand: project.deployCommand || '',
+        status: project.status
+    });
+});
+
+// 10. Update Project Config (Bindings, Env Vars, Port)
 router.patch('/:id', async (req, res) => {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });

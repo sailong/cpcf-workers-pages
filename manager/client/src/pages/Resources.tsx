@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from '../contexts/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import D1List from '../components/Resources/D1List';
 import KVList from '../components/Resources/KVList';
 import R2List from '../components/Resources/R2List';
@@ -11,7 +12,6 @@ type Tab = 'kv' | 'd1' | 'r2';
 const Resources: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const { theme, toggleTheme } = useTheme();
     const [activeTab, setActiveTab] = useState<Tab>('kv');
 
     return (
@@ -34,9 +34,8 @@ const Resources: React.FC = () => {
                         <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
 
                         <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
-                            <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
-                                {theme === 'dark' ? '🌙' : '☀️'}
-                            </button>
+                            <LanguageSwitcher />
+                            <ThemeToggle />
                         </div>
                     </div>
                 </header>

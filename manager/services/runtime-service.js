@@ -15,12 +15,15 @@ const R2_PORT = process.env.R2_ADMIN_PORT || 9099;
 const r2Admin = new R2AdminManager(path.join(__dirname, '../system-workers/r2-admin'), resourceService.getAll(), R2_PORT);
 
 /**
- * Restart running projects and System Worker on boot
+ * Restart running projects and System Worker on boot (并行优化)
  */
 async function startAll() {
     const projects = projectService.getAll();
-    for (const p of projects) {
-        if (p.status === 'running') {
+    
+    // 并行启动所有项目
+    const startPromises = projects
+        .filter(p => p.status === 'running')
+        .map(async (p) => {
             console.log(`[Auto-Start] Restoring project ${p.name}...`);
 
             // Fix legacy projects without port
@@ -33,14 +36,12 @@ async function startAll() {
                     console.error(`[Auto-Start] Failed to assign port for ${p.name}: ${e.message}`);
                     p.status = 'stopped';
                     projectService.save();
-                    continue;
+                    return;
                 }
             }
 
             try {
                 // Always attempt to release port before starting
-                // This prevents issues where isSystemPortInUse might return false negatives (e.g. ipv6/ipv4 mismatch)
-                // or if a zombie process is holding the port.
                 try {
                     console.log(`[Auto-Start] Ensuring port ${p.port} is free for ${p.name}...`);
                     await killPort(p.port);
@@ -54,8 +55,12 @@ async function startAll() {
                 p.status = 'stopped';
                 projectService.save();
             }
-        }
-    }
+        });
+
+    // 等待所有项目启动
+    await Promise.allSettled(startPromises);
+    
+    // 启动 R2 Admin
     r2Admin.start();
 }
 

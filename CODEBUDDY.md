@@ -1,172 +1,222 @@
-# CODEBUDDY.md 本文件为 CodeBuddy 在此仓库中工作时提供指导。
+# CODEBUDDY.md This file provides guidance to CodeBuddy when working with code in this repository.
 
 ## 项目概览
 
-CCFWP (Cloudflare 本地平台) 是一个基于 Docker 的本地开发环境，模拟 Cloudflare 的 Workers 和 Pages 运行时。它提供 Web UI 来管理多个无服务器项目，支持 KV、D1 和 R2 资源。
+CCFWP (Cloudflare 本地平台) 是一个基于 Docker 的本地开发环境，模拟 Cloudflare Workers/Pages 运行时。提供 Web UI 管理多个 Serverless 项目，内置 KV/D1/R2 资源模拟，支持在线代码编辑、构建部署和进程编排。
 
 ## 常用命令
 
-### 开发环境
+### Docker 环境
 
 ```bash
-# 启动整个平台（生产构建）
+# 生产构建启动
 docker-compose up -d --build
 
-# 开发模式（挂载本地源码，支持热重载）
+# 开发模式（源码挂载，热重载）
 docker-compose -f docker-compose.dev.yml up -d --build
 
-# 访问管理界面 http://localhost:8001
-# 默认密码：admin
+# 访问管理界面: http://localhost:8001 (默认密码: admin)
 ```
 
 ### 前端开发
 
 ```bash
 cd manager/client
-
-# 安装依赖
-pnpm install
-
-# 启动开发服务器（热重载）
-pnpm dev
-
-# 生产构建
-pnpm build
-
-# 代码检查
-pnpm lint
-
-# 预览生产构建
-pnpm preview
+pnpm install      # 安装依赖
+pnpm dev          # 开发服务器（热重载）
+pnpm build        # 生产构建到 client/dist
+pnpm lint         # TypeScript/ESLint 检查
+pnpm preview      # 预览生产构建
 ```
 
 ### 后端开发
 
 ```bash
 cd manager
+pnpm install      # 安装依赖
+node server.js    # 启动服务器（需先构建前端）
 
-# 安装依赖
-pnpm install
-
-# 启动服务器（需要先构建前端到 client/dist）
-node server.js
-
-# 环境变量（可选）：
-# MANAGER_SERVICE_PORT - 管理服务端口（默认：3000）
-# R2_ADMIN_PORT - R2 管理服务端口（默认：9100）
+# 环境变量:
+# MANAGER_SERVICE_PORT - 管理端口 (默认 3000)
+# R2_ADMIN_PORT - R2 管理端口 (默认 9100)
+# AUTH_PASSWORD - 登录密码 (默认 admin)
 ```
 
 ### 测试
 
 ```bash
-# 运行后端测试
 cd manager
-node tests/test-runner.js
+node tests/test-runner.js  # 运行后端测试
 
-# 通过 API 端点手动测试
-# 所有 API 路由在 /api/* 下
-# 大部分端点需要认证（JWT token）
+# API 手动测试: 所有路由在 /api/* 下，需 JWT token 认证
 ```
 
-## 架构说明
+## 架构设计
 
-### 核心组件
+### 分层架构
 
-**后端 (Express + Node.js)**
-- 入口文件：`manager/server.js`
-- API 路由在 `manager/routes/` 处理项目、资源（KV/D1/R2）、认证和文件管理
-- 业务逻辑在 `manager/services/`：`project-service.js`（CRUD）、`runtime-service.js`（进程编排）、`resource-service.js`（KV/D1/R2）、`auth-service.js`（JWT + 验证码）
-- 中间件：`auth.js`（JWT 验证）、`proxy.js`（域名路由的反向代理）
+```
+前端层 (React + Vite + TypeScript)
+  ↓ HTTP API (JWT Auth)
+后端层 (Express + Node.js)
+  ├─ 路由层: routes/ (auth, projects, resources-*, upload, build, files)
+  ├─ 服务层: services/ (project, runtime, resource, auth)
+  ├─ 工具层: utils/ (spawner, generator, kv-storage, d1-helper, safe-exec, sse-helper)
+  └─ 中间件: middleware/ (auth, proxy, upload)
+  ↓ spawn('npx wrangler')
+运行时层 (Wrangler 子进程)
+  ├─ Worker 项目 (独立进程)
+  ├─ Pages 项目 (独立进程)
+  └─ R2 Admin Worker (系统服务)
+  ↓ 文件系统 + SQLite
+持久化层 (.platform-data/)
+  ├─ JSON 配置: projects.json, resources.json, auth.json
+  ├─ KV 数据: kv-data/*.json
+  ├─ D1 数据库: d1-databases/*.sqlite
+  ├─ 上传代码: uploads/
+  └─ 构建产物: temp_builds/
+```
 
-**前端 (React + Vite + TypeScript)**
-- 入口文件：`manager/client/src/main.tsx`
-- 页面在 `manager/client/src/pages/`：Dashboard、CreateProject
-- 组件在 `manager/client/src/components/`：IDE（Monaco 编辑器）、Resources（KV/D1/R2 管理器）、ChangePasswordModal
-- 服务在 `manager/client/src/services/`：后端通信的 API SDK
-- 国际化：`manager/client/src/locales/`（中/英 JSON 文件）
+### 核心业务流程
 
-**进程管理（核心）**
-- `manager/utils/spawner.js` 是管理 Wrangler 进程的核心运行时引擎
-- 每个 Worker/Pages 项目作为子进程运行，通过 `spawn('npx', ['wrangler', ...])`
-- 处理 Workers（`wrangler dev`）和 Pages（`wrangler pages dev [dir]`）两种类型
-- 自动检测项目结构：单文件、ZIP 上传、带 source/dist 目录的构建项目
-- 进程生命周期：启动、停止、重启、状态跟踪（通过 Map<projectId, ChildProcess>）
+**1. 项目生命周期**
 
-**资源模拟**
-- KV：基于文件的键值存储，位于 `.platform-data/kv-data/`
-- D1：SQLite 数据库，位于 `.platform-data/d1-databases/`，使用 `better-sqlite3`
-- R2：对象存储模拟，有专用的管理 worker 在 `manager/system-workers/r2-admin/`
-- 资源绑定：项目通过 ID 引用资源，`wrangler.toml` 由 `manager/utils/generator.js` 动态生成
+```
+创建项目
+  ├─ 验证名称 (字母/数字/连字符，同类型唯一)
+  ├─ 分配端口 (自定义或自动 10000-20000)
+  ├─ 处理代码来源:
+  │   ├─ buildId: 从 temp_builds 复制源码和产物
+  │   ├─ code+filename: 直接写入 uploads/
+  │   └─ mainFile: 引用已有文件
+  └─ 保存到 projects.json
 
-**数据持久化**
-- 所有数据存储在 `.platform-data/` 目录（作为 Docker 卷挂载）
-- `projects.json`：项目元数据（名称、类型、端口、绑定）
-- `resources.json`：KV/D1/R2 资源定义
-- `auth.json`：密码哈希和 JWT 密钥
-- `uploads/`：项目源代码
-- `temp_builds/`：Pages 项目的构建产物
+启动项目
+  ├─ 强制释放端口 (killPort 清理僵尸进程)
+  ├─ 生成 wrangler.toml (generator.js)
+  ├─ 启动 Wrangler 子进程 (spawner.js)
+  │   ├─ Worker: wrangler dev <file> --config <toml>
+  │   └─ Pages: wrangler pages dev <dir> [--kv/--d1/--r2]
+  ├─ 播种 KV 数据 (临时 Seeder Worker 注入)
+  └─ 更新状态为 running
 
-### 请求流程
+停止项目
+  ├─ SIGTERM 优雅关闭
+  ├─ fuser -k <port>/tcp 强制释放端口
+  └─ 清理进程映射 (Map<projectId, ChildProcess>)
 
-1. **项目部署**：用户上传代码 → `routes/upload.js` 保存到 `.platform-data/uploads/` → `project-service.js` 创建元数据 → `runtime-service.js` 通过 `spawner.js` 启动 Wrangler 进程
+删除项目
+  ├─ 停止运行中的进程
+  ├─ 物理删除 uploads/ 目录/文件
+  └─ 从 projects.json 移除元数据
+```
 
-2. **资源绑定**：用户将 KV/D1 绑定到项目 → `resource-service.js` 更新元数据 → `generator.js` 创建包含绑定的 `wrangler.toml` → 进程重启以应用配置
+**2. 资源绑定机制**
 
-3. **域名路由**：请求到 `http://<项目名>-<类型>.localhost:8001` → `proxy.js` 中间件提取子域名 → 代理到内部端口（10000+）→ Wrangler 进程响应
+用户绑定 KV/D1/R2 → `resource-service.js` 更新 resources.json → `generator.js` 动态生成 wrangler.toml → 重启项目应用配置
 
-4. **认证流程**：登录请求 → `auth-service.js` 验证密码 + 验证码 → 返回 JWT token → 客户端在 Authorization 头中包含 token → `auth.js` 中间件验证受保护路由
+**3. 反向代理路由**
+
+```
+请求: http://myapp-worker.localhost:8001
+  ↓ 提取子域名 (proxy.js)
+匹配: 项目名称=myapp, 类型=worker
+  ↓ 查询 projects.json
+代理: http://127.0.0.1:<project.port>
+```
+
+**4. 认证流程**
+
+```
+获取验证码 → JWT 签名验证码文本 (5分钟有效)
+  ↓
+提交登录表单 → 验证验证码 + 用户名密码
+  ↓
+生成 JWT Token (7天有效) → 检查默认密码标志
+  ↓
+后续请求: Authorization: Bearer <token> → auth.js 中间件验证
+```
 
 ### 关键设计模式
 
-**进程隔离**：每个项目在独立的 Wrangler 进程中运行，有专用端口。管理服务作为编排器，而非运行时。
+**进程隔离**: 每个项目独立 Wrangler 子进程，通过 `Map<projectId, ChildProcess>` 跟踪。管理服务是编排器，非运行时。
 
-**配置生成**：`wrangler.toml` 根据项目元数据和资源绑定动态生成。不要手动编辑 - 更改会被覆盖。
+**配置生成**: `wrangler.toml` 根据项目元数据动态生成（KV/D1/R2 绑定、环境变量）。**不要手动编辑，更改会被覆盖**。
 
-**端口管理**：
-- 自动分配：系统从 10000 开始为内部 Wrangler 进程分配端口
-- 自定义端口：用户可指定 1024-65535 端口，但必须在 `docker-compose.yml` 中手动添加端口映射
-- 端口冲突检测：`utils/port-killer.js` 处理清理
+**端口管理**:
+- 自动分配: 从 10000 扫描可用端口 (范围 10000-20000)
+- 自定义端口: 用户指定 1024-65535，需在 docker-compose.yml 手动映射
+- 冲突检测: 双重检查 (项目占用 + 系统进程) + `port-killer.js` 清理
 
-**自动恢复**：启动时，`runtime-service.js` 读取 `projects.json` 并重启上次关闭前运行的所有项目。
+**KV 播种机制**: 启动 Pages 项目前，动态生成临时 Seeder Worker，将 `.platform-data/kv-data/<namespaceId>.json` 数据注入 Wrangler 本地状态，完成后自动清理。
 
-### 开发工作流
+**D1 安全执行**: 通过 Wrangler CLI 执行 SQL (`wrangler d1 execute`)，使用 `--persist-to` 共享状态目录确保多 Worker 访问同一数据库。包含表名验证、SQL 注入防护。
 
-1. **添加新 API 端点**：在 `manager/routes/` 创建路由，在 `server.js` 注册，按需添加认证中间件，在 `services/` 实现逻辑
+**SSE 实时推送**: 构建/部署进度通过 Server-Sent Events 推送，30 分钟超时 + 30 秒心跳，支持客户端断开自动清理。
 
-2. **添加前端功能**：在 `manager/client/src/components/` 创建组件，在 `App.tsx` 添加路由，在 `services/` 实现 API 调用，在 `locales/` 添加国际化键
+**安全命令执行**: 白名单机制 (npm/yarn/pnpm/npx/vite/wrangler 等) + 危险字符检测 (`;&|`$`, `../`, `${}`) + 无 Shell 模式 spawn。
 
-3. **修改项目运行时**：编辑 `utils/spawner.js` 处理进程管理，`utils/generator.js` 处理 wrangler.toml 生成，同时测试 Workers 和 Pages 项目类型
+**自动恢复**: 服务启动时，`runtime-service.js` 读取 `projects.json` 中 status='running' 的项目并自动重启。
 
-4. **数据库模式变更**：D1 数据库是 SQLite 文件 - 直接使用 `better-sqlite3` API。无迁移系统 - 模式由应用管理。
+### 环境变量管理
+
+支持三种类型（写入 wrangler.toml）:
+- `plain`: 明文字符串 → `[vars]` 区段
+- `json`: JSON 对象 → `[vars]` 区段 (直接序列化)
+- `secret`: 加密文本 → `[[unsafe.bindings]]` 区段
 
 ### Docker 架构
 
-`Dockerfile` 中的多阶段构建：
-1. **阶段 1 (frontend-builder)**：用 pnpm 构建 React 应用，输出到 `dist/`
-2. **阶段 2 (production)**：Node.js 运行时带 Wrangler CLI，复制构建好的前端，启动 Express 服务器
+**多阶段构建**:
+1. **frontend-builder**: pnpm 构建 React 应用 → `dist/`
+2. **production**: Node.js + Wrangler CLI，复制前端产物，启动 Express
 
-容器暴露端口：
-- 8001：管理界面和反向代理
-- 9100：R2 管理服务
+**端口暴露**:
+- 8001: 管理界面 + 反向代理
+- 9100: R2 管理服务
 
-卷挂载 `.platform-data/` 确保容器重启后数据持久化。
+**卷挂载**: `.platform-data/` 确保容器重启后数据持久化
 
 ### 重要约束
 
-- **Wrangler 版本**：通过 Dockerfile 中的 pnpm 全局管理。更改版本需要重新构建。
-- **Node.js 版本**：需要 Node 20+（Dockerfile 中指定）
-- **Better-sqlite3**：原生模块 - 更改 Node 版本或架构时必须重新构建
-- **端口冲突**：自定义端口需要手动 Docker 端口映射
-- **网络隔离**：项目在 Docker 网络内运行 - 外部访问仅通过反向代理或映射端口
+- **Wrangler 版本**: Dockerfile 中 pnpm 全局管理，更改需重新构建
+- **Node.js 版本**: 需要 Node 20+ (Dockerfile 指定)
+- **better-sqlite3**: 原生模块，更改 Node 版本/架构需重新编译
+- **wrangler.toml**: 动态生成，手动编辑会被覆盖
+- **网络隔离**: 项目在 Docker 网络内运行，外部访问仅通过反向代理或映射端口
+- **共享状态**: 所有 Worker/Pages 使用 `--persist-to` 指向同一目录，确保 D1 数据一致性
 
 ### 故障排查
 
-**Wrangler 安装失败**：Dockerfile 使用阿里云镜像（`registry.npmmirror.com`）适应国内网络。如果构建卡住，检查 DNS/代理。
+| 问题 | 原因 | 解决方案 |
+|------|------|---------|
+| Wrangler 安装失败 | 网络受限 | Dockerfile 已配置 npmmirror 镜像，检查 DNS/代理 |
+| 端口被占用 | 僵尸进程 | `port-killer.js` 自动清理，或 `lsof -i :<port>` 手动检查 |
+| 项目无法启动 | 缺少 wrangler.toml/无效绑定 | 检查资源绑定，查看 `docker logs ccfwp-container` |
+| D1 数据不一致 | 未使用共享状态 | 确保 `--persist-to` 指向 `.platform-data/wrangler-shared-state` |
+| 前端构建失败 | Node 版本/pnpm 问题 | 确保 Node 20+，运行 `pnpm lint` 检查 TypeScript |
+| 数据库损坏 | SQLite 文件异常 | 用 `sqlite3 .platform-data/d1-databases/*.sqlite` 检查/修复 |
+| R2 服务崩溃 | 端口冲突 (IPv4/IPv6) | `r2-admin-manager.js` 自动清理 /proc/net/tcp* 占用进程 |
 
-**端口已被占用**：`port-killer.js` 尝试自动清理。如果持续存在，在主机上检查 `lsof -i :<端口>`。
+### 开发工作流
 
-**项目无法启动**：检查 Docker 容器日志（`docker logs ccfwp-container`）。常见问题：缺少 `wrangler.toml`、无效绑定、端口冲突。
+**添加新 API 端点**:
+1. 在 `manager/routes/` 创建路由文件
+2. 在 `server.js` 注册路由
+3. 按需添加认证中间件
+4. 在 `services/` 实现业务逻辑
 
-**前端构建失败**：确保安装了 Node 20+ 和 pnpm。用 `pnpm lint` 检查 TypeScript 错误。
+**添加前端功能**:
+1. 在 `manager/client/src/components/` 创建组件
+2. 在 `App.tsx` 添加路由
+3. 在 `services/` 实现 API 调用
+4. 在 `locales/` 添加国际化键 (中/英 JSON)
 
-**数据库损坏**：D1 数据库是 `.platform-data/d1-databases/` 中的 SQLite 文件。可用 `sqlite3` 命令行工具检查/修复。
+**修改项目运行时**:
+- 编辑 `utils/spawner.js` 处理进程管理
+- 编辑 `utils/generator.js` 处理 wrangler.toml 生成
+- 同时测试 Workers 和 Pages 两种项目类型
+
+**数据库模式变更**:
+- D1 是 SQLite 文件，直接使用 `better-sqlite3` API 或 Wrangler CLI
+- 无迁移系统，模式由应用代码管理

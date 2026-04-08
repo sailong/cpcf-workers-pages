@@ -9,32 +9,24 @@ const { spawn } = require('child_process');
 const ALLOWED_COMMANDS = {
     // 包管理器
     'npm': {
-        allowedSubcommands: ['install', 'ci', 'run', 'build', 'test', 'start', 'dev', 'preview', 'exec'],
+        allowedSubcommands: ['install', 'ci', 'run', 'build', 'test', 'start', 'preview'],
         allowArgs: true
     },
     'yarn': {
-        allowedSubcommands: ['install', 'add', 'build', 'test', 'start', 'dev', 'run'],
+        allowedSubcommands: ['install', 'add', 'build', 'test', 'start'],
         allowArgs: true
     },
     'pnpm': {
-        allowedSubcommands: ['install', 'add', 'build', 'test', 'start', 'dev', 'run', 'exec'],
-        allowArgs: true
-    },
-    'npx': {
-        allowedSubcommands: null, // 允许任何子命令，但会验证包名
+        allowedSubcommands: ['install', 'add', 'build', 'test', 'start'],
         allowArgs: true
     },
     // 构建工具
-    'node': {
-        allowedSubcommands: null,
-        allowArgs: true
-    },
     'vite': {
-        allowedSubcommands: ['build', 'preview', 'dev'],
+        allowedSubcommands: ['build', 'preview'],
         allowArgs: true
     },
     'next': {
-        allowedSubcommands: ['build', 'start', 'dev', 'export'],
+        allowedSubcommands: ['build', 'export'],
         allowArgs: true
     },
     'tsc': {
@@ -46,7 +38,7 @@ const ALLOWED_COMMANDS = {
         allowArgs: true
     },
     'wrangler': {
-        allowedSubcommands: ['dev', 'deploy', 'pages', 'd1', 'kv', 'r2', 'tail'],
+        allowedSubcommands: ['deploy', 'pages', 'tail'],
         allowArgs: true
     }
 };

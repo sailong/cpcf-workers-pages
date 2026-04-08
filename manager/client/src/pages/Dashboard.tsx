@@ -4,15 +4,14 @@ import type { Project } from '../types';
 import { ProjectService } from '../services';
 import IDE from '../components/IDE/IDE';
 import ChangePasswordModal from '../components/ChangePasswordModal';
+import ThemeToggle from '../components/ThemeToggle';
 import { useNavigate } from 'react-router-dom';
 import { removeToken } from '../api';
-import { useTheme } from '../contexts/ThemeContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const Dashboard: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const { theme, toggleTheme } = useTheme();
     const [projects, setProjects] = useState<Project[]>([]);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showChangePassword, setShowChangePassword] = useState(false);
@@ -21,7 +20,22 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         loadProjects();
         const interval = setInterval(loadProjects, 5000);
-        return () => clearInterval(interval);
+        
+        // 页面可见性检测 - 不可见时停止轮询
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                clearInterval(interval);
+            } else {
+                loadProjects(); // 重新可见时立即刷新
+            }
+        };
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     const loadProjects = async () => {
@@ -106,9 +120,7 @@ const Dashboard: React.FC = () => {
 
                     <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
                         <LanguageSwitcher />
-                        <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
-                            {theme === 'dark' ? '🌙' : '☀️'}
-                        </button>
+                        <ThemeToggle />
                         <button onClick={() => setShowChangePassword(true)} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
                             🔑
                         </button>

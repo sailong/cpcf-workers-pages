@@ -58,7 +58,12 @@ app.use((err, req, res, next) => {
     if (res.headersSent) {
         return next(err);
     }
-    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+    // 生产环境隐藏错误详情，仅返回通用消息
+    const isDev = process.env.NODE_ENV !== 'production';
+    res.status(500).json({ 
+        error: 'Internal Server Error', 
+        details: isDev ? err.message : undefined 
+    });
 });
 
 // SPA Fallback (Must be after API routes)

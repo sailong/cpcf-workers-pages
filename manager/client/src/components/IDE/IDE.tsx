@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Project } from '../../types';
 import { ProjectService, FileService } from '../../services';
@@ -25,8 +25,14 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
     const [saving, setSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
     const [logs, setLogs] = useState<string[]>([]);
+    const logsEndRef = useRef<HTMLDivElement>(null);
 
     const isPages = project.type === 'pages';
+
+    // Auto-scroll logs
+    useEffect(() => {
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [logs]);
 
     // Initial Load
     useEffect(() => {
@@ -34,6 +40,19 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
             loadWorkerCode();
         }
     }, [project.id]);
+
+    // Keyboard shortcut: Ctrl+S / Cmd+S to save
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                handleSaveCode();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [code, selectedFile, isPages, saving]);
 
     const loadWorkerCode = async () => {
         setLoading(true);
@@ -233,6 +252,7 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                             <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-[var(--bg-card)] text-[var(--text-muted)]">
                                 {logs.map((log, i) => <div key={i} className="border-b border-[var(--border-color)] pb-0.5">{log}</div>)}
                                 {logs.length === 0 && <div className="opacity-50 italic">{t('ide.deploy.noLogs')}</div>}
+                                <div ref={logsEndRef} />
                             </div>
                         </div>
                     </div>

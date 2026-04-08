@@ -117,7 +117,7 @@ async function runTest() {
                 d1: [{ varName: 'MY_D1', resourceId: d1Id }]
             }
         };
-        const updateRes = JSON.parse(curl(`curl -s -X PUT "${API_URL}/projects/${createRes.id}/config" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '${JSON.stringify(updatePayload)}'`));
+        const updateRes = JSON.parse(curl(`curl -s -X PATCH "${API_URL}/projects/${createRes.id}" -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" -d '${JSON.stringify(updatePayload)}'`));
         if (updateRes.error) throw new Error("Update failed: " + updateRes.error);
         console.log("Update response:", updateRes);
 

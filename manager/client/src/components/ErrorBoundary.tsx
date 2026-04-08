@@ -27,16 +27,16 @@ class ErrorBoundary extends Component<Props & { t: TFunction }, State> {
     public render() {
         if (this.state.hasError) {
             return (
-                <div className="min-h-screen bg-gray-950 flex items-center justify-center p-8">
-                    <div className="bg-red-900/20 border border-red-800 rounded-lg p-6 max-w-lg">
+                <div className="min-h-screen flex items-center justify-center p-8" style={{ backgroundColor: 'var(--bg-base)' }}>
+                    <div className="neo-glass p-6 max-w-lg w-full mx-4">
                         <h1 className="text-2xl font-bold text-red-500 mb-4">{this.props.t('error.systemError')}</h1>
-                        <p className="text-gray-300 mb-4">{this.props.t('error.unexpectedError')}</p>
-                        <div className="bg-gray-900 p-4 rounded text-xs font-mono text-red-300 overflow-auto max-h-48">
+                        <p className="text-[var(--text-muted)] mb-4">{this.props.t('error.unexpectedError')}</p>
+                        <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-xs font-mono text-red-500 overflow-auto max-h-48">
                             {this.state.error?.toString()}
                         </div>
                         <button
                             onClick={() => window.location.reload()}
-                            className="mt-6 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded font-bold"
+                            className="mt-6 btn-gradient"
                         >
                             {this.props.t('error.reloadApp')}
                         </button>

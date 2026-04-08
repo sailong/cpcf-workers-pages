@@ -44,7 +44,7 @@ router.delete('/:id', (req, res) => {
 });
 
 // Execute SQL
-router.post('/:id/execute', (req, res) => {
+router.post('/:id/execute', async (req, res) => {
     const { id } = req.params;
     const { sql } = req.body;
 
@@ -53,7 +53,7 @@ router.post('/:id/execute', (req, res) => {
     if (!dbMeta) return res.status(404).json({ error: "Database not found" });
 
     try {
-        const result = d1Helper.executeSQL(id, sql);
+        const result = await d1Helper.executeSQL(id, sql);
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -61,13 +61,13 @@ router.post('/:id/execute', (req, res) => {
 });
 
 // List Tables
-router.get('/:id/tables', (req, res) => {
+router.get('/:id/tables', async (req, res) => {
     const { id } = req.params;
     const dbMeta = resourceService.getD1().find(d => d.id === id);
     if (!dbMeta) return res.status(404).json({ error: "Database not found" });
 
     try {
-        const tables = d1Helper.listTables(id);
+        const tables = await d1Helper.listTables(id);
         res.json(tables);
     } catch (error) {
         res.status(500).json({ error: error.message });

@@ -69,7 +69,8 @@ COPY manager/ ./manager/
 WORKDIR /app/manager
 # We need to rebuild better-sqlite3 specifically because it's native and arch-dependent
 # If copying from Mac -> Linux, the binary will be wrong.
-RUN pnpm install --prod --registry=https://registry.npmmirror.com
+# Use npm instead of pnpm for better native module support
+RUN npm install --omit=dev --registry=https://registry.npmmirror.com
 
 # Copy Built Frontend from Stage 1
 COPY --from=frontend-builder /app/manager/client/dist ./client/dist

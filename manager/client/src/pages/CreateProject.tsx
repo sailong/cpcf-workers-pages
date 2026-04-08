@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services';
-import { useTheme } from '../contexts/ThemeContext';
+import ThemeToggle from '../components/ThemeToggle';
 import WorkerForm from '../create-project/worker-form';
 import PagesForm from '../create-project/pages-form';
 import BuildForm from '../create-project/build-form';
@@ -14,7 +14,6 @@ type ProjectMode = 'worker' | 'pages' | 'build';
 const CreateProject: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const { theme, toggleTheme } = useTheme();
 
     // Shared State
     const [mode, setMode] = useState<ProjectMode>('worker');
@@ -23,6 +22,15 @@ const CreateProject: React.FC = () => {
     const [error, setError] = useState('');
     const [creating, setCreating] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
+
+    // 重置表单
+    const resetForm = () => {
+        setName('');
+        setCustomPort('');
+        setError('');
+        setSuccessMsg('');
+        setMode('worker');
+    };
 
     // Toast State
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
@@ -73,6 +81,7 @@ const CreateProject: React.FC = () => {
                 };
                 await api.post('/projects', payload);
                 setSuccessMsg(t('createProjectPage.successMessage', { type: 'Worker' }));
+                resetForm();
                 setTimeout(() => navigate('/'), 1500);
             } else {
                 if (!fileToUpload) throw new Error(t('createProjectPage.missingFile'));
@@ -94,6 +103,7 @@ const CreateProject: React.FC = () => {
                 await api.post('/projects', payload);
                 const typeLabel = subPayload.type === 'worker' ? 'Worker' : 'Pages';
                 setSuccessMsg(t('createProjectPage.successMessage', { type: typeLabel }));
+                resetForm();
                 setTimeout(() => navigate('/'), 1500);
             }
         } catch (err: any) {
@@ -124,9 +134,7 @@ const CreateProject: React.FC = () => {
                     <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
 
                     <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
-                        <button onClick={toggleTheme} className="p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)]">
-                            {theme === 'dark' ? '🌙' : '☀️'}
-                        </button>
+                        <ThemeToggle />
                     </div>
                 </div>
             </header>
