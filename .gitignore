@@ -45,5 +45,5 @@ Thumbs.db
 # tmp
 tmp/
 examples/
-test/
+tests/
 .workbuddy/
