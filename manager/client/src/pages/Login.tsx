@@ -96,7 +96,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                         />
                     </div>
 
-                    <div>
+                    <div className="space-y-4">
                         <div>
                             <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('loginPage.password')}</label>
                             <input
@@ -120,28 +120,28 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                                     className="neo-input flex-1"
                                 />
                                 <div
-                                    className="w-32 h-[46px] rounded-2xl overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border border-black/5 dark:border-white/10 flex items-center justify-center bg-white/50 backdrop-blur-md dark:bg-white/10"
+                                    className="w-32 h-[46px] rounded-xl overflow-hidden cursor-pointer hover:opacity-90 hover:scale-105 transition-all border border-[var(--border-color)] flex items-center justify-center bg-[var(--bg-card)] backdrop-blur-sm"
                                     onClick={fetchCaptcha}
                                     dangerouslySetInnerHTML={{ __html: captchaSvg }}
                                     title={t('loginPage.refreshCaptcha')}
                                 />
                             </div>
                         </div>
-
-                        {error && (
-                            <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-2xl text-sm text-center font-medium backdrop-blur-md">
-                                {error === 'Login failed' ? t('loginPage.authFailed') : error}
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full btn-gradient py-4 text-lg font-bold disabled:opacity-50 disabled:cursor-not-allowed mt-4 shadow-xl"
-                        >
-                            {loading ? t('loginPage.verifying') : t('loginPage.signIn')}
-                        </button>
                     </div>
+
+                    {error && (
+                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-xl text-sm text-center font-medium backdrop-blur-md">
+                            {error === 'Login failed' ? t('loginPage.authFailed') : error}
+                        </div>
+                    )}
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full btn-gradient py-3.5 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all"
+                    >
+                        {loading ? t('loginPage.verifying') : t('loginPage.signIn')}
+                    </button>
                 </form>
             </div>
 
