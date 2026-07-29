@@ -47,3 +47,11 @@ tmp/
 examples/
 tests/
 .workbuddy/
+.claude/
+.codegraph/
+.wolf/
+.codebuddy/
+
+# Backend security tests are repository fixtures, not generated test output.
+!manager/tests/
+!manager/tests/*.test.js

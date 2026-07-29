@@ -49,9 +49,9 @@ export const ProjectService = {
         const response = await fetch(`/api/projects/${id}/rebuild`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify(data)
         });
 
@@ -88,9 +88,9 @@ export const ProjectService = {
         const response = await fetch(`/api/projects/${id}/deploy`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                'Content-Type': 'application/json'
             },
+            credentials: 'same-origin',
             body: JSON.stringify({ buildId, outputDir })
         });
 

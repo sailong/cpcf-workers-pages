@@ -2,6 +2,8 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { generateConfig } = require('./generator');
+const { resolveWithin } = require('./path-helper');
+const cryptoHelper = require('./crypto-helper');
 
 class ProjectRuntime {
     constructor(uploadsDir, resources = { kv: [], d1: [] }) {
@@ -34,7 +36,7 @@ class ProjectRuntime {
 
             // 1. Build Flow (Source Directory Exists)
             const projectRootRel = path.dirname(project.mainFile);
-            const sourceDir = path.join(this.uploadsDir, projectRootRel, 'source');
+            const sourceDir = resolveWithin(this.uploadsDir, path.join(projectRootRel, 'source'));
 
             if (fs.existsSync(sourceDir)) {
                 cwd = sourceDir;
@@ -57,7 +59,7 @@ class ProjectRuntime {
                 // We initially assume CWD is the extract dir.
 
                 let targetPath = project.mainFile;
-                let fullPath = path.join(this.uploadsDir, targetPath);
+                let fullPath = resolveWithin(this.uploadsDir, targetPath);
 
                 // Auto-detect nested project root vs static dir
                 // Scenario A: Zip contains [ 'index.html', 'functions/' ] -> CWD = fullPath, Target = '.'
@@ -147,7 +149,9 @@ class ProjectRuntime {
                             : JSON.stringify(varData.value);
                     } else {
                         // plain 和 secret 类型直接使用值
-                        value = varData.value;
+                        value = varData.type === 'secret'
+                            ? cryptoHelper.decryptSecret(varData.value, project.id)
+                            : varData.value;
                     }
                     args.push('--binding', `${key}=${value}`);
                 });
@@ -171,7 +175,7 @@ class ProjectRuntime {
         } else {
             // For Workers: wrangler dev <file> --config <toml>
             const configContent = generateConfig(project, this.resources);
-            const configPath = path.join(this.uploadsDir, `${project.id}.toml`);
+            const configPath = resolveWithin(this.uploadsDir, `${project.id}.toml`);
             fs.writeFileSync(configPath, configContent);
 
             args.push('dev', project.mainFile);

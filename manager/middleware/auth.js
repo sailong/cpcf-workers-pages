@@ -1,24 +1,35 @@
-const jwt = require('jsonwebtoken');
+'use strict';
+
 const authService = require('../services/auth-service');
+const { getSessionToken } = require('../utils/session-cookie');
 
-module.exports = function authMiddleware(req, res, next) {
-    // Only protect /api routes
-    if (!req.path.startsWith('/api/')) return next();
+const PUBLIC_ROUTES = new Set(['/api/login', '/api/health', '/api/captcha']);
+const PASSWORD_CHANGE_ROUTES = new Set([
+    '/api/change-password',
+    '/api/logout',
+    '/api/password-status',
+    '/api/verify-session'
+]);
 
-    // Whitelist public routes
-    const publicRoutes = ['/api/login', '/api/health', '/api/captcha'];
-    if (publicRoutes.includes(req.path)) return next();
+function createAuthMiddleware(service = authService) {
+    return function authMiddleware(req, res, next) {
+        if (!req.path.startsWith('/api/') || PUBLIC_ROUTES.has(req.path)) return next();
+        const token = getSessionToken(req);
+        const session = service.verifySession(token);
+        if (!session) return res.sendStatus(401);
+        req.user = session;
+        req.sessionToken = token;
+        if (service.isDefaultPassword() && !PASSWORD_CHANGE_ROUTES.has(req.path)) {
+            return res.status(428).json({
+                error: '必须先修改初始密码',
+                code: 'PASSWORD_CHANGE_REQUIRED'
+            });
+        }
+        next();
+    };
+}
 
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-        const token = authHeader.split(' ')[1];
-        // Use current secret from service
-        jwt.verify(token, authService.getJwtSecret(), (err, user) => {
-            if (err) return res.sendStatus(403);
-            req.user = user;
-            next();
-        });
-    } else {
-        res.sendStatus(401);
-    }
-};
+const middleware = createAuthMiddleware();
+middleware.createAuthMiddleware = createAuthMiddleware;
+
+module.exports = middleware;

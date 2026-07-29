@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { AuthService } from '../services';
 import { useTheme } from '../contexts/ThemeContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import ChangePasswordModal from '../components/ChangePasswordModal';
 
 interface LoginProps {
-    onLogin: (token: string) => void;
+    onLogin: () => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -17,13 +18,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     const [captchaSvg, setCaptchaSvg] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
 
     const fetchCaptcha = async () => {
         try {
             const data = await AuthService.getCaptcha();
             setCaptchaSvg(data.image);
             setCaptchaId(data.captchaId);
-        } catch (e) {
+        } catch {
             console.error("Failed to fetch captcha");
         }
     };
@@ -39,15 +41,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         try {
             const res = await AuthService.login('admin', password, captcha, captchaId);
-            if (res.success && res.token) {
-                onLogin(res.token);
+            if (res.success) {
+                if (res.requirePasswordChange) {
+                    setRequiresPasswordChange(true);
+                } else {
+                    onLogin();
+                }
             } else {
                 setError(res.error || t('loginPage.loginFailed'));
                 fetchCaptcha();
                 setCaptcha('');
             }
-        } catch (err: any) {
-            setError(err.message || t('loginPage.connectionFailed'));
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t('loginPage.connectionFailed'));
         } finally {
             setLoading(false);
         }
@@ -148,6 +154,19 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             <div className="absolute bottom-6 text-center text-gray-600 text-xs">
                 &copy; {new Date().getFullYear()} {t('loginPage.copyright')}
             </div>
+            {requiresPasswordChange && (
+                <ChangePasswordModal
+                    required
+                    onClose={() => undefined}
+                    onSuccess={() => {
+                        setRequiresPasswordChange(false);
+                        setPassword('');
+                        setCaptcha('');
+                        setError(t('auth.passwordChangedLoginAgain'));
+                        fetchCaptcha();
+                    }}
+                />
+            )}
         </div >
     );
 };

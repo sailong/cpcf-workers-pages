@@ -69,9 +69,7 @@ const fileFilter = (req, file, cb) => {
     }
 
     // 检查 MIME 类型（允许某些未知类型通过 application/octet-stream）
-    const isAllowedMime = ALLOWED_MIME_TYPES.some(allowed => 
-        mimeType === allowed || mimeType.startsWith('text/') || mimeType.startsWith('application/')
-    );
+    const isAllowedMime = ALLOWED_MIME_TYPES.some(allowed => mimeType === allowed);
 
     if (!isAllowedMime) {
         return cb(new Error(`不支持的 MIME 类型: ${mimeType}`), false);

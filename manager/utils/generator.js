@@ -1,3 +1,5 @@
+const cryptoHelper = require('./crypto-helper');
+
 /**
  * Generates wrangler.toml content based on project config
  * @param {Object} project 
@@ -93,7 +95,8 @@ function generateConfig(project, resources = { kv: [], d1: [] }) {
                 config.push("[[unsafe.bindings]]");
                 config.push(`name = "${key}"`);
                 config.push(`type = "secret_text"`);
-                config.push(`text = "${varData.value}"`);
+                const secretValue = cryptoHelper.decryptSecret(varData.value, project.id);
+                config.push(`text = ${JSON.stringify(secretValue)}`);
             });
         }
     }

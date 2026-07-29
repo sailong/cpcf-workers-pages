@@ -9,9 +9,47 @@ const config = require('../config');
 const killPort = require('../utils/port-killer');
 const { validateCommand, safeShellExec } = require('../utils/safe-exec');
 const { createSSEManager, createTempFileCleaner } = require('../utils/sse-helper');
+const { resolveWithin } = require('../utils/path-helper');
+const cryptoHelper = require('../utils/crypto-helper');
 
 // Helper to access runtime
 const runtime = runtimeService.runtime;
+
+function prepareEnvVars(envVars, projectId, existing = {}) {
+    const prepared = {};
+    for (const [key, varData] of Object.entries(envVars || {})) {
+        const validation = cryptoHelper.validateEnvVar(key, varData && varData.value, varData && varData.type);
+        if (!validation.valid) throw new Error(validation.error);
+        if (varData.type === 'secret') {
+            if (varData.value === '******' && existing[key] && existing[key].type === 'secret') {
+                prepared[key] = existing[key];
+            } else {
+                prepared[key] = { ...varData, value: cryptoHelper.encryptSecret(varData.value, projectId) };
+            }
+        } else {
+            prepared[key] = varData;
+        }
+    }
+    return prepared;
+}
+
+function migrateStoredSecrets(project) {
+    let changed = false;
+    for (const varData of Object.values(project.envVars || {})) {
+        if (!varData || varData.type !== 'secret' || typeof varData.value !== 'string') continue;
+        const result = cryptoHelper.migrateStoredSecret(varData.value, project.id);
+        if (result.migrated) {
+            varData.value = result.ciphertext;
+            changed = true;
+        }
+    }
+    if (changed) projectService.save();
+}
+
+function publicProject(project) {
+    migrateStoredSecrets(project);
+    return { ...project, envVars: cryptoHelper.maskSecrets(project.envVars) };
+}
 
 // 1. Get All Projects (with Real-time Status)
 router.get('/', async (req, res) => {
@@ -22,7 +60,7 @@ router.get('/', async (req, res) => {
         const portInUse = await projectService.isSystemPortInUse(p.port);
 
         return {
-            ...p,
+            ...publicProject(p),
             status: running ? 'running' : 'stopped',
             portInUse // Boolean: true means something is listening on this port
         };
@@ -67,24 +105,24 @@ router.post('/', async (req, res) => {
 
     if (buildId) {
         // Handle Pre-built Project
-        const tempBuildPath = path.join(config.TEMP_BUILD_DIR, buildId);
-        const buildOutputPath = outputDir ? path.join(tempBuildPath, outputDir) : tempBuildPath;
+        const tempBuildPath = resolveWithin(config.TEMP_BUILD_DIR, buildId);
+        const buildOutputPath = outputDir ? resolveWithin(tempBuildPath, outputDir, { allowBase: true }) : tempBuildPath;
 
         if (!fs.existsSync(buildOutputPath)) {
             return res.status(400).json({ error: "Build artifact expired or invalid" });
         }
 
         const projectDirName = `page-${name}-${Date.now().toString(36)}`;
-        const projectRootPath = path.join(config.UPLOADS_DIR, projectDirName);
-        const sourceDir = path.join(projectRootPath, 'source');
-        const distDir = path.join(projectRootPath, 'dist');
+        const projectRootPath = resolveWithin(config.UPLOADS_DIR, projectDirName);
+        const sourceDir = resolveWithin(projectRootPath, 'source');
+        const distDir = resolveWithin(projectRootPath, 'dist');
 
         try {
             fs.mkdirSync(sourceDir, { recursive: true });
             fs.cpSync(tempBuildPath, sourceDir, { recursive: true });
             try { fs.rmSync(tempBuildPath, { recursive: true, force: true }); } catch { }
 
-            const artifactInSource = outputDir ? path.join(sourceDir, outputDir) : sourceDir;
+            const artifactInSource = outputDir ? resolveWithin(sourceDir, outputDir, { allowBase: true }) : sourceDir;
             fs.cpSync(artifactInSource, distDir, { recursive: true });
         } catch (e) {
             console.error("Failed to setup project directories", e);
@@ -94,12 +132,21 @@ router.post('/', async (req, res) => {
         actualMainFile = path.join(projectDirName, 'dist');
 
     } else if (code && filename) {
+        if (path.basename(filename) !== filename) {
+            return res.status(400).json({ error: "Filename must not contain a path" });
+        }
         const generatedFilename = `${id}-${filename}`;
-        const filePath = path.join(config.UPLOADS_DIR, generatedFilename);
+        const filePath = resolveWithin(config.UPLOADS_DIR, generatedFilename);
         fs.writeFileSync(filePath, code, 'utf8');
         actualMainFile = generatedFilename;
     } else if (!mainFile) {
         return res.status(400).json({ error: "必须提供 mainFile, buildId, 或 code+filename" });
+    } else {
+        try {
+            resolveWithin(config.UPLOADS_DIR, mainFile);
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
     }
 
     const newProject = {
@@ -110,7 +157,7 @@ router.post('/', async (req, res) => {
         status: 'stopped',
         mainFile: actualMainFile,
         bindings: bindings || {},
-        envVars: envVars || {},
+        envVars: prepareEnvVars(envVars || {}, id),
         buildCommand: buildCommand || '',
         outputDir: outputDir || '',
         deployCommand: deployCommand || '',
@@ -118,7 +165,7 @@ router.post('/', async (req, res) => {
     };
 
     projectService.add(newProject);
-    res.json(newProject);
+    res.json(publicProject(newProject));
 });
 
 // 3. Start Project
@@ -179,13 +226,9 @@ router.delete('/:id', async (req, res) => { // Make async
             // Support both folders (page-xxx/dist) and single files (worker-xxx.js)
             const parts = project.mainFile.split(/[/\\]/);
             const targetName = parts[0];
-            const targetPath = path.join(config.UPLOADS_DIR, targetName);
+            const resolvedPath = resolveWithin(config.UPLOADS_DIR, targetName);
 
-            // Safety check: ensure targetPath is restricted to UPLOADS_DIR
-            const resolvedPath = path.resolve(targetPath);
-            const resolvedUploadsDir = path.resolve(config.UPLOADS_DIR);
-
-            if (resolvedPath.startsWith(resolvedUploadsDir) && fs.existsSync(resolvedPath)) {
+            if (fs.existsSync(resolvedPath)) {
                 console.log(`[Delete] Physically removing ${resolvedPath} for project ${project.name}...`);
                 fs.rmSync(resolvedPath, { recursive: true, force: true });
             }
@@ -203,7 +246,12 @@ router.get('/:id/code', (req, res) => {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
 
-    const filePath = path.join(config.UPLOADS_DIR, project.mainFile);
+    let filePath;
+    try {
+        filePath = resolveWithin(config.UPLOADS_DIR, project.mainFile);
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
+    }
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: "Code file not found" });
     }
@@ -225,11 +273,11 @@ router.put('/:id/code', (req, res) => {
     if (!project) return res.status(404).json({ error: "Project not found" });
     if (code === undefined || code === null) return res.status(400).json({ error: "Code is required" });
 
-    const filePath = path.join(config.UPLOADS_DIR, project.mainFile);
-
-    // Safety check: prevent escaping uploads dir (basic)
-    if (!filePath.startsWith(config.UPLOADS_DIR)) {
-        return res.status(400).json({ error: "Invalid file path" });
+    let filePath;
+    try {
+        filePath = resolveWithin(config.UPLOADS_DIR, project.mainFile);
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
     }
 
     try {
@@ -285,11 +333,12 @@ router.post('/:id/rebuild', async (req, res) => {
         let relativeRoot = path.dirname(project.mainFile);
         if (relativeRoot === '.') relativeRoot = project.mainFile;
 
-        const projectRootPath = path.join(config.UPLOADS_DIR, relativeRoot);
-        const sourceDir = fs.existsSync(path.join(projectRootPath, 'source'))
-            ? path.join(projectRootPath, 'source')
+        const projectRootPath = resolveWithin(config.UPLOADS_DIR, relativeRoot);
+        const candidateSourceDir = resolveWithin(projectRootPath, 'source');
+        const sourceDir = fs.existsSync(candidateSourceDir)
+            ? candidateSourceDir
             : projectRootPath;
-        const distDir = path.join(projectRootPath, 'dist');
+        const distDir = resolveWithin(projectRootPath, 'dist');
 
         const { flattenDirectory } = require('../utils/fs-helper');
         flattenDirectory(sourceDir);
@@ -317,7 +366,7 @@ router.post('/:id/rebuild', async (req, res) => {
         };
 
         // 0. Deep Cleanup: Remove .wrangler cache to prevent accumulation of temp files
-        const wranglerDir = path.join(sourceDir, '.wrangler');
+        const wranglerDir = resolveWithin(sourceDir, '.wrangler');
         if (fs.existsSync(wranglerDir)) {
             sse.sendLog("🧹 Cleaning up .wrangler cache and temporary files...");
             try {
@@ -346,7 +395,7 @@ router.post('/:id/rebuild', async (req, res) => {
         // 3. Sync to Dist (if it's a build-flow project with dist folder)
         if (fs.existsSync(path.join(projectRootPath, 'source')) && fs.existsSync(distDir)) {
             // Clear dist directory before syncing to ensure no stale files remain
-            const artifactSource = outputDir ? path.join(sourceDir, outputDir) : sourceDir;
+            const artifactSource = outputDir ? resolveWithin(sourceDir, outputDir, { allowBase: true }) : sourceDir;
             if (!fs.existsSync(artifactSource)) {
                 throw new Error(`Output directory '${outputDir}' not found at ${artifactSource}`);
             }
@@ -401,8 +450,8 @@ router.post('/:id/deploy', async (req, res) => {
     });
 
     try {
-        const tempBuildPath = path.join(config.TEMP_BUILD_DIR, buildId);
-        const artifactSource = outputDir ? path.join(tempBuildPath, outputDir) : tempBuildPath;
+        const tempBuildPath = resolveWithin(config.TEMP_BUILD_DIR, buildId);
+        const artifactSource = outputDir ? resolveWithin(tempBuildPath, outputDir, { allowBase: true }) : tempBuildPath;
 
         if (!fs.existsSync(artifactSource)) {
             throw new Error(`Artifact directory '${outputDir}' not found at ${artifactSource}`);
@@ -410,13 +459,13 @@ router.post('/:id/deploy', async (req, res) => {
 
         let relativeRoot = path.dirname(project.mainFile);
         if (relativeRoot === '.') relativeRoot = project.mainFile;
-        const projectRootPath = path.join(config.UPLOADS_DIR, relativeRoot);
+        const projectRootPath = resolveWithin(config.UPLOADS_DIR, relativeRoot);
 
         // 创建临时文件清理器
         const cleaner = createTempFileCleaner([tempBuildPath]);
 
         // 1. Reset Source Directory: Ensure IDE and build are perfectly synced with latest upload
-        const sourceDir = path.join(projectRootPath, 'source');
+        const sourceDir = resolveWithin(projectRootPath, 'source');
         if (fs.existsSync(sourceDir)) {
             sse.sendLog("🧹 Clearing old source code...");
             fs.rmSync(sourceDir, { recursive: true, force: true });
@@ -428,7 +477,7 @@ router.post('/:id/deploy', async (req, res) => {
         fs.cpSync(tempBuildPath, sourceDir, { recursive: true });
 
         // 2. Reset Dist Directory: Ensure a clean deployment environment
-        const distDir = path.join(projectRootPath, 'dist');
+        const distDir = resolveWithin(projectRootPath, 'dist');
         sse.sendLog("🚚 Syncing build artifacts to deployment directory...");
 
         // Clear dist directory before syncing to ensure no stale files remain
@@ -474,7 +523,7 @@ router.get('/:id/full-config', (req, res) => {
         type: project.type,
         port: project.port,
         bindings: project.bindings || {},
-        envVars: project.envVars || {},
+        envVars: cryptoHelper.maskSecrets(project.envVars || {}),
         buildCommand: project.buildCommand || '',
         outputDir: project.outputDir || '',
         deployCommand: project.deployCommand || '',
@@ -499,7 +548,11 @@ router.patch('/:id', async (req, res) => {
         needsRestart = true;
     }
     if (envVars) {
-        project.envVars = envVars;
+        try {
+            project.envVars = prepareEnvVars(envVars, project.id, project.envVars || {});
+        } catch (error) {
+            return res.status(400).json({ error: error.message });
+        }
         needsRestart = true;
     }
     if (port && port !== project.port) {
@@ -517,7 +570,7 @@ router.patch('/:id', async (req, res) => {
         await runtime.start(project);
     }
 
-    res.json({ success: true, project });
+    res.json({ success: true, project: publicProject(project) });
 });
 
 module.exports = router;

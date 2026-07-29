@@ -65,6 +65,6 @@ export interface FileNode {
 
 export interface AuthResponse {
     success?: boolean;
-    token?: string;
+    requirePasswordChange?: boolean;
     error?: string;
 }

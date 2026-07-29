@@ -6,6 +6,8 @@ const upload = require('../middleware/upload');
 const config = require('../config');
 const { validateCommand, safeShellExec } = require('../utils/safe-exec');
 const { createSSEManager, createTempFileCleaner } = require('../utils/sse-helper');
+const { resolveWithin } = require('../utils/path-helper');
+const { extractZipSafely } = require('../utils/zip-helper');
 
 router.post('/', (req, res, next) => {
     next();
@@ -27,7 +29,7 @@ router.post('/', (req, res, next) => {
 
     const { buildCommand, outputDir } = req.body;
     const buildId = 'build-' + Date.now();
-    const workDir = path.join(config.TEMP_BUILD_DIR, buildId);
+    const workDir = resolveWithin(config.TEMP_BUILD_DIR, buildId);
 
     // 创建临时文件清理器
     const cleaner = createTempFileCleaner([req.file.path, workDir]);
@@ -35,10 +37,8 @@ router.post('/', (req, res, next) => {
     try {
         // 1. Extract
         sse.sendLog(`Extracting files to ${workDir}...`);
-        const AdmZip = require('adm-zip');
         const { flattenDirectory } = require('../utils/fs-helper');
-        const zip = new AdmZip(req.file.path);
-        zip.extractAllTo(workDir, true);
+        await extractZipSafely(req.file.path, workDir);
 
         // 清理上传的临时文件
         try { fs.unlinkSync(req.file.path); } catch { }
@@ -83,7 +83,7 @@ router.post('/', (req, res, next) => {
         }
 
         // 3. Verify Output
-        const finalOutputDir = outputDir ? path.join(workDir, outputDir) : workDir;
+        const finalOutputDir = outputDir ? resolveWithin(workDir, outputDir, { allowBase: true }) : workDir;
         if (!fs.existsSync(finalOutputDir)) {
             throw new Error(`Output directory '${outputDir}' not found after build.`);
         }

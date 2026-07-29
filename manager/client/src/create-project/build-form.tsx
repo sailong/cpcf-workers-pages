@@ -1,7 +1,6 @@
 import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { useTranslation } from 'react-i18next';
 import JSZip from 'jszip';
-import { getToken } from '../api';
 import { analyzeFiles, analyzeZip } from '../utils/projectAnalyzer';
 import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types';
 
@@ -82,12 +81,9 @@ const BuildForm = forwardRef<SubFormHandle, SubFormProps>(({ setError, showToast
             formData.append('buildCommand', buildCommand);
             formData.append('outputDir', outputDir);
 
-            const token = getToken();
             const response = await fetch('/api/build', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
+                credentials: 'same-origin',
                 body: formData,
             });
 

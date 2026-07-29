@@ -25,11 +25,9 @@ const dynamicProxy = createProxyMiddleware({
 });
 
 module.exports = function (req, res, next) {
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
-    if (!host) return next();
-
-    // Remove port
-    const hostname = host.split(':')[0];
+    // Express only honors forwarded host data when the immediate proxy is trusted.
+    const hostname = req.hostname;
+    if (!hostname) return next();
     let prefix = null;
     let autoMatched = false;
 
@@ -67,7 +65,7 @@ module.exports = function (req, res, next) {
             return nameMatch && typeMatch;
         });
 
-        if (project && project.port) {
+        if (project && project.port && project.status === 'running') {
             req.proxyTarget = `http://127.0.0.1:${project.port}`;
             req.proxyProjectName = project.name;
             req.proxyProjectPort = project.port;
@@ -75,8 +73,8 @@ module.exports = function (req, res, next) {
             return dynamicProxy(req, res, next);
         }
 
-        console.log(`[ProxyRouter] Lookup failed for Name: ${projectName}, Type: ${projectType}`);
-        return res.status(404).send(`Project '${projectName}' ${projectType ? `(type: ${projectType})` : ''} not found.`);
+        console.log(`[ProxyRouter] Lookup failed or project stopped for Name: ${projectName}, Type: ${projectType}`);
+        return res.status(404).send(`Running project '${projectName}' ${projectType ? `(type: ${projectType})` : ''} not found.`);
     }
 
     next();

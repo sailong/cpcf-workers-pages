@@ -4,9 +4,7 @@
  */
 export {
     api as default,
-    getToken,
-    setToken,
-    removeToken,
     checkAuth,
+    logout,
     authenticatedFetch
 } from '../api';

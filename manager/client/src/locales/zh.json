@@ -329,14 +329,15 @@
     },
     "auth": {
         "passwordMismatch": "两次输入的密码不一致",
-        "passwordLength": "密码长度至少4位",
+        "passwordLength": "密码长度至少8位",
         "changePasswordFailed": "修改密码失败",
         "networkError": "网络连接失败",
         "changePasswordTitle": "修改密码",
         "oldPassword": "旧密码",
         "newPassword": "新密码",
         "confirmPassword": "确认新密码",
-        "changePasswordButton": "修改密码"
+        "changePasswordButton": "修改密码",
+        "passwordChangedLoginAgain": "密码已修改，请使用新密码重新登录。"
     },
     "error": {
         "systemError": "系统发生错误",

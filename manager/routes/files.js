@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const projectService = require('../services/project-service');
+const { assertNoSymlinkWithin, resolveWithin } = require('../utils/path-helper');
 
 /**
  * 安全验证路径，防止目录遍历攻击
@@ -13,55 +14,19 @@ const projectService = require('../services/project-service');
  * @returns {{ valid: boolean, error?: string, resolvedPath?: string }}
  */
 function validatePath(filePathParam, allowedRoot) {
-    if (!filePathParam || typeof filePathParam !== 'string') {
-        return { valid: false, error: '文件路径不能为空' };
-    }
-
-    // 1. URL 解码（处理编码绕过）
-    let decodedPath;
     try {
-        // 多次解码以防止双重编码攻击
-        decodedPath = filePathParam;
-        let prev = '';
-        while (prev !== decodedPath) {
-            prev = decodedPath;
-            decodedPath = decodeURIComponent(decodedPath);
+        if (fs.existsSync(allowedRoot) && fs.statSync(allowedRoot).isFile()) {
+            const resolvedPath = resolveWithin(path.dirname(allowedRoot), filePathParam);
+            if (resolvedPath !== allowedRoot) return { valid: false, error: '路径超出允许范围' };
+            assertNoSymlinkWithin(path.dirname(allowedRoot), resolvedPath);
+            return { valid: true, resolvedPath };
         }
-    } catch (e) {
-        return { valid: false, error: '无效的文件路径编码' };
+        const resolvedPath = resolveWithin(allowedRoot, filePathParam);
+        assertNoSymlinkWithin(allowedRoot, resolvedPath);
+        return { valid: true, resolvedPath };
+    } catch (error) {
+        return { valid: false, error: error.message };
     }
-
-    // 2. 检查危险模式
-    const dangerousPatterns = [
-        '..',
-        '\x00',           // Null 字节
-        '\n', '\r',       // 换行符
-        // Windows 特殊设备
-        /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i,
-    ];
-
-    for (const pattern of dangerousPatterns) {
-        if (typeof pattern === 'string' && decodedPath.includes(pattern)) {
-            return { valid: false, error: '路径包含不允许的字符' };
-        }
-        if (pattern instanceof RegExp && pattern.test(decodedPath)) {
-            return { valid: false, error: '无效的文件名' };
-        }
-    }
-
-    // 3. 规范化路径
-    const normalizedPath = path.normalize(decodedPath);
-    
-    // 4. 解析绝对路径
-    const resolvedRoot = path.resolve(allowedRoot);
-    const resolvedPath = path.resolve(allowedRoot, normalizedPath);
-
-    // 5. 验证最终路径在允许的根目录内
-    if (!resolvedPath.startsWith(resolvedRoot + path.sep) && resolvedPath !== resolvedRoot) {
-        return { valid: false, error: '路径超出允许范围' };
-    }
-
-    return { valid: true, resolvedPath };
 }
 
 /**
@@ -70,11 +35,10 @@ function validatePath(filePathParam, allowedRoot) {
  * @returns {string} - 项目根目录路径
  */
 function getProjectRootPath(project) {
-    const projectRoot = path.join(
-        config.UPLOADS_DIR, 
-        path.dirname(project.mainFile) === '.' ? project.mainFile : path.dirname(project.mainFile)
-    );
-    const sourceDir = path.join(projectRoot, 'source');
+    const mainPath = resolveWithin(config.UPLOADS_DIR, project.mainFile);
+    const relativeRoot = path.dirname(project.mainFile) === '.' ? project.mainFile : path.dirname(project.mainFile);
+    const projectRoot = resolveWithin(config.UPLOADS_DIR, relativeRoot);
+    const sourceDir = resolveWithin(projectRoot, 'source');
     
     if (fs.existsSync(sourceDir) && fs.statSync(sourceDir).isDirectory()) {
         return sourceDir;
@@ -85,10 +49,7 @@ function getProjectRootPath(project) {
     }
     
     // 单文件项目
-    const mainFilePath = path.join(config.UPLOADS_DIR, project.mainFile);
-    if (fs.existsSync(mainFilePath)) {
-        return path.dirname(mainFilePath);
-    }
+    if (fs.existsSync(mainPath)) return mainPath;
     
     return projectRoot;
 }
@@ -99,7 +60,8 @@ function getFiles(dir, baseDir) {
     const list = fs.readdirSync(dir);
     list.forEach(file => {
         const filePath = path.join(dir, file);
-        const stat = fs.statSync(filePath);
+        const stat = fs.lstatSync(filePath);
+        if (stat.isSymbolicLink()) return;
         if (stat && stat.isDirectory()) {
             // Recurse
             results = results.concat(getFiles(filePath, baseDir));

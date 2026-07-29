@@ -4,21 +4,21 @@ const fs = require('fs');
 const path = require('path');
 const upload = require('../middleware/upload');
 const config = require('../config');
+const { resolveWithin } = require('../utils/path-helper');
+const { extractZipSafely } = require('../utils/zip-helper');
 
-router.post('/', upload.single('file'), (req, res) => {
+router.post('/', upload.single('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    const filePath = path.join(config.UPLOADS_DIR, req.file.filename);
+    const filePath = resolveWithin(config.UPLOADS_DIR, req.file.filename);
     const isZip = req.file.originalname.toLowerCase().endsWith('.zip');
 
     if (isZip) {
         // Extract ZIP for Pages projects
-        const AdmZip = require('adm-zip');
-        const extractDir = path.join(config.UPLOADS_DIR, 'page-' + Date.now().toString(36));
+        const extractDir = resolveWithin(config.UPLOADS_DIR, 'page-' + Date.now().toString(36));
 
         try {
-            const zip = new AdmZip(filePath);
-            zip.extractAllTo(extractDir, true);
+            await extractZipSafely(filePath, extractDir);
 
             // Normalize: handle nested folder in ZIP
             const { flattenDirectory } = require('../utils/fs-helper');
@@ -34,7 +34,9 @@ router.post('/', upload.single('file'), (req, res) => {
                 isDirectory: true
             });
         } catch (e) {
-            return res.status(500).json({ error: "Failed to extract ZIP: " + e.message });
+            try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch { }
+            try { fs.unlinkSync(filePath); } catch { }
+            return res.status(400).json({ error: "Failed to extract ZIP: " + e.message });
         }
     } else {
         // Single file upload (for Workers)

@@ -18,7 +18,12 @@ export const AuthService = {
 
     changePassword: async (oldPassword: string, newPassword: string) => {
         const res = await api.post('/change-password', { oldPassword, newPassword });
+        window.dispatchEvent(new Event('auth:expired'));
         return res.data;
-    }
-};
+    },
 
+    logout: async () => {
+        await api.post('/logout');
+        window.dispatchEvent(new Event('auth:expired'));
+    },
+};

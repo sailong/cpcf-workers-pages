@@ -1,0 +1,94 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const express = require('express');
+const http = require('http');
+const { createHostGuard, sameOrigin, securityHeaders } = require('../middleware/security');
+
+async function withServer(run) {
+    const app = express();
+    app.set('trust proxy', false);
+    app.use(securityHeaders);
+    app.use(createHostGuard({ consoleHosts: ['console.example.test'], projectsBaseDomains: ['apps.example.test'] }));
+    app.use(sameOrigin);
+    app.use(express.json({ limit: '32b', strict: true }));
+    app.use((req, res) => res.json({ ok: true }));
+    app.use((error, req, res, next) => {
+        if (res.headersSent) return next(error);
+        res.status(error.type === 'entity.too.large' ? 413 : 400).json({ error: error.message });
+    });
+
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise((resolve, reject) => {
+        server.once('listening', resolve);
+        server.once('error', reject);
+    });
+    try {
+        await run(`http://127.0.0.1:${server.address().port}`);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+}
+
+function request(url, options = {}) {
+    return new Promise((resolve, reject) => {
+        const req = http.request(url, options, res => {
+            const chunks = [];
+            res.on('data', chunk => chunks.push(chunk));
+            res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString() }));
+        });
+        req.on('error', reject);
+        if (options.body) req.write(options.body);
+        req.end();
+    });
+}
+
+test('host allowlist, same-origin policy, security headers, and JSON limit are enforced', async () => {
+    await withServer(async baseUrl => {
+        const allowed = await request(baseUrl, { headers: { Host: 'console.example.test' } });
+        assert.equal(allowed.status, 200);
+        assert.equal(allowed.headers['x-content-type-options'], 'nosniff');
+        assert.match(allowed.headers['content-security-policy'], /frame-ancestors 'none'/);
+
+        assert.equal((await request(baseUrl, { headers: { Host: 'demo-worker.apps.example.test' } })).status, 200);
+        assert.equal((await request(baseUrl, { headers: { Host: 'console.example.test', 'X-Forwarded-Host': 'evil.example.test' } })).status, 200);
+        assert.equal((await request(baseUrl, { headers: { Host: 'attacker.example.test' } })).status, 421);
+        assert.equal((await request(baseUrl, {
+            method: 'POST',
+            headers: { Host: 'console.example.test', Origin: 'https://evil.example.test', 'Content-Type': 'application/json' },
+            body: '{}'
+        })).status, 403);
+        assert.equal((await request(baseUrl, {
+            method: 'POST',
+            headers: { Host: 'console.example.test', 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: 'x'.repeat(64) })
+        })).status, 413);
+    });
+});
+
+test('project traffic reaches the runtime before console CORS and security headers', async () => {
+    const app = express();
+    app.use(createHostGuard({ consoleHosts: ['console.example.test'], projectsBaseDomains: ['apps.example.test'] }));
+    app.use((req, res, next) => {
+        if (req.hostname.endsWith('.apps.example.test')) return res.json({ runtime: true });
+        next();
+    });
+    app.use(securityHeaders);
+    app.use(sameOrigin);
+    app.use((req, res) => res.json({ console: true }));
+
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => server.once('listening', resolve));
+    try {
+        const result = await request(`http://127.0.0.1:${server.address().port}`, {
+            method: 'POST',
+            headers: { Host: 'demo-worker.apps.example.test', Origin: 'https://consumer.example.test' }
+        });
+        assert.equal(result.status, 200);
+        assert.equal(JSON.parse(result.body).runtime, true);
+        assert.equal(result.headers['content-security-policy'], undefined);
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});

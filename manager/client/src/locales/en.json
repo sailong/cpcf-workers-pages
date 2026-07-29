@@ -317,14 +317,15 @@
     },
     "auth": {
         "passwordMismatch": "Passwords do not match",
-        "passwordLength": "Password must be at least 4 characters",
+        "passwordLength": "Password must be at least 8 characters",
         "changePasswordFailed": "Failed to change password",
         "networkError": "Network connection failed",
         "changePasswordTitle": "Change Password",
         "oldPassword": "Old Password",
         "newPassword": "New Password",
         "confirmPassword": "Confirm New Password",
-        "changePasswordButton": "Change Password"
+        "changePasswordButton": "Change Password",
+        "passwordChangedLoginAgain": "Password changed. Sign in again with your new password."
     },
     "error": {
         "systemError": "System Error",

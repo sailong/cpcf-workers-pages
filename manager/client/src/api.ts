@@ -1,101 +1,59 @@
 import axios from 'axios';
 import type { AxiosRequestConfig, AxiosResponse } from 'axios';
 
-export const getToken = () => localStorage.getItem('auth_token');
-export const setToken = (token: string) => localStorage.setItem('auth_token', token);
-export const removeToken = () => localStorage.removeItem('auth_token');
+// Existing service wrappers progressively provide concrete response types.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ApiData = any;
 
 const instance = axios.create({
     baseURL: '/api',
-    headers: {
-        'Content-Type': 'application/json',
-    }
+    withCredentials: true,
+    headers: { 'Content-Type': 'application/json' }
 });
 
-// Request interceptor for API calls
-instance.interceptors.request.use(
-    async config => {
-        const token = getToken();
-        if (token) {
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    error => {
-        return Promise.reject(error);
-    }
-);
-
-// Response interceptor for API calls
 instance.interceptors.response.use(
-    (response) => response,
-    async function (error) {
+    response => response,
+    async error => {
         if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-            removeToken();
             window.dispatchEvent(new Event('auth:expired'));
         }
         return Promise.reject(error);
     }
 );
 
-/**
- * Validates the token explicitly
- */
 export const checkAuth = async (): Promise<boolean> => {
-    const token = getToken();
-    if (!token) return false;
     try {
-        await instance.get('/verify-token');
+        await instance.get('/verify-session');
         return true;
-    } catch (e) {
-        removeToken();
+    } catch {
         return false;
     }
 };
 
+export const logout = async (): Promise<void> => {
+    try {
+        await instance.post('/logout');
+    } finally {
+        window.dispatchEvent(new Event('auth:expired'));
+    }
+};
+
 const api = {
-    get: <T = any, R = AxiosResponse<T>>(url: string, config?: AxiosRequestConfig): Promise<R> => {
-        return instance.get(url, config);
-    },
-    post: <T = any, R = AxiosResponse<T>>(url: string, data?: any, config?: AxiosRequestConfig): Promise<R> => {
-        return instance.post(url, data, config);
-    },
-    put: <T = any, R = AxiosResponse<T>>(url: string, data?: any, config?: AxiosRequestConfig): Promise<R> => {
-        return instance.put(url, data, config);
-    },
-    patch: <T = any, R = AxiosResponse<T>>(url: string, data?: any, config?: AxiosRequestConfig): Promise<R> => {
-        return instance.patch(url, data, config);
-    },
-    delete: <T = any, R = AxiosResponse<T>>(url: string, config?: AxiosRequestConfig): Promise<R> => {
-        return instance.delete(url, config);
-    },
-    // For manual handling
+    get: <T = ApiData, R = AxiosResponse<T>>(url: string, config?: AxiosRequestConfig): Promise<R> => instance.get(url, config),
+    post: <T = ApiData, R = AxiosResponse<T>>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<R> => instance.post(url, data, config),
+    put: <T = ApiData, R = AxiosResponse<T>>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<R> => instance.put(url, data, config),
+    patch: <T = ApiData, R = AxiosResponse<T>>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<R> => instance.patch(url, data, config),
+    delete: <T = ApiData, R = AxiosResponse<T>>(url: string, config?: AxiosRequestConfig): Promise<R> => instance.delete(url, config),
     axiosInstance: instance
 };
 
 export { api };
 
 export const authenticatedFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const token = getToken();
-    const headers = new Headers(init?.headers);
-
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    }
-
-    const config = {
-        ...init,
-        headers
-    };
-
-    const response = await fetch(input, config);
-
+    const response = await fetch(input, { ...init, credentials: 'same-origin' });
     if (response.status === 401 || response.status === 403) {
-        removeToken();
         window.dispatchEvent(new Event('auth:expired'));
     }
-
     return response;
 };
 

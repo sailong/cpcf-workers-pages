@@ -100,10 +100,9 @@ const DeployPanel: React.FC<DeployPanelProps> = ({ project, onLog, onSuccess }) 
                 formData.append('outputDir', outputDir);
                 formData.append('deployCommand', deployCommand);
 
-                const token = localStorage.getItem('auth_token');
                 const response = await fetch('/api/build', {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
+                    credentials: 'same-origin',
                     body: formData
                 });
 

@@ -6,7 +6,7 @@ import IDE from '../components/IDE/IDE';
 import ChangePasswordModal from '../components/ChangePasswordModal';
 import ThemeToggle from '../components/ThemeToggle';
 import { useNavigate } from 'react-router-dom';
-import { removeToken } from '../api';
+import { logout } from '../api';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 
 const Dashboard: React.FC = () => {
@@ -15,7 +15,7 @@ const Dashboard: React.FC = () => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [showChangePassword, setShowChangePassword] = useState(false);
-    const [rootDomain, setRootDomain] = useState<string>(window.location.hostname);
+    const [rootDomain] = useState<string>(window.location.hostname);
 
     useEffect(() => {
         loadProjects();
@@ -87,8 +87,8 @@ const Dashboard: React.FC = () => {
         }
     };
 
-    const handleLogout = () => {
-        removeToken();
+    const handleLogout = async () => {
+        await logout();
         navigate('/login');
     };
 

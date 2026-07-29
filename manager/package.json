@@ -4,21 +4,22 @@
     "description": "Manager service for Cloudflare Local Platform",
     "main": "server.js",
     "scripts": {
-        "start": "node server.js"
+        "start": "node server.js",
+        "test": "node --test tests/*.test.js"
     },
     "dependencies": {
-        "adm-zip": "^0.5.16",
-        "bcrypt": "^5.1.1",
+        "bcrypt": "^6.0.0",
         "better-sqlite3": "^11.8.1",
-        "body-parser": "^1.20.2",
-        "cors": "^2.8.5",
         "dotenv": "^17.2.3",
         "execa": "^5.1.1",
-        "express": "^4.18.2",
-        "http-proxy-middleware": "^3.0.5",
-        "jsonwebtoken": "^9.0.3",
+        "express": "^5.2.1",
+        "http-proxy-middleware": "^3.0.7",
         "mkdirp": "^3.0.1",
-        "multer": "^1.4.5-lts.1",
-        "svg-captcha": "^1.4.0"
+        "multer": "^2.0.2",
+        "svg-captcha": "^1.4.0",
+        "yauzl": "^3.2.0"
+    },
+    "devDependencies": {
+        "yazl": "^3.3.1"
     }
 }

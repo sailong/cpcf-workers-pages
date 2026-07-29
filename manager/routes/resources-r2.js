@@ -124,9 +124,9 @@ router.delete('/:id/files/:key', async (req, res) => {
 });
 
 // Download File
-router.get('/:id/files/:key(*)', async (req, res) => {
+router.get('/:id/files/*key', async (req, res) => {
     const { id } = req.params;
-    const key = req.params[0];
+    const key = Array.isArray(req.params.key) ? req.params.key.join('/') : req.params.key;
 
     const url = new URL(`${getR2AdminUrl()}/get`);
     url.searchParams.set('bucket', id);

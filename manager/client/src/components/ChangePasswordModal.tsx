@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { AuthService } from '../services/auth';
 
 interface ChangePasswordModalProps {
     onClose: () => void;
     onSuccess: () => void;
+    required?: boolean;
 }
 
-const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSuccess }) => {
+const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSuccess, required = false }) => {
     const { t } = useTranslation();
     const [oldPassword, setOldPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -22,7 +24,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
         if (newPassword !== confirmPassword) {
             return setError(t('auth.passwordMismatch'));
         }
-        if (newPassword.length < 4) {
+        if (newPassword.length < 8) {
             return setError(t('auth.passwordLength'));
         }
 
@@ -30,8 +32,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
         try {
             await AuthService.changePassword(oldPassword, newPassword);
             onSuccess();
-        } catch (e: any) {
-            setError(e.response?.data?.error || e.message || t('auth.changePasswordFailed'));
+        } catch (error: unknown) {
+            const message = axios.isAxiosError<{ error?: string }>(error)
+                ? error.response?.data?.error || error.message
+                : error instanceof Error ? error.message : '';
+            setError(message || t('auth.changePasswordFailed'));
         } finally {
             setLoading(false);
         }
@@ -78,13 +83,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
                     )}
 
                     <div className="flex justify-end gap-3 mt-6">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="btn-glass"
-                        >
-                            {t('common.cancel')}
-                        </button>
+                        {!required && (
+                            <button type="button" onClick={onClose} className="btn-glass">
+                                {t('common.cancel')}
+                            </button>
+                        )}
                         <button
                             type="submit"
                             disabled={loading}
