@@ -83,9 +83,13 @@ git tag v1.2.4 && git push origin v1.2.4
 ```
 
 工作流先执行后端、前端、运行时隔离和 E2E 测试；任何 CI 作业失败都会阻止发布。通过后再为
-amd64、arm64 分别生成包含生产 `node_modules` 和前端 `dist` 的 `tar.zst`，并使用 Cosign GitHub
+amd64、arm64 分别生成包含生产 `node_modules` 和前端 `dist` 的 `tar.gz`，并使用 Cosign GitHub
 OIDC 对 `manifest.json` 无密钥签名。已存在的 GitHub Release 不允许覆盖。
 升级器会根据仓库、固定工作流路径和目标 Tag 自动生成唯一证书身份，不接受可放宽的身份正则配置。
+
+从旧的 `tar.zst` 发行格式迁移时，必须先发布并部署一次包含新版升级器的 Docker 镜像，再发布首个
+`tar.gz` 应用版本；旧镜像内的升级器无法读取新格式。完成这次运行环境升级后，后续应用版本继续
+通过 GitHub Release 在线升级，无需重复替换 Docker 镜像。
 
 管理员在“设置 > 应用版本”填写明确的 `vX.Y.Z` 后执行升级。升级器依次完成 Cosign 身份校验、
 SHA-256 和架构校验、数据库迁移 dry-run、完整 release 快照、原子切换、重启及健康检查。dry-run

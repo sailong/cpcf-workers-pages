@@ -71,3 +71,21 @@ test('application release containers write mounted files as the runner user', ()
     assert.equal((script.match(/--env HOME=\/tmp\/ccfwp-home/g) || []).length, 2);
     assert.equal((script.match(/--env NPM_CONFIG_CACHE=\/tmp\/ccfwp-npm-cache/g) || []).length, 2);
 });
+
+test('application releases use tar.gz bundles from build through online extraction', () => {
+    const buildScript = fs.readFileSync(path.join(ROOT, 'scripts/build-app-release.sh'), 'utf8');
+    const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/app-release.yml'), 'utf8');
+    const releaseClient = fs.readFileSync(path.join(ROOT, 'updater/release-client.js'), 'utf8');
+    const updaterServer = fs.readFileSync(path.join(ROOT, 'updater/server.js'), 'utf8');
+    const dockerfile = fs.readFileSync(path.join(ROOT, 'Dockerfile'), 'utf8');
+    const releaseSources = [buildScript, workflow, releaseClient, updaterServer, dockerfile].join('\n');
+
+    assert.match(buildScript, /ccfwp-app-\$VERSION-linux-\$ARCH\.tar\.gz/);
+    assert.match(buildScript, /tar -czf "\$BUNDLE" -C "\$WORK_DIR\/package" manager/);
+    assert.match(workflow, /ccfwp-app-\$\{version\}-linux-\$\{arch\}\.tar\.gz/);
+    assert.match(releaseClient, /ccfwp-app-\$\{tag\}-linux-\$\{arch\}\.tar\.gz/);
+    assert.match(updaterServer, /\['-tzf', bundlePath\]/);
+    assert.match(updaterServer, /\['-xzf', bundlePath, '-C', destination\]/);
+    assert.match(dockerfile, /apt-get install -y ca-certificates python3 build-essential gzip/);
+    assert.doesNotMatch(releaseSources, /tar\.zst|--zstd|\bzstd\b/i);
+});

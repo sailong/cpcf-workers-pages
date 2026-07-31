@@ -55,7 +55,7 @@ ENV CI=true \
 # 【Config】System Dependencies with Aliyun Mirror
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
-    apt-get install -y ca-certificates python3 build-essential zstd && \
+    apt-get install -y ca-certificates python3 build-essential gzip && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -44,9 +44,6 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Install zstd
-        run: sudo apt-get update && sudo apt-get install -y zstd
-
       - name: Build amd64 release bundle
         run: ./scripts/build-app-release.sh "${{ steps.version.outputs.version }}" amd64 dist/releases
 
@@ -66,7 +63,7 @@ jobs:
           const directory = 'dist/releases';
           const bundles = {};
           for (const arch of ['amd64', 'arm64']) {
-            const asset = `ccfwp-app-${version}-linux-${arch}.tar.zst`;
+            const asset = `ccfwp-app-${version}-linux-${arch}.tar.gz`;
             const file = path.join(directory, asset);
             bundles[`linux-${arch}`] = {
               asset,

@@ -78,11 +78,11 @@ function acquireLock() {
 }
 
 async function extractBundle(bundlePath, destination) {
-    const listing = await execFileAsync('tar', ['--zstd', '-tf', bundlePath], { maxBuffer: 4 * 1024 * 1024 });
+    const listing = await execFileAsync('tar', ['-tzf', bundlePath], { maxBuffer: 4 * 1024 * 1024 });
     for (const item of listing.stdout.split('\n').map(value => value.trim()).filter(Boolean)) {
         if (item.startsWith('/') || item.split('/').includes('..')) throw new Error(`Unsafe release archive entry: ${item}`);
     }
-    await execFileAsync('tar', ['--zstd', '-xf', bundlePath, '-C', destination], { maxBuffer: 1024 * 1024 });
+    await execFileAsync('tar', ['-xzf', bundlePath, '-C', destination], { maxBuffer: 1024 * 1024 });
     const managerRoot = path.join(destination, 'manager');
     for (const required of [
         path.join(managerRoot, 'server.js'),

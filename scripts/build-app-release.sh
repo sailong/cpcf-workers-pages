@@ -10,7 +10,7 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 [[ "$VERSION" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || fail "version must use the stable vX.Y.Z format"
 [[ "$ARCH" == "amd64" || "$ARCH" == "arm64" ]] || fail "architecture must be amd64 or arm64"
 command -v docker >/dev/null || fail "docker is required"
-command -v zstd >/dev/null || fail "zstd is required"
+command -v gzip >/dev/null || fail "gzip is required"
 
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
@@ -48,6 +48,6 @@ docker run --rm --platform "linux/$ARCH" \
 printf '{"version":"%s","gitSha":"%s"}\n' "$VERSION" "${GITHUB_SHA:-$(git -C "$ROOT_DIR" rev-parse HEAD)}" \
     > "$WORK_DIR/package/manager/app-version.json"
 
-BUNDLE="$OUTPUT_DIR/ccfwp-app-$VERSION-linux-$ARCH.tar.zst"
-tar --zstd -C "$WORK_DIR/package" -cf "$BUNDLE" manager
+BUNDLE="$OUTPUT_DIR/ccfwp-app-$VERSION-linux-$ARCH.tar.gz"
+tar -czf "$BUNDLE" -C "$WORK_DIR/package" manager
 printf '%s\n' "$BUNDLE"
