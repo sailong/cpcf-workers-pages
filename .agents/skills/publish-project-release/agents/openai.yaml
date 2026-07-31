@@ -1,0 +1,4 @@
+interface:
+  display_name: "发布项目版本"
+  short_description: "按严格 SemVer 安全发布 Docker 镜像和签名应用升级包"
+  default_prompt: "使用 $publish-project-release 准备并发布下一个严格 SemVer 版本。"
