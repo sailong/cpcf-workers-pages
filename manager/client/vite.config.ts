@@ -16,8 +16,8 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'monaco-editor': ['@monaco-editor/react'],
-          'vendor': ['react', 'react-dom', 'react-router-dom', 'i18next', 'react-i18next']
+          'monaco-editor': ['@monaco-editor/react', 'monaco-editor'],
+          'vendor': ['react', 'react-dom', 'i18next', 'react-i18next']
         }
       }
     },

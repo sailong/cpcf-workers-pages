@@ -20,16 +20,15 @@
 ### ⚡️ Serverless 项目管理
 - **Workers & Pages**: 统一管理两种类型的 Cloudflare 项目。
 - **在线代码编辑器**: 集成 Monaco Editor，支持 TypeScript/JavaScript 语法高亮与智能提示。
-- **动态部署**: 一键保存代码并自动热重载，秒级生效。
+- **不可变部署**: 上传或保存代码会生成新版本并立即切换运行；失败时可一键回滚到上一版本。
 - **文件上传**: 支持上传单文件 (Worker) 或 ZIP 包 (Pages 静态站点)。
-- **智能端口分配**:
 - **智能端口分配**:
     - **自动模式 (推荐)**: 留空端口，系统自动分配内部端口 (10000+)。
         - **访问地址**: 通过统一反向代理访问。
             - **Worker**: `http://<项目名>-worker.localhost:8001`
             - **Pages**: `http://<项目名>-pages.localhost:8001`
-    - **自定义模式**: 支持绑定任意端口 (1024-65535)。
-        - **注意**: 自定义端口**默认无法从外部访问**。必须在 `docker-compose.yml` 的 `ports` 部分手动添加映射（如 `- "8080:8080"`）并重启容器。
+    - **自定义模式**: 支持设置项目的内部端口元数据 (1024-65535)。
+        - **注意**: 项目流量统一经过管理入口和项目子域名转发，不要为单个项目额外暴露 Docker 端口。
     - **冲突检测**: 自动检测端口占用并提示。
 - **旧项目兼容**: 自动检测并修复旧项目配置（如缺失的资源绑定），确保平滑迁移。
 
@@ -45,16 +44,14 @@
 - **资源绑定 (Bindings)**: 
     - 简单的 UI 操作将 KV/D1 绑定到 Worker/Pages 项目。
     - 自动生成 `wrangler.toml` 配置。
-    - **R2 服务增强**:
-        - 强制绑定 `0.0.0.0`，完美解决 Docker 网络通信问题。
-        - 支持 IPv6 端口检测与清理，彻底解决 "Address already in use" 崩溃问题。
+    - **R2 服务增强**: 支持对象列表、元数据、范围读取和分片上传，并与项目绑定隔离。
 
 ### 🔐 认证与安全 (Authentication & Security)
-- **安全登录系统**: 集成 `svg-captcha` 图形验证码，有效防止暴力破解。
-- **JWT 身份验证**: 采用 JWT (JSON Web Token) 进行全站鉴权，自动处理会话过期与续期。
+- **安全登录系统**: 验证码在服务端保存、一次性使用并自动过期，登录请求按来源限速。
+- **服务端会话**: 使用仅保存哈希的随机会话；生产通过 `__Host-`、`Secure`、`HttpOnly`、`SameSite=Strict` Cookie 传递，HTTP 本地开发使用同样的会话策略但不强制 `Secure`。
 - **密码管理**:
-    - 支持修改管理员密码，凭证持久化存储于 `.platform-data/auth.json`。
-    - **JWT Secret 持久化**: 确保服务重启后 Token 不失效。
+    - 单管理员密码哈希和会话版本保存在权限受限的 `.platform-data/auth.json`，会话只以哈希形式存入 SQLite。
+    - 修改密码会立即撤销此前的全部会话。
 - **环境变量管理**: 支持 Plain Text、JSON、Secrets 三种类型的环境变量。
 - **敏感数据脱敏**: 界面默认隐藏敏感 Secret 值，支持一键切换显示/隐藏。
 
@@ -68,28 +65,65 @@
 
 ### 启动平台
 
-只需要一条命令即可启动整个环境：
+开发环境使用：
 
 ```bash
-docker-compose up -d --build
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 启动完成后，访问管理控制台：
 **http://localhost:8001**
 
-*   **默认密码**: `admin`
-*   登录成功后，即可开始管理您的 Worker 项目与资源。
-*   **重置密码**: 如果忘记密码，可删除或修改 `.platform-data/auth.json` 文件。
+*   **用户名**: `admin`
+*   **开发环境初始密码**: 全新数据目录为 `Admin@123`，首次登录后必须修改；已有 `.platform-data/` 会继续使用其中的已保存密码。
+*   该初始密码仅用于本机开发；生产 Compose 要求通过 `.env` 显式设置 `AUTH_PASSWORD`。
+*   忘记已保存密码时使用下方的 `reset-admin-password.js`，不要直接修改 SQLite 或删除 `.platform-data/`。
 
 ### ⚙️ 环境配置 (Environment Configuration)
 您可以在 `docker-compose.yml` 环境变量中修改默认配置：
 
-*   `MANAGER_SERVICE_PORT`: 管理后台服务内部监听端口 (默认 `3000`)
-    *   **注意**: 修改此变量后，必须同步修改 `docker-compose.yml` 中的 `ports` 映射（例如 `"8001:3000"` 中的 `3000`）。
-*   `AUTH_PASSWORD`: 管理后台登录密码 (默认 `admin`)
-*   `R2_ADMIN_PORT`: R2 管理服务端口 (默认 `9100`)
+*   `MANAGER_SERVICE_PORT`: 管理后台服务内部监听端口，Compose 默认 `8001`。
+*   `AUTH_PASSWORD`: 管理后台初始密码。生产环境必须显式设置，且不能使用默认密码 `Admin@123`。
+*   `CONSOLE_HOST`: 公网管理控制台域名。
+*   `PROJECTS_BASE_DOMAIN`: 项目子域名的根域名；项目地址为 `<项目名>-<类型>.<根域名>`。
+*   `INGRESS_PROXY_TOKEN`: Caddy 到管理服务的内部请求凭证，至少 32 个字符。
 
-    *   **部署场景**: 如果部署到公网或使用反向代理（如 1Panel），请将其设置为你的域名（例如 `ccfwp.example.com`）。此时项目访问地址将变为 `http://<项目名>-<类型>.ccfwp.example.com:端口`。
+    *   **公网部署**: 仅开放 80/443，由 Caddy 自动签发控制台和项目泛域名证书；不要直接暴露管理端口或内部资源网关。
+*   **运行时隔离**: 默认 Docker。`RUNTIME_PROVIDER=process` 必须同时设置 `ALLOW_UNISOLATED_RUNTIME=true`，仅用于本机非隔离调试，禁止用于公网。
+
+### 测试与质量闸门
+
+```bash
+./scripts/test-all.sh
+./scripts/test-runtime-broker.sh
+./scripts/public-preflight.sh
+```
+
+`public-preflight.sh` 用于公网发布前检查：强制 Docker 运行时、校验必要密钥，并确认 Compose 只对外暴露 80/443。
+
+构建依赖默认仅允许锁文件安装，默认网络策略为 `BUILD_NETWORK_MODE=prefer-offline`；可通过 `online|prefer-offline|offline` 与 `BUILD_REGISTRY_ALLOWLIST` 控制安装网络和 registry 白名单。
+
+第一条运行后端测试、Pages 运行验证、前端覆盖率、Lint、类型检查、构建、依赖审计和 Compose 校验；第二条使用 Docker 实测项目网络、文件和 D1/KV/R2 隔离。
+
+浏览器测试使用独立的 `18001` 端口和内存数据目录，不会修改开发环境的 `.platform-data/`；脚本会生成临时凭据，并在成功或失败后清理容器和卷：
+
+```bash
+./scripts/test-e2e.sh
+```
+
+开发环境如果忘记了已持久化的管理员密码，不要直接编辑 `auth.json`。先停止服务，再通过环境变量执行一次性重置（密码不会出现在 shell 参数或日志中）：
+
+```bash
+docker compose -f docker-compose.dev.yml stop
+CCFWP_ADMIN_PASSWORD='ChangeMe123' \
+  docker compose -f docker-compose.dev.yml run --rm --no-deps \
+  ccfwp-platform node manager/scripts/reset-admin-password.js
+docker compose -f docker-compose.dev.yml up -d
+```
+
+`ChangeMe123` 仅为格式示例；请使用自己的强密码。生产环境还必须显式设置 `CCFWP_ALLOW_ADMIN_RESET=1`，并在管理服务停止时执行。
+
+GitHub Actions 会在推送和拉取请求时执行相同的质量、运行时隔离和 Playwright 阶段。
 
 ---
 
@@ -110,7 +144,8 @@ docker-compose up -d --build
 ## 🛠️ 技术栈 (Tech Stack)
 
 *   **Runtime**: Cloudflare Wrangler (Local Mode)
-*   **Backend**: Node.js (Express), `jsonwebtoken` (Auth), `svg-captcha` (Security), `better-sqlite3`, `child_process` (Spawner)
+*   **Compatibility**: See [Local Runtime Compatibility](docs/compatibility.md) for supported APIs and intentional edge-network deviations.
+*   **Backend**: Node.js (Express), bcrypt/SQLite 会话认证, `svg-captcha`, `better-sqlite3`, pinned Wrangler/workerd, Docker Runtime Broker
 *   **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Monaco Editor
 *   **Infrastructure**: Docker, Docker Compose
 
@@ -138,14 +173,8 @@ docker-compose up -d --build
 │   │   │   ├── App.tsx       # 路由配置
 │   │   │   └── main.tsx      # 入口文件
 │   │   └── dist/             # 构建产物 (后端托管)
-│   ├── utils/                # 后端工具模块
-│   │   ├── spawner.js        # 进程管理器 (核心)
-│   │   ├── generator.js      # wrangler.toml 配置生成
-│   │   ├── d1-helper.js      # D1 数据库操作
-│   │   ├── kv-storage.js     # KV 存储引擎
-│   │   ├── r2-admin-manager.js # R2 服务管理
-│   │   └── crypto-helper.js  # 加密/脱敏工具
-│   ├── system-workers/       # 系统级 Worker (R2 Admin)
+│   ├── services/             # 控制面、资源运行时、Runtime Broker
+│   ├── utils/                # 路径、加密、Wrangler 和兼容性工具
 │   └── tests/                # 测试脚本
 │
 ├── docs/                     # 文档中心

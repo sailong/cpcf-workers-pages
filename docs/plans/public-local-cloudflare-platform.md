@@ -155,7 +155,7 @@
 ### Documentation references
 
 - Cloudflare D1, KV, R2, Pages Functions, Wrangler, and local-data documentation captured in Phase 0.
-- Current helpers: `manager/utils/d1-helper.js`, `manager/utils/kv-storage.js`, `manager/system-workers/r2-admin/src/index.js`.
+- Canonical helpers: `manager/services/resource-runtime.js`, `manager/services/resource-gateway-server.js`, and `manager/utils/d1-helper.js`.
 
 ### Verification checklist
 

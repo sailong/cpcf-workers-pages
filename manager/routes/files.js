@@ -5,7 +5,12 @@ const fs = require('fs');
 const path = require('path');
 const config = require('../config');
 const projectService = require('../services/project-service');
+const { DEFAULT_PROJECT_LIMITS } = require('../services/project-limits');
 const { assertNoSymlinkWithin, resolveWithin } = require('../utils/path-helper');
+const { getReleaseRoot, isReleasePath, resolveProjectPath } = require('../utils/project-paths');
+const { getDirectorySize } = require('../utils/fs-helper');
+
+const MAX_FILE_CONTENT_BYTES = 10 * 1024 * 1024;
 
 /**
  * 安全验证路径，防止目录遍历攻击
@@ -35,6 +40,11 @@ function validatePath(filePathParam, allowedRoot) {
  * @returns {string} - 项目根目录路径
  */
 function getProjectRootPath(project) {
+    if (isReleasePath(project.mainFile)) {
+        const releaseRoot = getReleaseRoot(project.mainFile);
+        const sourceDir = resolveWithin(releaseRoot, 'source');
+        return fs.existsSync(sourceDir) ? sourceDir : resolveProjectPath(project.mainFile);
+    }
     const mainPath = resolveWithin(config.UPLOADS_DIR, project.mainFile);
     const relativeRoot = path.dirname(project.mainFile) === '.' ? project.mainFile : path.dirname(project.mainFile);
     const projectRoot = resolveWithin(config.UPLOADS_DIR, relativeRoot);
@@ -74,6 +84,34 @@ function getFiles(dir, baseDir) {
         }
     });
     return results;
+}
+
+
+function assertProjectDiskLimit(project, rootPath, targetPath, nextSize) {
+    const limitBytes = project.limits.diskMb * 1024 * 1024;
+    const currentSize = getDirectorySize(rootPath);
+    const previousSize = targetPath === rootPath ? currentSize : getDirectorySize(targetPath);
+    const projectedSize = currentSize - previousSize + nextSize;
+    if (projectedSize > limitBytes) {
+        const error = new Error(`Project disk limit exceeded (${project.limits.diskMb} MB)`);
+        error.statusCode = 413;
+        throw error;
+    }
+}
+
+function getProjectContentLimitBytes(project) {
+    const configured = Number(project?.limits?.uploadMb || DEFAULT_PROJECT_LIMITS.uploadMb) * 1024 * 1024;
+    return Math.min(MAX_FILE_CONTENT_BYTES, configured);
+}
+
+function assertProjectUploadLimit(project, size) {
+    const limitBytes = getProjectContentLimitBytes(project);
+    if (size > limitBytes) {
+        const limitMb = Math.floor(limitBytes / 1024 / 1024);
+        const error = new Error(`File content exceeds upload limit (${limitMb} MB)`);
+        error.statusCode = 413;
+        throw error;
+    }
 }
 
 // 12. List Files
@@ -129,10 +167,12 @@ router.get('/:id/files/content', (req, res) => {
         return res.status(400).json({ error: "Cannot read directory content" });
     }
 
-    // 文件大小限制（10MB）
+    // Keep the editor bounded even when a project has a larger package upload limit.
     const stat = fs.statSync(validation.resolvedPath);
-    if (stat.size > 10 * 1024 * 1024) {
-        return res.status(400).json({ error: "File too large (max 10MB)" });
+    try {
+        assertProjectUploadLimit(project, stat.size);
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.message });
     }
 
     try {
@@ -147,15 +187,19 @@ router.get('/:id/files/content', (req, res) => {
 router.put('/:id/files/content', (req, res) => {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
+    if (isReleasePath(project.mainFile)) {
+        return res.status(409).json({ error: 'Immutable release files cannot be edited in place; create a new deployment' });
+    }
 
     const { path: filePathParam, content } = req.body;
     if (!filePathParam) return res.status(400).json({ error: "File path is required" });
     if (content === undefined) return res.status(400).json({ error: "Content is required" });
 
-    // 内容大小限制（10MB）
     const contentSize = Buffer.byteLength(content, 'utf8');
-    if (contentSize > 10 * 1024 * 1024) {
-        return res.status(400).json({ error: "Content too large (max 10MB)" });
+    try {
+        assertProjectUploadLimit(project, contentSize);
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.message });
     }
 
     // 获取项目根目录
@@ -168,11 +212,12 @@ router.put('/:id/files/content', (req, res) => {
     }
 
     try {
+        assertProjectDiskLimit(project, rootPath, validation.resolvedPath, contentSize);
         fs.mkdirSync(path.dirname(validation.resolvedPath), { recursive: true });
         fs.writeFileSync(validation.resolvedPath, content, 'utf8');
         res.json({ success: true });
     } catch (e) {
-        res.status(500).json({ error: "Failed to save file: " + e.message });
+        res.status(e.statusCode || 500).json({ error: e.statusCode ? e.message : "Failed to save file: " + e.message });
     }
 });
 
@@ -180,6 +225,9 @@ router.put('/:id/files/content', (req, res) => {
 router.delete('/:id/files/content', (req, res) => {
     const project = projectService.getById(req.params.id);
     if (!project) return res.status(404).json({ error: "Project not found" });
+    if (isReleasePath(project.mainFile)) {
+        return res.status(409).json({ error: 'Immutable release files cannot be deleted in place; create a new deployment' });
+    }
 
     const filePathParam = req.query.path;
     if (!filePathParam) return res.status(400).json({ error: "File path is required" });
@@ -210,3 +258,6 @@ router.delete('/:id/files/content', (req, res) => {
 });
 
 module.exports = router;
+module.exports.assertProjectDiskLimit = assertProjectDiskLimit;
+module.exports.assertProjectUploadLimit = assertProjectUploadLimit;
+module.exports.getProjectContentLimitBytes = getProjectContentLimitBytes;

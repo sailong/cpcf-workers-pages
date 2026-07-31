@@ -1,67 +1,62 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { Project, Bindings, EnvVars, KVNamespace, D1Database, R2Bucket } from '../../types';
+import type { Project, Bindings, EnvVars, JsonValue, ProjectLimits, Resources } from '../../types';
 import { ProjectService, ResourceService } from '../../services';
+import { useFeedback } from '../../contexts/feedback-context';
+import { CheckCircle2, Loader2, Plus, RefreshCw, Save, Trash2, TriangleAlert } from 'lucide-react';
+import { getErrorMessage } from '../../utils/errors';
 
 interface ConfigPanelProps {
     project: Project;
     onSave: () => void;
+    view: 'bindings' | 'settings';
 }
 
-const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
+const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave, view }) => {
     const { t } = useTranslation();
+    const { notify } = useFeedback();
     const [bindings, setBindings] = useState<Bindings>({ kv: [], d1: [], r2: [] });
     const [envVars, setEnvVars] = useState<EnvVars>({});
     const [port, setPort] = useState<number>(0);
     const [buildCommand, setBuildCommand] = useState('');
     const [outputDir, setOutputDir] = useState('');
-    const [deployCommand, setDeployCommand] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [compatibilityDate, setCompatibilityDate] = useState(project.compatibilityDate);
+    const [compatibilityFlagsText, setCompatibilityFlagsText] = useState(project.compatibilityFlags.join(', '));
+    const [limits, setLimits] = useState<ProjectLimits>(project.limits);
+    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [resourceLoadError, setResourceLoadError] = useState('');
 
-    const [resources, setResources] = useState<{ kv: any[], d1: any[], r2: any[] }>({ kv: [], d1: [], r2: [] });
+    const [resources, setResources] = useState<Resources>({ kv: [], d1: [], r2: [] });
 
-    useEffect(() => {
-        loadConfig();
-        loadResources();
-    }, [project.id]);
-
-    const loadConfig = async () => {
+    const loadConfig = useCallback(async () => {
         setLoading(true);
+        setLoadError('');
         try {
-            // We need a specific endpoint for full config or just use what we have? 
-            // The original used /api/projects/:id/full-config.
-            // Let's assume ProjectService.getAll() returns enough, or we add a getOne/Config.
-            // Actually original code used a custom endpoint. I should probably add it or use getAll's data if complete.
-            // Project definitions in `types` have bindings/envVars.
-            // But let's fetch fresh.
-            // For now, I'll use a new method in ProjectService or just existing getAll -> find.
-            // Better: Add getById to ProjectService or standardized get.
-
-            // Wait, I implemented getAll, getCode, etc. I didn't verify if getAll returns full envVars/bindings details.
-            // The backend `getAll` does return bindings/envVars.
-            // But let's re-fetch to be safe or use props if passed.
-            // ideally we fetch fresh config.
             const projects = await ProjectService.getAll();
             const current = projects.find(p => p.id === project.id);
-            if (current) {
-                setBindings(current.bindings || { kv: [], d1: [], r2: [] });
-                // @ts-ignore - backend might return object, frontend type expects specific structure
-                setEnvVars(current.envVars || {});
-                setPort(current.port);
-                setBuildCommand(current.buildCommand || '');
-                setOutputDir(current.outputDir || '');
-                setDeployCommand(current.deployCommand || '');
-            }
-        } catch (e) {
-            console.error(e);
+            if (!current) throw new Error(t('ide.config.projectMissing'));
+            setBindings(current.bindings || { kv: [], d1: [], r2: [] });
+            setEnvVars(current.envVars || {});
+            setPort(current.port);
+            setBuildCommand(current.buildCommand || '');
+            setOutputDir(current.outputDir || '');
+            setCompatibilityDate(current.compatibilityDate);
+            setCompatibilityFlagsText(current.compatibilityFlags.join(', '));
+            setLimits(current.limits);
+        } catch (error) {
+            const message = getErrorMessage(error, t('ide.config.loadFailed'));
+            setLoadError(message);
+            notify(message, 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [notify, project.id, t]);
 
-    const loadResources = async () => {
+    const loadResources = useCallback(async () => {
+        setResourceLoadError('');
         try {
             const [kv, d1, r2] = await Promise.all([
                 ResourceService.getKV(),
@@ -69,8 +64,17 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 ResourceService.getR2()
             ]);
             setResources({ kv, d1, r2 });
-        } catch (e) { console.error(e); }
-    };
+        } catch (error) {
+            const message = getErrorMessage(error, t('ide.config.resourceLoadFailed'));
+            setResourceLoadError(message);
+            notify(message, 'error');
+        }
+    }, [notify, t]);
+
+    useEffect(() => {
+        void loadConfig();
+        if (view === 'bindings') void loadResources();
+    }, [loadConfig, loadResources, view]);
 
     const handleSave = async () => {
         setSaving(true);
@@ -82,13 +86,16 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                 port,
                 buildCommand,
                 outputDir,
-                deployCommand
+                compatibilityDate,
+                compatibilityFlags: compatibilityFlagsText.split(',').map(flag => flag.trim()).filter(Boolean),
+                limits
             });
             onSave();
             setSaveSuccess(true);
+            notify(t('common.saveSuccess'), 'success');
             setTimeout(() => setSaveSuccess(false), 3000);
-        } catch (e) {
-            alert(t('common.saveFailed'));
+        } catch (error) {
+            notify(getErrorMessage(error, t('common.saveFailed')), 'error');
         } finally {
             setSaving(false);
         }
@@ -102,137 +109,146 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
     };
 
     const updateBinding = (type: 'kv' | 'd1' | 'r2', index: number, field: 'varName' | 'resourceId', value: string) => {
-        const newBindings = { ...bindings };
-        newBindings[type][index] = { ...newBindings[type][index], [field]: value };
-        setBindings(newBindings);
+        setBindings(current => ({
+            ...current,
+            [type]: current[type].map((binding, bindingIndex) => bindingIndex === index
+                ? { ...binding, [field]: value }
+                : binding)
+        }));
     };
 
     const removeBinding = (type: 'kv' | 'd1' | 'r2', index: number) => {
-        const newBindings = { ...bindings };
-        newBindings[type].splice(index, 1);
-        setBindings(newBindings);
+        setBindings(current => ({
+            ...current,
+            [type]: current[type].filter((_, bindingIndex) => bindingIndex !== index)
+        }));
     };
 
-    const addEnvVar = () => {
-        // Use a temporary key or just rely on the object?
-        // UI needs to handle key editing.
-        // Simplified: Just add an empty entry if using array UI, but it's an object.
-        // Let's use a local array for editing then convert to object.
-        // For now, simple object manipulation is tricky in UI.
-        // Implementation omitted for brevity, focusing on structure.
-        // Assuming EnvVars management is similar to listings.
+    const updateLimit = (key: keyof ProjectLimits, value: string) => {
+        setLimits(current => ({ ...current, [key]: Number(value) }));
     };
 
-    if (loading) return <div>{t('config.loading')}</div>;
+    if (loading) return <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 size={17} className="animate-spin" />{t('ide.config.loading')}</div>;
+    if (loadError) return <div role="alert" className="flex min-h-48 flex-col items-center justify-center gap-3 border border-red-500/25 bg-red-500/10 p-6 text-center text-sm text-[var(--color-danger)]"><TriangleAlert size={20} aria-hidden="true" /><span>{loadError}</span><button type="button" className="console-button secondary" onClick={() => void loadConfig()}><RefreshCw size={14} aria-hidden="true" />{t('common.retry')}</button></div>;
 
     return (
-        <div className="p-6 space-y-8 text-gray-300 overflow-y-auto h-full">
+        <div className="space-y-6">
+            {view === 'bindings' ? <>
+            {resourceLoadError && <div role="alert" className="flex items-center justify-between gap-3 border border-red-500/25 bg-red-500/10 px-3 py-2 text-sm text-[var(--color-danger)]"><span className="flex min-w-0 items-center gap-2"><TriangleAlert size={16} className="shrink-0" aria-hidden="true" /><span>{resourceLoadError}</span></span><button type="button" className="console-button secondary shrink-0" onClick={() => void loadResources()}><RefreshCw size={14} aria-hidden="true" />{t('common.retry')}</button></div>}
             {/* Bindings Section */}
             <div>
-                <h3 className="text-lg font-bold text-white mb-4">{t('config.bindings')}</h3>
+                <h2 className="mb-1 text-sm font-semibold text-[var(--text-main)]">{t('ide.config.bindings')}</h2>
+                <p className="mb-4 text-xs text-[var(--text-muted)]">{t('ide.config.bindingsDescription')}</p>
 
                 {/* KV */}
-                <div className="mb-6">
-                    <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium text-blue-400">{t('config.kvBinding')}</label>
-                        <button onClick={() => addBinding('kv')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ {t('common.add')}</button>
+                <div className="mb-5 border-t border-[var(--border-color)] pt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-[var(--text-main)]">{t('ide.config.kvBinding')}</h3>
+                        <button type="button" onClick={() => addBinding('kv')} className="console-button secondary"><Plus size={14} />{t('common.add')}</button>
                     </div>
                     {bindings.kv.map((b, i) => (
-                        <div key={i} className="flex gap-2 mb-2">
+                        <div key={i} className="mb-2 grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_minmax(12rem,2fr)_2.25rem]">
                             <input
-                                className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm w-1/3"
-                                placeholder={t('config.variableName')}
+                                className="console-input w-full font-mono"
+                                aria-label={t('ide.config.variableName')}
+                                placeholder={t('ide.config.variableName')}
                                 value={b.varName}
                                 onChange={e => updateBinding('kv', i, 'varName', e.target.value)}
                             />
                             <select
-                                className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm flex-1"
+                                className="console-input w-full"
+                                aria-label={t('ide.config.selectKV')}
                                 value={b.resourceId}
                                 onChange={e => updateBinding('kv', i, 'resourceId', e.target.value)}
                             >
-                                <option value="">{t('config.selectKV')}</option>
+                                <option value="">{t('ide.config.selectKV')}</option>
                                 {resources.kv.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
-                            <button onClick={() => removeBinding('kv', i)} className="text-red-500 hover:text-red-400 px-2">×</button>
+                            <button type="button" onClick={() => removeBinding('kv', i)} className="console-icon-button text-red-500" title={t('common.delete')}><Trash2 size={15} /></button>
                         </div>
                     ))}
                 </div>
 
                 {/* D1 */}
-                <div className="mb-6">
-                    <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium text-purple-400">{t('config.d1Binding')}</label>
-                        <button onClick={() => addBinding('d1')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ {t('common.add')}</button>
+                <div className="mb-5 border-t border-[var(--border-color)] pt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-[var(--text-main)]">{t('ide.config.d1Binding')}</h3>
+                        <button type="button" onClick={() => addBinding('d1')} className="console-button secondary"><Plus size={14} />{t('common.add')}</button>
                     </div>
                     {bindings.d1.map((b, i) => (
-                        <div key={i} className="flex gap-2 mb-2">
+                        <div key={i} className="mb-2 grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_minmax(12rem,2fr)_2.25rem]">
                             <input
-                                className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm w-1/3"
-                                placeholder={t('config.variableName')}
+                                className="console-input w-full font-mono"
+                                aria-label={t('ide.config.variableName')}
+                                placeholder={t('ide.config.variableName')}
                                 value={b.varName}
                                 onChange={e => updateBinding('d1', i, 'varName', e.target.value)}
                             />
                             <select
-                                className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm flex-1"
+                                className="console-input w-full"
+                                aria-label={t('ide.config.selectD1')}
                                 value={b.resourceId}
                                 onChange={e => updateBinding('d1', i, 'resourceId', e.target.value)}
                             >
-                                <option value="">{t('config.selectD1')}</option>
+                                <option value="">{t('ide.config.selectD1')}</option>
                                 {resources.d1.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
-                            <button onClick={() => removeBinding('d1', i)} className="text-red-500 hover:text-red-400 px-2">×</button>
+                            <button type="button" onClick={() => removeBinding('d1', i)} className="console-icon-button text-red-500" title={t('common.delete')}><Trash2 size={15} /></button>
                         </div>
                     ))}
                 </div>
 
                 {/* R2 */}
-                <div className="mb-6">
-                    <div className="flex justify-between mb-2">
-                        <label className="text-sm font-medium text-yellow-400">{t('config.r2Binding')}</label>
-                        <button onClick={() => addBinding('r2')} className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700">+ {t('common.add')}</button>
+                <div className="mb-5 border-t border-[var(--border-color)] pt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-xs font-semibold text-[var(--text-main)]">{t('ide.config.r2Binding')}</h3>
+                        <button type="button" onClick={() => addBinding('r2')} className="console-button secondary"><Plus size={14} />{t('common.add')}</button>
                     </div>
                     {bindings.r2.map((b, i) => (
-                        <div key={i} className="flex gap-2 mb-2">
+                        <div key={i} className="mb-2 grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_minmax(12rem,2fr)_2.25rem]">
                             <input
-                                className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm w-1/3"
-                                placeholder={t('config.variableName')}
+                                className="console-input w-full font-mono"
+                                aria-label={t('ide.config.variableName')}
+                                placeholder={t('ide.config.variableName')}
                                 value={b.varName}
                                 onChange={e => updateBinding('r2', i, 'varName', e.target.value)}
                             />
                             <select
-                                className="bg-gray-900 border border-gray-700 rounded px-3 py-1 text-sm flex-1"
+                                className="console-input w-full"
+                                aria-label={t('ide.config.selectR2')}
                                 value={b.resourceId}
                                 onChange={e => updateBinding('r2', i, 'resourceId', e.target.value)}
                             >
-                                <option value="">{t('config.selectR2')}</option>
+                                <option value="">{t('ide.config.selectR2')}</option>
                                 {resources.r2.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                             </select>
-                            <button onClick={() => removeBinding('r2', i)} className="text-red-500 hover:text-red-400 px-2">×</button>
+                            <button type="button" onClick={() => removeBinding('r2', i)} className="console-icon-button text-red-500" title={t('common.delete')}><Trash2 size={15} /></button>
                         </div>
                     ))}
                 </div>
             </div>
 
             {/* Environment Variables */}
-            <div className="mb-8 border-t border-gray-700 pt-6">
-                <div className="flex justify-between mb-4">
-                    <h3 className="text-lg font-bold text-white">{t('config.envVars')}</h3>
+            <div className="border-t border-[var(--border-color)] pt-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                    <div><h2 className="text-sm font-semibold text-[var(--text-main)]">{t('ide.config.envVars')}</h2><p className="mt-0.5 text-xs text-[var(--text-muted)]">{t('ide.config.envDescription')}</p></div>
                     <button
+                        type="button"
                         onClick={() => {
                             const newKey = `VAR_${Object.keys(envVars).length + 1}`;
                             setEnvVars({ ...envVars, [newKey]: { type: 'plain', value: '' } });
                         }}
-                        className="text-xs bg-gray-800 px-2 py-1 rounded hover:bg-gray-700"
+                        className="console-button secondary"
                     >
-                        + {t('config.addVar')}
+                        <Plus size={14} />{t('ide.config.addVar')}
                     </button>
                 </div>
 
                 {Object.entries(envVars).map(([key, config], i) => (
-                    <div key={i} className="flex gap-2 mb-2 items-start">
+                    <div key={i} className="mb-2 grid gap-2 sm:grid-cols-[minmax(8rem,1fr)_7rem_minmax(10rem,2fr)_2.25rem]">
                         <input
-                            className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm w-1/4 font-mono"
-                            placeholder={t('config.key')}
+                            className="console-input w-full font-mono"
+                            placeholder={t('ide.config.key')}
                             value={key}
                             onChange={e => {
                                 const newKey = e.target.value;
@@ -246,29 +262,31 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                             }}
                         />
                         <select
-                            className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm w-24"
+                            className="console-input w-full"
                             value={config.type}
                             onChange={e => {
                                 setEnvVars({
                                     ...envVars,
-                                    [key]: { ...config, type: e.target.value as any }
+                                    [key]: { ...config, type: e.target.value as EnvVars[string]['type'] }
                                 });
                             }}
                         >
-                            <option value="plain">{t('config.typeText')}</option>
-                            <option value="secret">{t('config.typeSecret')}</option>
-                            <option value="json">{t('config.typeJson')}</option>
+                            <option value="plain">{t('ide.config.typeText')}</option>
+                            <option value="secret">{t('ide.config.typeSecret')}</option>
+                            <option value="json">{t('ide.config.typeJson')}</option>
                         </select>
                         <input
-                            className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-sm flex-1 font-mono"
-                            placeholder={t('config.value')}
+                            type={config.type === 'secret' ? 'password' : 'text'}
+                            className="console-input w-full font-mono"
+                            placeholder={t('ide.config.value')}
                             value={typeof config.value === 'string' ? config.value : JSON.stringify(config.value)}
                             onChange={e => {
-                                let val: any = e.target.value;
+                                let val: JsonValue = e.target.value;
                                 if (config.type === 'json') {
                                     try {
                                         val = JSON.parse(e.target.value);
-                                    } catch (err) {
+                                    } catch {
+                                        val = e.target.value;
                                     }
                                 }
                                 setEnvVars({
@@ -278,81 +296,131 @@ const ConfigPanel: React.FC<ConfigPanelProps> = ({ project, onSave }) => {
                             }}
                         />
                         <button
+                            type="button"
                             onClick={() => {
                                 const newEnv = { ...envVars };
                                 delete newEnv[key];
                                 setEnvVars(newEnv);
                             }}
-                            className="text-red-500 hover:text-red-400 px-2 pt-1"
+                            className="console-icon-button text-red-500"
+                            title={t('common.delete')}
                         >
-                            ×
+                            <Trash2 size={15} />
                         </button>
                     </div>
                 ))}
                 {Object.keys(envVars).length === 0 && (
-                    <div className="text-gray-500 text-sm italic">{t('config.noEnvVars')}</div>
+                    <div className="border border-dashed border-[var(--border-color)] px-4 py-6 text-center text-sm text-[var(--text-muted)]">{t('ide.config.noEnvVars')}</div>
                 )}
             </div>
+            </> : <>
             <div>
-                <h3 className="text-lg font-bold text-white mb-4">{t('config.buildSettings')}</h3>
+                <h2 className="mb-4 text-sm font-semibold text-[var(--text-main)]">{t('ide.config.buildSettings')}</h2>
 
-                <div className="grid grid-cols-2 gap-6 mb-6">
+                <div className="mb-5 grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.port')}</label>
+                        <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('ide.config.port')}</label>
                         <input
                             type="number"
                             value={port}
-                            onChange={e => setPort(parseInt(e.target.value))}
-                            className="input-liquid w-full p-3 font-mono"
+                            onChange={e => setPort(Number.parseInt(e.target.value, 10) || 0)}
+                            className="console-input w-full font-mono"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.outputDir')}</label>
+                        <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('ide.config.outputDir')}</label>
                         <input
                             type="text"
                             value={outputDir}
                             onChange={e => setOutputDir(e.target.value)}
                             placeholder="dist"
-                            className="input-liquid w-full p-3 font-mono"
+                            className="console-input w-full font-mono"
                         />
                     </div>
                 </div>
 
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.buildCommand')}</label>
+                        <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('ide.config.buildCommand')}</label>
                         <input
                             type="text"
                             value={buildCommand}
                             onChange={e => setBuildCommand(e.target.value)}
-                            placeholder="npm install && npm run build"
-                            className="input-liquid w-full p-3 font-mono"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('config.deployCommand')}</label>
-                        <input
-                            type="text"
-                            value={deployCommand}
-                            onChange={e => setDeployCommand(e.target.value)}
-                            placeholder="npx wrangler deploy"
-                            className="input-liquid w-full p-3 font-mono"
+                            placeholder="npm ci && npm run build"
+                            className="console-input w-full font-mono"
                         />
                     </div>
                 </div>
             </div>
 
-            <div className="pt-4 border-t border-gray-700 flex items-center gap-4">
+            <div className="border-t border-[var(--border-color)] pt-6">
+                <h3 className="mb-1 text-base font-semibold text-[var(--text-main)]">{t('ide.config.compatibility.title')}</h3>
+                <p className="mb-4 text-xs text-[var(--text-muted)]">{t('ide.config.compatibility.description')}</p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-xs text-[var(--text-muted)]">
+                        <span className="mb-1.5 block font-medium">{t('ide.config.compatibility.date')}</span>
+                        <input
+                            type="date"
+                            value={compatibilityDate}
+                            onChange={event => setCompatibilityDate(event.target.value)}
+                            className="console-input w-full font-mono"
+                        />
+                    </label>
+                    <label className="block text-xs text-[var(--text-muted)]">
+                        <span className="mb-1.5 block font-medium">{t('ide.config.compatibility.flags')}</span>
+                        <input
+                            type="text"
+                            value={compatibilityFlagsText}
+                            onChange={event => setCompatibilityFlagsText(event.target.value)}
+                            placeholder="nodejs_compat"
+                            className="console-input w-full font-mono"
+                        />
+                    </label>
+                </div>
+            </div>
+
+            <div className="border-t border-[var(--border-color)] pt-6">
+                <h3 className="text-base font-semibold text-[var(--text-main)] mb-1">{t('ide.config.limits.title')}</h3>
+                <p className="text-xs text-[var(--text-muted)] mb-4">{t('ide.config.limits.description')}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {([
+                        ['cpu', 'cpu', '0.1'],
+                        ['memoryMb', 'memory', '1'],
+                        ['diskMb', 'disk', '1'],
+                        ['uploadMb', 'upload', '1'],
+                        ['concurrentRequests', 'concurrency', '1'],
+                        ['buildTimeoutSeconds', 'buildTimeout', '1'],
+                        ['pids', 'pids', '1']
+                    ] as const).map(([key, label, step]) => (
+                        <label key={key} className="block text-xs text-[var(--text-muted)]">
+                            <span className="block mb-1.5 font-medium">{t(`ide.config.limits.${label}`)}</span>
+                            <input
+                                type="number"
+                                min={step}
+                                step={step}
+                                value={limits[key]}
+                                onChange={event => updateLimit(key, event.target.value)}
+                                className="console-input w-full font-mono"
+                            />
+                        </label>
+                    ))}
+                </div>
+            </div>
+            </>}
+
+            <div className="sticky bottom-0 flex items-center gap-3 border-t border-[var(--border-color)] bg-[var(--bg-base)] py-3">
                 <button
+                    type="button"
                     onClick={handleSave}
                     disabled={saving}
-                    className="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded font-medium disabled:opacity-50"
+                    className="console-button primary"
                 >
+                    {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
                     {saving ? t('common.saving') : t('common.save')}
                 </button>
                 {saveSuccess && (
-                    <span className="text-sm text-green-400 animate-fade-in flex items-center gap-1.5">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    <span className="flex items-center gap-1.5 text-sm text-emerald-500">
+                        <CheckCircle2 size={15} />
                         {t('common.saved')}
                     </span>
                 )}

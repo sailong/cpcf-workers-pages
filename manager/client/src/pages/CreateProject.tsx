@@ -1,24 +1,47 @@
 import React, { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from '../use-router';
 import { api } from '../services';
 import ThemeToggle from '../components/ThemeToggle';
 import WorkerForm from '../create-project/worker-form';
 import PagesForm from '../create-project/pages-form';
 import BuildForm from '../create-project/build-form';
 import type { SubFormHandle } from '../create-project/types';
+import { getErrorMessage } from '../utils/errors';
+import { AlertCircle, ArrowLeft, CheckCircle2, Code2, Globe2, Loader2, PackageCheck } from 'lucide-react';
+import { useFeedback } from '../contexts/feedback-context';
 
 /** Three modes */
 type ProjectMode = 'worker' | 'pages' | 'build';
 
+type ProjectLimitsDraft = {
+    cpu: number;
+    memoryMb: number;
+    diskMb: number;
+    uploadMb: number;
+    concurrentRequests: number;
+    buildTimeoutSeconds: number;
+    pids: number;
+};
+
 const CreateProject: React.FC = () => {
     const navigate = useNavigate();
     const { t } = useTranslation();
+    const { notify } = useFeedback();
 
     // Shared State
     const [mode, setMode] = useState<ProjectMode>('worker');
     const [name, setName] = useState('');
     const [customPort, setCustomPort] = useState<number | ''>('');
+    const [limits, setLimits] = useState<ProjectLimitsDraft>({
+        cpu: 1,
+        memoryMb: 512,
+        diskMb: 512,
+        uploadMb: 100,
+        concurrentRequests: 32,
+        buildTimeoutSeconds: 600,
+        pids: 256,
+    });
     const [error, setError] = useState('');
     const [creating, setCreating] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
@@ -27,20 +50,24 @@ const CreateProject: React.FC = () => {
     const resetForm = () => {
         setName('');
         setCustomPort('');
+        setLimits({
+            cpu: 1,
+            memoryMb: 512,
+            diskMb: 512,
+            uploadMb: 100,
+            concurrentRequests: 32,
+            buildTimeoutSeconds: 600,
+            pids: 256,
+        });
         setError('');
-        setSuccessMsg('');
         setMode('worker');
     };
-
-    // Toast State
-    const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     // Ref
     const formRef = useRef<SubFormHandle>(null);
 
     const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-        setToast({ msg, type });
-        setTimeout(() => setToast(null), 3000);
+        notify(msg, type);
     };
 
     /** Create Logic */
@@ -51,7 +78,8 @@ const CreateProject: React.FC = () => {
         }
 
         const nameRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$/;
-        if (!nameRegex.test(name)) {
+        const maxNameLength = mode === 'worker' ? 56 : 57;
+        if (!nameRegex.test(name) || name.length > maxNameLength) {
             setError(t('createProjectPage.nameInvalid'));
             return;
         }
@@ -68,16 +96,14 @@ const CreateProject: React.FC = () => {
         setError('');
 
         try {
-            // @ts-ignore
-            const fileToUpload = subPayload._file as File | undefined;
-            // @ts-ignore
-            delete subPayload._file;
+            const { _file: fileToUpload, ...projectPayload } = subPayload;
 
             if (subPayload.type === 'worker' && subPayload.code) {
                 const payload = {
-                    ...subPayload,
+                    ...projectPayload,
                     name,
                     port: customPort || undefined,
+                    limits,
                 };
                 await api.post('/projects', payload);
                 setSuccessMsg(t('createProjectPage.successMessage', { type: 'Worker' }));
@@ -85,20 +111,18 @@ const CreateProject: React.FC = () => {
                 setTimeout(() => navigate('/'), 1500);
             } else {
                 if (!fileToUpload) throw new Error(t('createProjectPage.missingFile'));
-                const formData = new FormData();
-                formData.append('file', fileToUpload);
-
-                const uploadRes = await api.post('/upload', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
-
-                const { filename: uploadedFilename } = uploadRes.data;
-                const payload = {
-                    ...subPayload,
-                    name,
-                    mainFile: uploadedFilename,
-                    port: customPort || undefined,
-                };
+                let payload = { ...projectPayload, name, port: customPort || undefined, limits };
+                if (!subPayload.buildId) {
+                    const formData = new FormData();
+                    formData.append('file', fileToUpload);
+                    const uploadRes = await api.post('/upload', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                            'X-Project-Upload-Limit-Mb': String(limits.uploadMb)
+                        }
+                    });
+                    payload = { ...payload, mainFile: uploadRes.data.filename };
+                }
 
                 await api.post('/projects', payload);
                 const typeLabel = subPayload.type === 'worker' ? 'Worker' : 'Pages';
@@ -106,8 +130,8 @@ const CreateProject: React.FC = () => {
                 resetForm();
                 setTimeout(() => navigate('/'), 1500);
             }
-        } catch (err: any) {
-            setError(err.response?.data?.error || err.message || t('createProjectPage.error'));
+        } catch (err: unknown) {
+            setError(getErrorMessage(err, t('createProjectPage.error')));
             console.error(err);
             setCreating(false);
         }
@@ -115,129 +139,147 @@ const CreateProject: React.FC = () => {
 
     const isCreateDisabled = creating;
 
+    const modes = [
+        { id: 'worker' as const, label: t('createProjectPage.worker'), description: t('createProjectPage.workerDesc'), icon: Code2 },
+        { id: 'pages' as const, label: t('createProjectPage.pages'), description: t('createProjectPage.pagesDesc'), icon: Globe2 },
+        { id: 'build' as const, label: t('createProjectPage.build'), description: t('createProjectPage.buildDesc'), icon: PackageCheck }
+    ];
+
     return (
-        <div className="min-h-screen p-6 md:p-10 font-sans transition-colors duration-300">
-            <header className="max-w-4xl mx-auto w-full flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="console-page">
+            <section className="console-page-header">
                 <div>
-                    <h1 className="text-4xl font-black text-[var(--text-main)] tracking-tight">{t('createProjectPage.title')}</h1>
-                    <p className="text-[var(--text-muted)] mt-1 font-medium">{t('createProjectPage.subtitle')}</p>
+                    <h1>{t('createProjectPage.title')}</h1>
+                    <p>{t('createProjectPage.subtitle')}</p>
                 </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/')}
-                        className="btn-glass"
-                    >
-                        <span>{t('common.back')}</span>
+                <div className="flex items-center gap-2">
+                    <ThemeToggle className="icon-button" />
+                    <button type="button" onClick={() => navigate('/')} className="console-button secondary">
+                        <ArrowLeft size={15} aria-hidden="true" />
+                        {t('common.back')}
                     </button>
-
-                    <div className="h-8 w-px bg-current opacity-10 mx-2"></div>
-
-                    <div className="flex items-center gap-2 bg-white/10 p-1 rounded-2xl border border-white/20 backdrop-blur-md">
-                        <ThemeToggle />
-                    </div>
                 </div>
-            </header>
+            </section>
 
-            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
-                {/* 1. Type Selection */}
-                <div className="neo-card p-8">
-                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">{t('createProjectPage.step1')}</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[
-                            { id: 'worker', label: t('createProjectPage.worker'), icon: '⚡️', desc: t('createProjectPage.workerDesc') },
-                            { id: 'pages', label: t('createProjectPage.pages'), icon: '📄', desc: t('createProjectPage.pagesDesc') },
-                            { id: 'build', label: t('createProjectPage.build'), icon: '🛠️', desc: t('createProjectPage.buildDesc') }
-                        ].map(m => (
+            <div className="console-panel overflow-hidden">
+                <div className="border-b border-[var(--border-color)] px-4 py-3">
+                    <p className="text-xs font-semibold text-[var(--text-muted)]">{t('createProjectPage.step1')}</p>
+                    <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3" role="tablist" aria-label={t('createProjectPage.step1')}>
+                        {modes.map(({ id, label, description, icon: Icon }) => (
                             <button
-                                key={m.id}
-                                onClick={() => setMode(m.id as ProjectMode)}
-                                className={`relative p-6 rounded-2xl border transition-all text-left group overflow-hidden ${mode === m.id
-                                    ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] shadow-lg shadow-indigo-500/10'
-                                    : ' hover:border-white/50 border border-black/5 hover:border-black/10 shadow-sm dark:bg-white/5 dark:border-white/5 dark:hover:bg-white/10 dark:hover:border-white/10'
-                                    }`}
+                                key={id}
+                                type="button"
+                                role="tab"
+                                aria-selected={mode === id}
+                                onClick={() => setMode(id)}
+                                className={`flex min-h-20 items-start gap-3 border px-4 py-3 text-left transition-colors ${mode === id
+                                    ? 'border-[var(--primary)] bg-[var(--color-primary-light)]'
+                                    : 'border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)]'}`}
                             >
-                                <div className={`text-4xl mb-4 transition-transform duration-300 ${mode === m.id ? 'scale-110' : 'group-hover:scale-110 opacity-70 group-hover:opacity-100'}`}>{m.icon}</div>
-                                <div className={`font-bold text-lg capitalize mb-1 ${mode === m.id ? 'text-[var(--color-primary)]' : 'text-[var(--text-main)]'}`}>{m.label}</div>
-                                <div className="text-xs text-[var(--text-muted)] leading-relaxed">{m.desc}</div>
-                                {mode === m.id && (
-                                    <div className="absolute top-3 right-3 text-[var(--color-primary)]">
-                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                                    </div>
-                                )}
+                                <Icon size={18} className={mode === id ? 'mt-0.5 text-[var(--primary)]' : 'mt-0.5 text-[var(--text-muted)]'} />
+                                <span>
+                                    <span className="block text-sm font-semibold">{label}</span>
+                                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{description}</span>
+                                </span>
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* 2. Basic Info */}
-                <div className="neo-card p-8 space-y-6">
-                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-2 ml-1 tracking-widest">{t('createProjectPage.step2')}</label>
-                    <div className="grid md:grid-cols-2 gap-6">
+                <div className="border-b border-[var(--border-color)] px-4 py-4">
+                    <p className="mb-3 text-xs font-semibold text-[var(--text-muted)]">{t('createProjectPage.step2')}</p>
+                    <div className="grid gap-4 md:grid-cols-2">
                         <div>
-                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('createProjectPage.projectName')}</label>
+                            <label htmlFor="project-name" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('createProjectPage.projectName')}</label>
                             <input
+                                id="project-name"
                                 type="text"
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(event) => setName(event.target.value)}
+                                maxLength={mode === 'worker' ? 56 : 57}
                                 placeholder={mode === 'worker' ? t('createProjectPage.projectNamePlaceholder.worker') : t('createProjectPage.projectNamePlaceholder.pages')}
-                                className="neo-input w-full"
+                                className="console-input w-full"
                             />
                         </div>
                         <div>
-                            <label className="block text-[var(--text-muted)] text-xs font-bold uppercase mb-2 ml-1">{t('createProjectPage.internalPort')}</label>
+                            <label htmlFor="project-port" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('createProjectPage.internalPort')}</label>
                             <input
+                                id="project-port"
                                 type="number"
+                                min="1024"
+                                max="65535"
                                 value={customPort}
-                                onChange={(e) => setCustomPort(e.target.value ? parseInt(e.target.value) : '')}
+                                onChange={(event) => setCustomPort(event.target.value ? Number.parseInt(event.target.value, 10) : '')}
                                 placeholder={t('createProjectPage.portPlaceholder')}
-                                className="neo-input w-full"
+                                className="console-input w-full"
                             />
                         </div>
                     </div>
                 </div>
 
-                {/* 3. Detailed Config */}
-                <div className="neo-card p-8">
-                    <label className="block text-[var(--color-primary)] text-xs font-bold uppercase mb-6 ml-1 tracking-widest">{t('createProjectPage.step3')}</label>
+
+                <div className="border-t border-[var(--border-color)] px-4 py-4">
+                    <p className="mb-1 text-xs font-semibold text-[var(--text-muted)]">{t('createProjectPage.limitsTitle')}</p>
+                    <p className="mb-3 text-[11px] text-[var(--text-muted)]">{t('createProjectPage.limitsDescription')}</p>
+                    <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+                        {([
+                            ['cpu', 'cpu', '0.1'],
+                            ['memoryMb', 'memory', '1'],
+                            ['diskMb', 'disk', '1'],
+                            ['uploadMb', 'upload', '1'],
+                            ['concurrentRequests', 'concurrency', '1'],
+                            ['buildTimeoutSeconds', 'buildTimeout', '1'],
+                            ['pids', 'pids', '1'],
+                        ] as const).map(([key, label, step]) => (
+                            <label key={key} className="block text-xs">
+                                <span className="mb-1.5 block font-medium text-[var(--text-muted)]">{t(`ide.config.limits.${label}`)}</span>
+                                <input
+                                    type="number"
+                                    min={key === 'cpu' ? 0.1 : 1}
+                                    step={step}
+                                    value={limits[key]}
+                                    onChange={(event) => setLimits(current => ({
+                                        ...current,
+                                        [key]: key === 'cpu'
+                                            ? Number.parseFloat(event.target.value || '0')
+                                            : Number.parseInt(event.target.value || '0', 10)
+                                    }))}
+                                    className="console-input w-full"
+                                />
+                            </label>
+                        ))}
+                    </div>
+                </div>
+                <div className="px-4 py-4">
+                    <p className="mb-3 text-xs font-semibold text-[var(--text-muted)]">{t('createProjectPage.step3')}</p>
                     {mode === 'worker' && <WorkerForm ref={formRef} setError={setError} showToast={showToast} />}
                     {mode === 'pages' && <PagesForm ref={formRef} setError={setError} showToast={showToast} />}
-                    {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} />}
+                    {mode === 'build' && <BuildForm ref={formRef} setError={setError} showToast={showToast} limits={limits} />}
                 </div>
 
-                {/* 4. Action */}
-                <div className="pb-20">
+                <div className="border-t border-[var(--border-color)] bg-[var(--bg-subtle)] px-4 py-3">
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-6 py-4 rounded-2xl flex items-center gap-3 mb-6 backdrop-blur-md">
-                            <span className="text-xl">⚠️</span><span>{error}</span>
+                        <div role="alert" className="console-alert error mb-3">
+                            <AlertCircle size={16} aria-hidden="true" />
+                            <span>{error}</span>
                         </div>
                     )}
-                    <button
-                        onClick={handleCreate}
-                        disabled={isCreateDisabled}
-                        className="w-full btn-gradient text-xl py-4 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {creating ? t('createProjectPage.deploying') : t('createProjectPage.createDeploy')}
-                    </button>
+                    <div className="flex justify-end">
+                        <button type="button" onClick={() => void handleCreate()} disabled={isCreateDisabled} className="console-button primary min-w-40">
+                            {creating && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
+                            {creating ? t('createProjectPage.deploying') : t('createProjectPage.createDeploy')}
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {toast && (
-                <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl text-white font-medium z-[100] flex items-center gap-3 backdrop-blur-md border border-white/10 ${toast.type === 'error' ? 'bg-red-500/80 shadow-red-900/50' : 'bg-green-500/80 shadow-green-900/50'}`}>
-                    <span>{toast.type === 'success' ? '✅' : '❌'}</span>
-                    <span>{toast.msg}</span>
-                </div>
-            )}
-
             {successMsg && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100]">
-                    <div className="glass-card p-10 text-center max-w-sm mx-4 transform scale-100 animate-in fade-in zoom-in duration-300">
-                        <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <span className="text-4xl">🎉</span>
-                        </div>
-                        <h3 className="text-2xl font-bold mb-2">{t('createProjectPage.success')}</h3>
-                        <p className="opacity-60 mb-6">{successMsg}</p>
-                        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/55 p-4">
+                    <div role="status" className="console-dialog w-full max-w-sm p-6 text-center">
+                        <CheckCircle2 size={30} className="mx-auto text-emerald-500" aria-hidden="true" />
+                        <h2 className="mt-3 text-base font-semibold">{t('createProjectPage.success')}</h2>
+                        <p className="mt-2 text-sm text-[var(--text-muted)]">{successMsg}</p>
+                        <Loader2 size={18} className="mx-auto mt-5 animate-spin text-[var(--primary)]" aria-hidden="true" />
                     </div>
                 </div>
             )}

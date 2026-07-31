@@ -1,0 +1,51 @@
+services:
+  ccfwp-test:
+    build: .
+    image: ccfwp-platform:test
+    container_name: ccfwp-test
+    expose:
+      - "8001"
+    environment:
+      NODE_ENV: test
+      AUTH_PASSWORD: ${CCFWP_TEST_PASSWORD:?CCFWP_TEST_PASSWORD is required}
+      CAPTCHA_TEST_ANSWER: ${CCFWP_TEST_CAPTCHA:?CCFWP_TEST_CAPTCHA is required}
+      MANAGER_SERVICE_PORT: 8001
+      WRANGLER_SEND_METRICS: "false"
+      RUNTIME_PROVIDER: docker
+      BUILD_NETWORK_MODE: ${BUILD_NETWORK_MODE:-prefer-offline}
+      BUILD_REGISTRY_ALLOWLIST: ${BUILD_REGISTRY_ALLOWLIST:-https://registry.npmmirror.com/,https://registry.npmjs.org/}
+      BUILD_DEFAULT_REGISTRY: ${BUILD_DEFAULT_REGISTRY:-https://registry.npmmirror.com/}
+      PROJECT_RUNTIME_IMAGE: ccfwp-platform:test
+      MANAGER_CONTAINER_ID: ccfwp-test
+      PLATFORM_DATA_HOST_DIR: ${CCFWP_TEST_DATA_DIR:-/tmp/ccfwp-test-data}
+    volumes:
+      - ${CCFWP_TEST_DATA_DIR:-/tmp/ccfwp-test-data}:/app/.platform-data
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 5s
+
+  ccfwp-test-ingress:
+    image: ccfwp-platform:test
+    container_name: ccfwp-test-ingress
+    command: ["node", "tests/test-ingress-proxy.js"]
+    ports:
+      - "18001:8001"
+    environment:
+      TEST_INGRESS_TARGET_HOST: ccfwp-test
+      TEST_INGRESS_TARGET_PORT: 8001
+      TEST_INGRESS_PORT: 8001
+    depends_on:
+      ccfwp-test:
+        condition: service_healthy
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 2s

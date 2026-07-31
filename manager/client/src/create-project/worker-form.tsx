@@ -2,6 +2,7 @@ import React, { useState, forwardRef, useImperativeHandle } from 'react';
 import { useTranslation } from 'react-i18next';
 import Editor from '../components/IDE/Editor';
 import type { SubFormHandle, SubFormProps, CreateProjectPayload } from './types';
+import { FileCode2, Upload } from 'lucide-react';
 
 type CodeSource = 'editor' | 'upload';
 
@@ -51,54 +52,57 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                     bindings: { kv: [], d1: [], r2: [] },
                     envVars: {},
                     _file: file, // 临时字段，父组件处理上传
-                } as any;
+                };
             }
         },
     }));
 
     return (
         <div>
-            <label className="block text-gray-500 text-xs font-bold uppercase mb-4 ml-1 tracking-widest">
+            <p className="mb-2 text-xs font-medium text-[var(--text-muted)]">
                 {t('workerForm.codeSource')}
-            </label>
-            <div className="flex gap-4 mb-8">
+            </p>
+            <div className="mb-4 flex gap-1 border-b border-[var(--border-color)]" role="tablist" aria-label={t('workerForm.codeSource')}>
                 <button
+                    type="button"
+                    role="tab"
+                    aria-selected={codeSource === 'editor'}
                     onClick={() => setCodeSource('editor')}
-                    className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${codeSource === 'editor'
-                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
-                        : 'border-transparent glass hover:bg-current/5 opacity-60'
-                        }`}
+                    className={codeSource === 'editor' ? 'resource-tab active' : 'resource-tab'}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">{t('workerForm.editor')}</div>
+                    <FileCode2 size={15} aria-hidden="true" />
+                    {t('workerForm.editor')}
                 </button>
                 <button
+                    type="button"
+                    role="tab"
+                    aria-selected={codeSource === 'upload'}
                     onClick={() => setCodeSource('upload')}
-                    className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${codeSource === 'upload'
-                        ? 'border-blue-500/50 bg-blue-500/10 dark:text-white text-blue-700 shadow-lg shadow-blue-500/10'
-                        : 'border-transparent glass hover:bg-current/5 opacity-60'
-                        }`}
+                    className={codeSource === 'upload' ? 'resource-tab active' : 'resource-tab'}
                 >
-                    <div className="font-bold flex items-center justify-center gap-2">{t('workerForm.upload')}</div>
+                    <Upload size={15} aria-hidden="true" />
+                    {t('workerForm.upload')}
                 </button>
             </div>
 
             {codeSource === 'editor' ? (
-                <div className="space-y-6">
+                <div className="space-y-4">
                     <div>
-                        <label className="block text-gray-500 text-xs font-bold uppercase mb-2 ml-1 tracking-widest">
+                        <label htmlFor="worker-filename" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">
                             {t('workerForm.filename')}
                         </label>
                         <input
+                            id="worker-filename"
                             type="text"
                             value={filename}
                             onChange={(e) => setFilename(e.target.value)}
                             placeholder="worker.js"
-                            className="neo-input w-full p-4 font-mono"
+                            className="console-input w-full font-mono"
                         />
                     </div>
-                    <div className="border border-current/10 rounded-2xl overflow-hidden glass shadow-2xl">
+                    <div className="overflow-hidden rounded-md border border-[var(--border-color)]">
                         <Editor
-                            height="400px"
+                            height="360px"
                             language={filename.endsWith('.ts') ? 'typescript' : 'javascript'}
                             code={code}
                             onChange={(value) => setCode(value || '')}
@@ -116,24 +120,24 @@ const WorkerForm = forwardRef<SubFormHandle, SubFormProps>(({ setError }, ref) =
                     />
                     <label
                         htmlFor="worker-file-upload"
-                        className={`block w-full px-4 py-12 border-2 border-dashed rounded-2xl text-center cursor-pointer transition-all duration-300 ${file
-                            ? 'border-blue-500/50 bg-blue-500/5'
-                            : 'border-current/10 glass hover:border-blue-500/30'
+                        className={`flex min-h-40 w-full cursor-pointer items-center justify-center rounded-md border border-dashed px-4 py-8 text-center transition-colors ${file
+                            ? 'border-[var(--primary)] bg-[var(--color-primary-light)]'
+                            : 'border-[var(--border-color)] bg-[var(--bg-subtle)] hover:border-[var(--border-color-hover)]'
                             }`}
                     >
                         {file ? (
-                            <div className="animate-in fade-in zoom-in duration-300">
-                                <div className="text-5xl mb-4 drop-shadow-lg">📄</div>
-                                <div className="font-bold text-lg mb-1">{file.name}</div>
-                                <div className="text-xs text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full inline-block font-mono">
+                            <div>
+                                <FileCode2 size={24} className="mx-auto text-[var(--primary)]" aria-hidden="true" />
+                                <div className="mt-3 text-sm font-semibold">{file.name}</div>
+                                <div className="mt-1 font-mono text-xs text-[var(--text-muted)]">
                                     {(file.size / 1024).toFixed(2)} KB
                                 </div>
                             </div>
                         ) : (
                             <div>
-                                <div className="text-5xl mb-4 opacity-30">📁</div>
-                                <div className="font-bold text-lg mb-1 opacity-60">{t('workerForm.selectFile')}</div>
-                                <div className="text-xs opacity-40">{t('workerForm.fileSupport')}</div>
+                                <Upload size={24} className="mx-auto text-[var(--text-muted)]" aria-hidden="true" />
+                                <div className="mt-3 text-sm font-semibold">{t('workerForm.selectFile')}</div>
+                                <div className="mt-1 text-xs text-[var(--text-muted)]">{t('workerForm.fileSupport')}</div>
                             </div>
                         )}
                     </label>

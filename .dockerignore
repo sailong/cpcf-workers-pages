@@ -43,7 +43,8 @@ coverage/
 
 # Examples & Tests (not needed in image)
 examples/
-manager/tests/
+manager/tests/*
+!manager/tests/test-ingress-proxy.js
 tmp/
 tests/
 .workbuddy/

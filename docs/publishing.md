@@ -21,14 +21,14 @@
     将 `your-username` 替换为你的 Docker Hub 用户名。
     ```bash
     # 在项目根目录下执行 (兼容当前架构)
-    docker build -t your-username/ccfwp:latest .
+    docker build -t your-username/ccfwp:0.1.0 .
     ```
 
     > 注意：必须在项目根目录执行，因为 Dockerfile 需要访问 manager 目录。
 
 2.  **推送镜像**
     ```bash
-    docker push your-username/ccfwp:latest
+    docker push your-username/ccfwp:0.1.0
     ```
 
 ## 3. 构建多架构镜像 (推荐)
@@ -53,33 +53,19 @@
     ```bash
     docker buildx build \
       --platform linux/amd64,linux/arm64 \
-      -t your-username/ccfwp:latest \
+      -t your-username/ccfwp:0.1.0 \
       --push .
     ```
 
 ## 4. 用户如何使用你的镜像？
 
-当镜像发布成功后，其他用户无需下载源码，只需使用以下 `docker-compose.yml` 即可启动：
+公网部署必须同时运行管理服务与仓库提供的 Caddy 入口。使用根目录的
+`docker-compose.yml` 和 `.env.production.example`，填写管理员密码、控制台域名、
+项目根域名、Cloudflare DNS Token 与内部入口凭证。生产环境只开放 80/443；
+管理端口 8001 和资源网关 9200 均保持在容器网络内部。
 
-```yaml
-services:
-  ccfwp:
-    image: your-username/ccfwp:latest  # <--- 修改这里为你发布的镜像名
-    container_name: ccfwp
-    ports:
-      - "8001:8001"
-      - "9100:9100"
-    volumes:
-      - ./data:/app/.platform-data
-    environment:
-      - NODE_ENV=production
-      - MANAGER_SERVICE_PORT=8001
-      - R2_ADMIN_PORT=9100
-
-    restart: unless-stopped
-```
-
-用户只需运行：
+完成配置后先执行：
 ```bash
-docker-compose up -d
+./scripts/public-preflight.sh
+docker compose --env-file .env -f docker-compose.yml up -d
 ```

@@ -47,6 +47,31 @@ function flattenDirectory(dir) {
     }
 }
 
+function getDirectorySize(target) {
+    if (!fs.existsSync(target)) return 0;
+    const stat = fs.lstatSync(target);
+    if (stat.isSymbolicLink()) return 0;
+    if (stat.isFile()) return stat.size;
+    if (!stat.isDirectory()) return 0;
+    return fs.readdirSync(target).reduce((total, entry) => total + getDirectorySize(path.join(target, entry)), 0);
+}
+
+function assertWithinByteLimit(size, limitBytes, message) {
+    if (size > limitBytes) {
+        const error = new Error(message || `Size limit exceeded (${limitBytes} bytes)`);
+        error.statusCode = 413;
+        throw error;
+    }
+    return size;
+}
+
+function assertPathWithinByteLimit(target, limitBytes, message) {
+    return assertWithinByteLimit(getDirectorySize(target), limitBytes, message);
+}
+
 module.exports = {
-    flattenDirectory
+    flattenDirectory,
+    getDirectorySize,
+    assertWithinByteLimit,
+    assertPathWithinByteLimit
 };

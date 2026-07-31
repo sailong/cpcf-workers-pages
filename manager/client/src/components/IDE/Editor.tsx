@@ -1,6 +1,7 @@
 import React from 'react';
 import MonacoEditor from '@monaco-editor/react';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../contexts/useTheme';
+import '../../monaco';
 
 interface EditorProps {
     code: string;

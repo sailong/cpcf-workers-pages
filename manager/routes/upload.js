@@ -1,13 +1,15 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const upload = require('../middleware/upload');
 const config = require('../config');
 const { resolveWithin } = require('../utils/path-helper');
 const { extractZipSafely } = require('../utils/zip-helper');
+const { DEFAULT_PROJECT_LIMITS } = require('../services/project-limits');
 
-router.post('/', upload.single('file'), async (req, res) => {
+router.post('/', upload.singleForProject('file'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
     const filePath = resolveWithin(config.UPLOADS_DIR, req.file.filename);
@@ -15,10 +17,12 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     if (isZip) {
         // Extract ZIP for Pages projects
-        const extractDir = resolveWithin(config.UPLOADS_DIR, 'page-' + Date.now().toString(36));
+        const extractDir = resolveWithin(config.UPLOADS_DIR, `page-${crypto.randomUUID()}`);
 
         try {
-            await extractZipSafely(filePath, extractDir);
+            await extractZipSafely(filePath, extractDir, {
+                maxExpandedBytes: DEFAULT_PROJECT_LIMITS.diskMb * 1024 * 1024
+            });
 
             // Normalize: handle nested folder in ZIP
             const { flattenDirectory } = require('../utils/fs-helper');

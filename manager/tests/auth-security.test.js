@@ -11,6 +11,7 @@ const { createAuthMiddleware } = require('../middleware/auth');
 const { createLoginRateLimiter } = require('../middleware/login-rate-limit');
 const { createAuthRouter } = require('../routes/auth');
 const { assertProductionPasswordConfigured } = require('../server');
+const { createDatabase } = require('../services/database');
 
 async function withServer(options, run) {
     const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ccfwp-auth-test-'));
@@ -33,7 +34,8 @@ async function withServer(options, run) {
     app.use('/api', createAuthRouter({
         authService,
         loginRateLimiter: createLoginRateLimiter(options),
-        captchaRateLimiter: options.captchaRateLimiter
+        captchaRateLimiter: options.captchaRateLimiter,
+        secureCookies: options.secureCookies
     }));
     app.get('/api/protected', (req, res) => res.json({ ok: true }));
     const server = app.listen(0, '127.0.0.1');
@@ -68,7 +70,7 @@ test('captcha challenge is opaque, server-side, expiring, and one-use', async ()
 });
 
 test('login sets a hardened opaque cookie and password change revokes it', async () => {
-    await withServer({}, async ({ baseUrl, directory, getCaptchaAnswer }) => {
+    await withServer({ secureCookies: true }, async ({ baseUrl, directory, getCaptchaAnswer }) => {
         const captcha = await fetch(`${baseUrl}/api/captcha`).then(response => response.json());
         const login = await fetch(`${baseUrl}/api/login`, {
             method: 'POST',
@@ -104,6 +106,30 @@ test('login sets a hardened opaque cookie and password change revokes it', async
     });
 });
 
+test('development login uses an HTTP-compatible session cookie', async () => {
+    await withServer({ secureCookies: false }, async ({ baseUrl, getCaptchaAnswer }) => {
+        const captcha = await fetch(`${baseUrl}/api/captcha`).then(response => response.json());
+        const login = await fetch(`${baseUrl}/api/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'StrongPass123',
+                captcha: getCaptchaAnswer(),
+                captchaId: captcha.captchaId
+            })
+        });
+        const cookie = login.headers.get('set-cookie');
+
+        assert.equal(login.status, 200);
+        assert.match(cookie, /^ccfwp_session=/);
+        assert.doesNotMatch(cookie, /Secure/i);
+        assert.match(cookie, /HttpOnly/i);
+        assert.match(cookie, /SameSite=Strict/i);
+        assert.equal((await fetch(`${baseUrl}/api/verify-session`, { headers: { Cookie: cookie } })).status, 200);
+    });
+});
+
 test('login attempts are bounded per IP', async () => {
     await withServer({ maxAttempts: 1, windowMs: 60000 }, async ({ baseUrl }) => {
         const first = await fetch(`${baseUrl}/api/login`, {
@@ -119,6 +145,27 @@ test('login attempts are bounded per IP', async () => {
         assert.equal(first.status, 400);
         assert.equal(second.status, 429);
         assert.ok(Number(second.headers.get('retry-after')) > 0);
+    });
+});
+
+test('successful login resets the per-IP attempt budget', async () => {
+    await withServer({ maxAttempts: 1, windowMs: 60000 }, async ({ baseUrl, getCaptchaAnswer }) => {
+        const login = async () => {
+            const captcha = await fetch(`${baseUrl}/api/captcha`).then(response => response.json());
+            return fetch(`${baseUrl}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: 'admin',
+                    password: 'StrongPass123',
+                    captcha: getCaptchaAnswer(),
+                    captchaId: captcha.captchaId
+                })
+            });
+        };
+
+        assert.equal((await login()).status, 200);
+        assert.equal((await login()).status, 200);
     });
 });
 
@@ -156,6 +203,32 @@ test('captcha issuance is bounded per IP', async () => {
         assert.equal(limited.status, 429);
         assert.match((await limited.json()).error, /验证码请求过多/);
     });
+});
+
+test('sessions persist in SQLite and are removed from auth.json', async () => {
+    const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ccfwp-session-db-test-'));
+    const authFile = path.join(directory, 'auth.json');
+    const db = createDatabase({
+        databaseFile: path.join(directory, 'control-plane.sqlite3'),
+        projectsFile: path.join(directory, 'projects.json'),
+        resourcesFile: path.join(directory, 'resources.json')
+    });
+    try {
+        const first = createAuthService({ db, authFile, initialPassword: 'StrongPass123', now: () => 1000 });
+        await first.initialize();
+        const token = await first.createSession();
+        assert.equal(db.prepare('SELECT COUNT(*) AS count FROM sessions').get().count, 1);
+        assert.equal(Object.hasOwn(JSON.parse(await fs.promises.readFile(authFile, 'utf8')), 'sessions'), false);
+
+        const second = createAuthService({ db, authFile, initialPassword: null, now: () => 1000 });
+        await second.initialize();
+        assert.equal(second.verifySession(token).role, 'admin');
+        await second.revokeSession(token);
+        assert.equal(db.prepare('SELECT COUNT(*) AS count FROM sessions').get().count, 0);
+    } finally {
+        db.close();
+        await fs.promises.rm(directory, { recursive: true, force: true });
+    }
 });
 
 test('production startup rejects the bootstrap default password', () => {

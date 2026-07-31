@@ -1,18 +1,64 @@
+x-platform-image: &platform-image "ccfwp-platform:${CCFWP_IMAGE_TAG:-0.1.0}"
+
 services:
   ccfwp:
     build: .
-    image: ccfwp:latest
+    image: *platform-image
     container_name: ccfwp-container
-    ports:
-      - "8001:8001"
-      - "9100:9100"
+    expose:
+      - "8001"
     volumes:
       # 持久化数据卷
       - ./.platform-data:/app/.platform-data
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - NODE_ENV=production
-      # 管理后台内部端口
-      - MANAGER_SERVICE_PORT=8001
-      - R2_ADMIN_PORT=9100
+      NODE_ENV: production
+      MANAGER_SERVICE_PORT: 8001
+      RUNTIME_PROVIDER: docker
+      BUILD_NETWORK_MODE: ${BUILD_NETWORK_MODE:-prefer-offline}
+      BUILD_REGISTRY_ALLOWLIST: ${BUILD_REGISTRY_ALLOWLIST:-https://registry.npmmirror.com/,https://registry.npmjs.org/}
+      BUILD_DEFAULT_REGISTRY: ${BUILD_DEFAULT_REGISTRY:-https://registry.npmmirror.com/}
+      PROJECT_RUNTIME_IMAGE: *platform-image
+      MANAGER_CONTAINER_ID: ccfwp-container
+      PLATFORM_DATA_HOST_DIR: ${PWD}/.platform-data
+      AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in .env}
+      INGRESS_PROXY_TOKEN: ${INGRESS_PROXY_TOKEN:?Set INGRESS_PROXY_TOKEN in .env}
+      CONSOLE_HOSTS: ${CONSOLE_HOST:?Set CONSOLE_HOST in .env}
+      PROJECTS_BASE_DOMAIN: ${PROJECTS_BASE_DOMAIN:?Set PROJECTS_BASE_DOMAIN in .env}
+      TRUST_PROXY: linklocal,uniquelocal
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/api/health',{headers:{host:process.env.CONSOLE_HOSTS}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
 
     restart: unless-stopped
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Caddy.Dockerfile
+    image: ccfwp-caddy:2.10.0-cloudflare
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN in .env}
+      CONSOLE_HOST: ${CONSOLE_HOST:?Set CONSOLE_HOST in .env}
+      PROJECTS_BASE_DOMAIN: ${PROJECTS_BASE_DOMAIN:?Set PROJECTS_BASE_DOMAIN in .env}
+      INGRESS_PROXY_TOKEN: ${INGRESS_PROXY_TOKEN:?Set INGRESS_PROXY_TOKEN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      ccfwp:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

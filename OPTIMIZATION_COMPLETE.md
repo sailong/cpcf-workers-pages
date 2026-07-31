@@ -1,5 +1,7 @@
 # CCFWP 项目优化完成报告
 
+> 历史版本。当前实现与验证结果请以根目录 `README.md`、`AGENTS.md`、`docs/` 和 `.github/workflows/ci.yml` 为准。
+
 ## 已完成的优化（14 项）
 
 ### P0 - 严重安全问题修复 ✅

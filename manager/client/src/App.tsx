@@ -1,11 +1,19 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Resources from './pages/Resources';
 import CreateProject from './pages/CreateProject';
+import Deployments from './pages/Deployments';
+import Trash from './pages/Trash';
+import SettingsPage from './pages/Settings';
 import { checkAuth } from './api';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { Navigate, Router } from './router';
+import { routePathname } from './router-path';
+import { useLocation, useNavigate } from './use-router';
+import { FeedbackProvider } from './components/ui/FeedbackProvider';
+import { Activity, Boxes, FolderKanban, Plus, Settings, Trash2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children, authenticated, loading }: { children: React.ReactElement; authenticated: boolean; loading: boolean }) => {
@@ -21,7 +29,11 @@ const ProtectedRoute = ({ children, authenticated, loading }: { children: React.
 
 // Layout Wrapper
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
-  const [, setServerOnline] = useState(false);
+  const [serverOnline, setServerOnline] = useState(false);
+  const { pathname } = useLocation();
+  const activePath = routePathname(pathname);
+  const navigate = useNavigate();
+  const { t } = useTranslation();
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -35,20 +47,53 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     return () => clearInterval(timer);
   }, []);
 
-  return (
-    <div className="min-h-screen font-sans relative">
-      {/* LanguageSwitcher removed from global layout */}
-      {/* Global Fluid Background */}
-      <div className="fluid-bg">
-        <div className="orb orb-1"></div>
-        <div className="orb orb-2"></div>
-        <div className="orb orb-3"></div>
-      </div>
+  if (activePath === '/login') return <div className="min-h-screen bg-[var(--bg-base)]">{children}</div>;
 
-      {/* Content */}
-      <div className="relative z-10">
-        {children}
-      </div>
+  const navItems = [
+    { path: '/', label: t('projects'), icon: FolderKanban },
+    { path: '/deployments', label: t('deployments'), icon: Activity },
+    { path: '/resources', label: t('resources'), icon: Boxes },
+    { path: '/trash', label: t('trash.title'), icon: Trash2 },
+    { path: '/settings', label: t('settings'), icon: Settings }
+  ];
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-base)] font-sans text-[var(--text-main)]">
+      <header className="console-topbar">
+        <button type="button" className="console-brand" onClick={() => navigate('/')}>
+          <span className="console-brand-mark">CF</span>
+          <span className="hidden sm:inline">Workers Console</span>
+        </button>
+        <nav className="console-nav" aria-label="Primary">
+          {navItems.map(({ path, label, icon: Icon }) => (
+            <button
+              key={path}
+              type="button"
+              className={activePath === path ? 'console-nav-item active' : 'console-nav-item'}
+              onClick={() => navigate(path)}
+            >
+              <Icon size={16} aria-hidden="true" />
+              <span className="hidden lg:inline">{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="hidden items-center gap-2 text-xs text-[var(--text-muted)] sm:flex">
+            <span className={`h-2 w-2 rounded-full ${serverOnline ? 'bg-emerald-500' : 'bg-red-500'}`} />
+            {serverOnline ? t('online') : t('offline')}
+          </span>
+          <button
+            type="button"
+            className="console-button primary"
+            onClick={() => navigate('/create')}
+            aria-label={t('createProject')}
+          >
+            <Plus size={15} aria-hidden="true" />
+            <span className="hidden sm:inline">{t('createProject')}</span>
+          </button>
+        </div>
+      </header>
+      <main>{children}</main>
     </div>
   );
 };
@@ -70,31 +115,40 @@ function App() {
   return (
     <ThemeProvider>
       <Router>
-        <AppLayout>
-          <Routes>
-            <Route path="/login" element={<LoginWrapper onAuthenticated={() => setAuthenticated(true)} />} />
-            <Route path="/" element={
-              <ProtectedRoute authenticated={authenticated} loading={authLoading}>
-                <Dashboard />
-              </ProtectedRoute>
-            } />
-            <Route path="/resources" element={
-              <ProtectedRoute authenticated={authenticated} loading={authLoading}>
-                <Resources />
-              </ProtectedRoute>
-            } />
-            <Route path="/create" element={
-              <ProtectedRoute authenticated={authenticated} loading={authLoading}>
-                <CreateProject />
-              </ProtectedRoute>
-            } />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AppLayout>
+        <FeedbackProvider>
+          <AppLayout>
+            <AppRoutes
+              authenticated={authenticated}
+              loading={authLoading}
+              onAuthenticated={() => setAuthenticated(true)}
+            />
+          </AppLayout>
+        </FeedbackProvider>
       </Router>
     </ThemeProvider>
   );
 }
+
+const AppRoutes = ({ authenticated, loading, onAuthenticated }: {
+  authenticated: boolean;
+  loading: boolean;
+  onAuthenticated: () => void;
+}) => {
+  const { pathname } = useLocation();
+  const activePath = routePathname(pathname);
+  if (activePath === '/login') return <LoginWrapper onAuthenticated={onAuthenticated} />;
+
+  let page: React.ReactElement;
+  if (activePath === '/') page = <Dashboard />;
+  else if (activePath === '/deployments') page = <Deployments />;
+  else if (activePath === '/resources') page = <Resources />;
+  else if (activePath === '/trash') page = <Trash />;
+  else if (activePath === '/settings') page = <SettingsPage />;
+  else if (activePath === '/create') page = <CreateProject />;
+  else return <Navigate to="/" replace />;
+
+  return <ProtectedRoute authenticated={authenticated} loading={loading}>{page}</ProtectedRoute>;
+};
 
 // Login Wrapper to handle redirect
 const LoginWrapper = ({ onAuthenticated }: { onAuthenticated: () => void }) => {

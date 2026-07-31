@@ -1,9 +1,27 @@
 import api from './api';
-import type { Project } from '../types';
+import type {
+    PlatformConfig,
+    Project,
+    ProjectDeployment,
+    ProjectRelease,
+    ProjectRuntimeMetrics,
+    RuntimeLog
+} from '../types';
+import { consumeSSE } from '../utils/sse-stream';
+
+interface RebuildOptions {
+    buildCommand: string;
+    outputDir: string;
+}
 
 export const ProjectService = {
     getAll: async (): Promise<Project[]> => {
         const res = await api.get('/projects');
+        return res.data;
+    },
+
+    getPlatformConfig: async (): Promise<PlatformConfig> => {
+        const res = await api.get<PlatformConfig>('/config');
         return res.data;
     },
 
@@ -12,8 +30,8 @@ export const ProjectService = {
         return res.data;
     },
 
-    start: async (id: string, force: boolean = false) => {
-        const res = await api.post(`/projects/${id}/start`, { force });
+    start: async (id: string) => {
+        const res = await api.post(`/projects/${id}/start`);
         return res.data;
     },
 
@@ -42,7 +60,42 @@ export const ProjectService = {
         return res.data;
     },
 
-    rebuild: async (id: string, data: any, onLog: (msg: string) => void) => {
+    getReleases: async (id: string): Promise<ProjectRelease[]> => {
+        const res = await api.get<ProjectRelease[]>(`/projects/${id}/releases`);
+        return res.data;
+    },
+
+    getDeployments: async (id: string, limit = 50): Promise<ProjectDeployment[]> => {
+        const res = await api.get<ProjectDeployment[]>(`/projects/${id}/deployments`, { params: { limit } });
+        return res.data;
+    },
+
+    getRuntimeLogs: async (id: string, limit = 500): Promise<RuntimeLog[]> => {
+        const res = await api.get<RuntimeLog[]>(`/projects/${id}/runtime-logs`, { params: { limit } });
+        return res.data;
+    },
+
+    clearRuntimeLogs: async (id: string): Promise<{ success: boolean; removed: number }> => {
+        const res = await api.delete<{ success: boolean; removed: number }>(`/projects/${id}/runtime-logs`);
+        return res.data;
+    },
+
+    getMetrics: async (id: string): Promise<ProjectRuntimeMetrics> => {
+        const res = await api.get<ProjectRuntimeMetrics>(`/projects/${id}/metrics`);
+        return res.data;
+    },
+
+    activateRelease: async (id: string, releaseId: string) => {
+        const res = await api.post(`/projects/${id}/releases/${releaseId}/activate`);
+        return res.data;
+    },
+
+    rollback: async (id: string) => {
+        const res = await api.post(`/projects/${id}/rollback`);
+        return res.data;
+    },
+
+    rebuild: async (id: string, data: RebuildOptions, onLog: (msg: string) => void) => {
         // SSE implementation requires native EventSource or fetch
         // Axios doesn't support streams well comfortably for SSE
         // Using native fetch for SSE
@@ -55,32 +108,11 @@ export const ProjectService = {
             body: JSON.stringify(data)
         });
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) return;
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const jsonStr = line.substring(6);
-                    let message;
-                    try {
-                        message = JSON.parse(jsonStr);
-                    } catch (e) {
-                        continue; // Ignore partial or invalid JSON
-                    }
-
-                    if (message.type === 'log') onLog(message.content);
-                    if (message.type === 'error') throw new Error(message.content);
-                    if (message.type === 'result') return message;
-                }
-            }
-        }
+        return consumeSSE(response, message => {
+            if (message.type === 'log') onLog(String(message.content || ''));
+            if (message.type === 'error') throw new Error(String(message.content || 'Build failed'));
+            return message.type === 'result';
+        });
     },
 
     // Deploy Build Artifact to Existing Project
@@ -94,31 +126,10 @@ export const ProjectService = {
             body: JSON.stringify({ buildId, outputDir })
         });
 
-        const reader = response.body?.getReader();
-        const decoder = new TextDecoder();
-
-        if (!reader) return;
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n\n');
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const jsonStr = line.substring(6);
-                    let message;
-                    try {
-                        message = JSON.parse(jsonStr);
-                    } catch (e) {
-                        continue; // Ignore partial or invalid JSON
-                    }
-
-                    if (message.type === 'log') onLog(message.content);
-                    if (message.type === 'error') onError(message.content);
-                    if (message.type === 'result') return message;
-                }
-            }
-        }
+        return consumeSSE(response, message => {
+            if (message.type === 'log') onLog(String(message.content || ''));
+            if (message.type === 'error') onError(String(message.content || 'Deploy failed'));
+            return message.type === 'result';
+        });
     }
 };

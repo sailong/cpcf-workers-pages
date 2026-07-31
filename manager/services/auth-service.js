@@ -38,6 +38,7 @@ function validatePasswordStrength(password) {
 
 function createAuthService(options = {}) {
     const authFile = options.authFile || config.AUTH_FILE;
+    let sessionDb = options.db || null;
     const now = options.now || Date.now;
     const sessionTtlMs = options.sessionTtlMs || 12 * 60 * 60 * 1000;
     const captchaTtlMs = options.captchaTtlMs || 5 * 60 * 1000;
@@ -55,8 +56,12 @@ function createAuthService(options = {}) {
 
     function cleanupExpired() {
         const timestamp = now();
-        for (const [key, session] of sessions) {
-            if (session.expiresAt <= timestamp || session.version !== sessionVersion) sessions.delete(key);
+        if (sessionDb) {
+            sessionDb.prepare('DELETE FROM sessions WHERE expires_at <= ? OR version <> ?').run(timestamp, sessionVersion);
+        } else {
+            for (const [key, session] of sessions) {
+                if (session.expiresAt <= timestamp || session.version !== sessionVersion) sessions.delete(key);
+            }
         }
         for (const [key, challenge] of captchaChallenges) {
             if (challenge.expiresAt <= timestamp) captchaChallenges.delete(key);
@@ -65,16 +70,19 @@ function createAuthService(options = {}) {
 
     function serialize() {
         cleanupExpired();
-        return {
+        const state = {
             password: passwordHash,
             isDefaultPassword: defaultPassword,
-            sessionVersion,
-            sessions: Array.from(sessions.entries()).map(([tokenHash, session]) => ({
+            sessionVersion
+        };
+        if (!sessionDb) {
+            state.sessions = Array.from(sessions.entries()).map(([tokenHash, session]) => ({
                 tokenHash,
                 expiresAt: session.expiresAt,
                 version: session.version
-            }))
-        };
+            }));
+        }
+        return state;
     }
 
     function save() {
@@ -109,7 +117,15 @@ function createAuthService(options = {}) {
             if (Array.isArray(stored.sessions)) {
                 for (const session of stored.sessions) {
                     if (/^[a-f0-9]{64}$/.test(session.tokenHash || '') && session.expiresAt > now() && session.version === sessionVersion) {
-                        sessions.set(session.tokenHash, { expiresAt: session.expiresAt, version: session.version });
+                        if (sessionDb) {
+                            sessionDb.prepare(`
+                                INSERT INTO sessions (token_hash, expires_at, version, created_at)
+                                VALUES (?, ?, ?, ?)
+                                ON CONFLICT(token_hash) DO UPDATE SET expires_at = excluded.expires_at, version = excluded.version
+                            `).run(session.tokenHash, session.expiresAt, session.version, new Date(now()).toISOString());
+                        } else {
+                            sessions.set(session.tokenHash, { expiresAt: session.expiresAt, version: session.version });
+                        }
                     }
                 }
             }
@@ -127,6 +143,11 @@ function createAuthService(options = {}) {
 
     function requireInitialized() {
         if (!initialized) throw new Error('Auth service has not been initialized');
+    }
+
+    function attachDatabase(db) {
+        if (initialized) throw new Error('Cannot attach the session database after initialization');
+        sessionDb = db;
     }
 
     function createCaptchaChallenge(answer) {
@@ -158,9 +179,24 @@ function createAuthService(options = {}) {
         requireInitialized();
         cleanupExpired();
         const token = crypto.randomBytes(32).toString('base64url');
-        if (sessions.size >= maxSessions) sessions.delete(sessions.keys().next().value);
-        sessions.set(sha256(token), { expiresAt: now() + sessionTtlMs, version: sessionVersion });
-        await save();
+        const tokenHash = sha256(token);
+        const expiresAt = now() + sessionTtlMs;
+        if (sessionDb) {
+            const count = sessionDb.prepare('SELECT COUNT(*) AS count FROM sessions').get().count;
+            if (count >= maxSessions) {
+                sessionDb.prepare(`
+                    DELETE FROM sessions WHERE token_hash IN (
+                        SELECT token_hash FROM sessions ORDER BY created_at, token_hash LIMIT ?
+                    )
+                `).run(count - maxSessions + 1);
+            }
+            sessionDb.prepare('INSERT INTO sessions (token_hash, expires_at, version, created_at) VALUES (?, ?, ?, ?)')
+                .run(tokenHash, expiresAt, sessionVersion, new Date(now()).toISOString());
+        } else {
+            if (sessions.size >= maxSessions) sessions.delete(sessions.keys().next().value);
+            sessions.set(tokenHash, { expiresAt, version: sessionVersion });
+            await save();
+        }
         return token;
     }
 
@@ -168,14 +204,19 @@ function createAuthService(options = {}) {
         requireInitialized();
         if (typeof token !== 'string' || token.length < 32) return null;
         cleanupExpired();
-        const session = sessions.get(sha256(token));
+        const session = sessionDb
+            ? sessionDb.prepare('SELECT expires_at AS expiresAt, version FROM sessions WHERE token_hash = ?').get(sha256(token))
+            : sessions.get(sha256(token));
         if (!session || session.version !== sessionVersion || session.expiresAt <= now()) return null;
         return { role: 'admin', expiresAt: session.expiresAt, version: session.version };
     }
 
     async function revokeSession(token) {
-        if (typeof token === 'string') sessions.delete(sha256(token));
-        await save();
+        if (typeof token === 'string') {
+            if (sessionDb) sessionDb.prepare('DELETE FROM sessions WHERE token_hash = ?').run(sha256(token));
+            else sessions.delete(sha256(token));
+        }
+        if (!sessionDb) await save();
     }
 
     async function setPassword(password) {
@@ -183,12 +224,14 @@ function createAuthService(options = {}) {
         passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
         defaultPassword = false;
         sessionVersion += 1;
-        sessions.clear();
+        if (sessionDb) sessionDb.prepare('DELETE FROM sessions').run();
+        else sessions.clear();
         await save();
     }
 
     return {
         PASSWORD_RULES,
+        attachDatabase,
         initialize,
         isInitialized: () => initialized,
         isDefaultPassword: () => defaultPassword,
@@ -201,7 +244,9 @@ function createAuthService(options = {}) {
         verifySession,
         revokeSession,
         getSessionVersion: () => sessionVersion,
-        getPersistedSessionsForTest: () => Array.from(sessions.keys())
+        getPersistedSessionsForTest: () => sessionDb
+            ? sessionDb.prepare('SELECT token_hash FROM sessions ORDER BY created_at, token_hash').all().map(row => row.token_hash)
+            : Array.from(sessions.keys())
     };
 }
 

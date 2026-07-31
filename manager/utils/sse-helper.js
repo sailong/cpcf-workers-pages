@@ -17,7 +17,8 @@ function createSSEManager(res, options = {}) {
         timeout = SSE_TIMEOUT,
         heartbeatInterval = SSE_HEARTBEAT_INTERVAL,
         onTimeout = null,
-        onClose = null
+        onClose = null,
+        onEvent = null
     } = options;
 
     // 获取 request 对象
@@ -40,6 +41,7 @@ function createSSEManager(res, options = {}) {
         try {
             res.write(`data: ${JSON.stringify({ type, ...data })}\n\n`);
             if (res.flush) res.flush();
+            if (onEvent) onEvent(type, data);
             return true;
         } catch (e) {
             console.error('[SSE] Send error:', e.message);
@@ -101,10 +103,17 @@ function createSSEManager(res, options = {}) {
         if (onClose) onClose();
     };
 
-    // 监听客户端断开
-    req.on('close', () => {
-        console.log('[SSE] Client disconnected');
+    // IncomingMessage emits close after a normal request body completes. Only
+    // aborted requests or a response socket closing before end are disconnects.
+    req.on('aborted', () => {
+        console.log('[SSE] Client aborted request');
         close();
+    });
+    res.on('close', () => {
+        if (!isClosed && !res.writableEnded) {
+            console.log('[SSE] Client disconnected');
+            close();
+        }
     });
 
     // 初始化
@@ -118,6 +127,21 @@ function createSSEManager(res, options = {}) {
         sendResult,
         close,
         isClosed: () => isClosed
+    };
+}
+
+function createRecordedSSEManager(res, recorder, options = {}) {
+    const sse = createSSEManager(res, options);
+    const send = (type, data) => {
+        recorder.onEvent(type, data);
+        return sse.send(type, data);
+    };
+    return {
+        ...sse,
+        send,
+        sendLog: content => send('log', { content }),
+        sendError: content => send('error', { content }),
+        sendResult: data => send('result', data)
     };
 }
 
@@ -153,9 +177,17 @@ async function cleanupTempFiles(filePaths) {
 function createTempFileCleaner(filePaths) {
     let cleaned = false;
 
+    const removeHandler = () => {
+        process.off('exit', exitHandler);
+        process.off('SIGINT', exitHandler);
+        process.off('SIGTERM', exitHandler);
+        process.off('uncaughtException', exitHandler);
+    };
+
     const cleanup = async () => {
         if (cleaned) return;
         cleaned = true;
+        removeHandler();
         await cleanupTempFiles(filePaths);
     };
 
@@ -173,17 +205,13 @@ function createTempFileCleaner(filePaths) {
                 filePaths.push(filePath);
             }
         },
-        removeHandler: () => {
-            process.off('exit', exitHandler);
-            process.off('SIGINT', exitHandler);
-            process.off('SIGTERM', exitHandler);
-            process.off('uncaughtException', exitHandler);
-        }
+        removeHandler
     };
 }
 
 module.exports = {
     createSSEManager,
+    createRecordedSSEManager,
     cleanupTempFiles,
     createTempFileCleaner,
     SSE_TIMEOUT,

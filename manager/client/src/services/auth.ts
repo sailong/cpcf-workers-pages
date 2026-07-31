@@ -1,4 +1,5 @@
 import api from './api';
+import axios from 'axios';
 import type { AuthResponse } from '../types';
 
 export const AuthService = {
@@ -6,8 +7,11 @@ export const AuthService = {
         try {
             const res = await api.post('/login', { username, password, captcha, captchaId });
             return res.data;
-        } catch (error: any) {
-            return { success: false, error: error.response?.data?.error || error.message };
+        } catch (error: unknown) {
+            const message = axios.isAxiosError<{ error?: string }>(error)
+                ? error.response?.data?.error || error.message
+                : error instanceof Error ? error.message : 'Login failed';
+            return { success: false, error: message };
         }
     },
 

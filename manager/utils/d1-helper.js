@@ -1,215 +1,93 @@
-const path = require('path');
-const fs = require('fs');
-const { exec } = require('child_process');
-const { promisify } = require('util');
-const execAsync = promisify(exec);
+'use strict';
 
-const DATA_DIR = path.join(__dirname, '../../.platform-data');
-const SHARED_STATE_DIR = path.join(DATA_DIR, 'wrangler-shared-state');
-const MANAGER_CONFIG_PATH = path.join(DATA_DIR, 'manager-d1-config.toml');
+const resourceRuntime = require('../services/resource-runtime');
+const resourceService = require('../services/resource-service');
+const { unstable_splitSqlQuery: splitSqlQuery } = require('wrangler');
 
-// SQL 关键字黑名单（防止注入）
-const SQL_KEYWORDS = [
+const SQL_KEYWORDS = new Set([
     'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'DROP', 'CREATE', 'ALTER', 'TRUNCATE',
     'UNION', 'JOIN', 'WHERE', 'FROM', 'INTO', 'SET', 'VALUES', 'AND', 'OR', 'NOT',
     'NULL', 'TRUE', 'FALSE', 'EXEC', 'EXECUTE', 'SCRIPT', 'DECLARE', 'CAST', 'CONVERT'
-];
+]);
 
-/**
- * 验证表名是否安全
- * @param {string} tableName - 要验证的表名
- * @returns {{ valid: boolean, error?: string, safeName?: string }}
- */
 function validateTableName(tableName) {
-    if (!tableName || typeof tableName !== 'string') {
-        return { valid: false, error: '表名不能为空' };
-    }
-
-    // 去除首尾空格
+    if (!tableName || typeof tableName !== 'string') return { valid: false, error: '表名不能为空' };
     const trimmed = tableName.trim();
-
-    // 长度限制
-    if (trimmed.length > 128) {
-        return { valid: false, error: '表名过长（最大 128 字符）' };
-    }
-
-    // 只允许字母、数字、下划线，且不能以数字开头
-    const validPattern = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
-    if (!validPattern.test(trimmed)) {
+    if (trimmed.length > 128) return { valid: false, error: '表名过长（最大 128 字符）' };
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed)) {
         return { valid: false, error: '表名只能包含字母、数字、下划线，且不能以数字开头' };
     }
-
-    // 检查是否包含 SQL 关键字
-    const upperName = trimmed.toUpperCase();
-    if (SQL_KEYWORDS.includes(upperName)) {
-        return { valid: false, error: `表名不能是 SQL 关键字: ${trimmed}` };
-    }
-
+    if (SQL_KEYWORDS.has(trimmed.toUpperCase())) return { valid: false, error: `表名不能是 SQL 关键字: ${trimmed}` };
     return { valid: true, safeName: trimmed };
 }
 
-/**
- * 验证 SQL 语句是否安全（基础检查）
- * @param {string} sql - SQL 语句
- * @returns {{ valid: boolean, error?: string }}
- */
 function validateSQL(sql) {
-    if (!sql || typeof sql !== 'string') {
-        return { valid: false, error: 'SQL 语句不能为空' };
-    }
-
-    // 检查危险的多语句执行
-    const dangerousPatterns = [
-        /;\s*(DROP|DELETE|TRUNCATE|ALTER|CREATE)\s/i,  // 危险语句组合
-        /--/,                                           // SQL 注释
-        /\/\*/,                                         // 多行注释开始
-        /\*\//,                                         // 多行注释结束
-        /xp_/i,                                         // 扩展存储过程
-        /sp_/i,                                         // 系统存储过程
-    ];
-
-    for (const pattern of dangerousPatterns) {
-        if (pattern.test(sql)) {
-            return { valid: false, error: `SQL 语句包含不允许的模式` };
-        }
-    }
-
+    if (!sql || typeof sql !== 'string') return { valid: false, error: 'SQL 语句不能为空' };
+    if (Buffer.byteLength(sql, 'utf8') > 1024 * 1024) return { valid: false, error: 'SQL 语句不能超过 1 MiB' };
     return { valid: true };
 }
 
-/**
- * Ensures the manager config exists with the target binding
- * @param {string} dbId 
- * @param {string} dbName 
- */
-function ensureConfig(dbId, dbName) {
-    // We generate a simple wrangler.toml for the manager to use
-    // It maps the requested database to a binding named "DB"
-    const configContent = `
-name = "manager-d1-client"
-compatibility_date = "2024-09-23"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "${dbName}"
-database_id = "${dbId}"
-preview_database_id = "${dbId}"
-`;
-    fs.writeFileSync(MANAGER_CONFIG_PATH, configContent);
-}
-
-/**
- * Execute SQL via Wrangler CLI (async, non-blocking)
- */
-async function runWranglerSQL(dbId, sql) {
-    const resourcesPath = path.join(DATA_DIR, 'resources.json');
-    let dbName = 'unknown-db';
-    if (fs.existsSync(resourcesPath)) {
-        try {
-            const data = JSON.parse(fs.readFileSync(resourcesPath, 'utf8'));
-            const db = data.d1.find(d => d.id === dbId);
-            if (db) dbName = db.name;
-        } catch (e) { console.error("Error reading resources for name lookup", e); }
-    }
-
-    ensureConfig(dbId, dbName);
-
-    const sqlFile = path.join(DATA_DIR, 'temp-query.sql');
-    fs.writeFileSync(sqlFile, sql);
-
-    try {
-        const cmd = `npx wrangler d1 execute DB --local --config "${MANAGER_CONFIG_PATH}" --file "${sqlFile}" --persist-to "${SHARED_STATE_DIR}" --json`;
-        const { stdout, stderr } = await execAsync(cmd, { 
-            encoding: 'utf8',
-            timeout: 30000 // 30 秒超时
-        });
-
-        const output = JSON.parse(stdout);
-
-        if (Array.isArray(output) && output.length > 0) {
-            return output[0];
-        }
-        return { success: true, results: [] };
-
-    } catch (e) {
-        console.error("Wrangler Exec Error:", e.stderr || e.message);
-        throw new Error(`D1 Execution Failed: ${e.message}`);
+function assertDatabase(dbId) {
+    if (!resourceService.getD1().some(database => database.id === dbId)) {
+        const error = new Error('D1 database not found');
+        error.statusCode = 404;
+        throw error;
     }
 }
 
-/**
- * Execute SQL and return results
- */
-async function executeSQL(dbId, sql) {
-    const raw = await runWranglerSQL(dbId, sql);
-    
-    if (raw.results) {
-        if (raw.results.length > 0) {
-            const columns = Object.keys(raw.results[0]);
-            const rows = raw.results.map(row => Object.values(row));
-            return { columns, rows };
-        } else {
-            if (sql.trim().toUpperCase().startsWith('SELECT')) {
-                return { columns: [], rows: [] };
-            }
-        }
+function toConsoleResult(result, statement) {
+    const rows = result.results || [];
+    const returnsRows = /^\s*(SELECT|PRAGMA|WITH|EXPLAIN)\b/i.test(statement);
+    if (returnsRows || rows.length > 0) {
+        const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+        return { columns, rows: rows.map(row => columns.map(column => row[column])) };
     }
-
     return {
-        success: true,
+        success: result.success !== false,
         meta: {
-            changes: raw.meta?.changes || 0,
-            last_row_id: raw.meta?.last_row_id || 0
+            changes: result.meta?.changes || 0,
+            last_row_id: result.meta?.last_row_id || 0,
+            duration: result.meta?.duration
         }
     };
 }
 
-/**
- * List tables in the database
- */
+async function runStatements(dbId, sql) {
+    assertDatabase(dbId);
+    const validation = validateSQL(sql);
+    if (!validation.valid) throw new Error(validation.error);
+    const statements = splitSqlQuery(sql).map(statement => statement.trim()).filter(Boolean);
+    if (statements.length === 0) throw new Error('SQL 语句不能为空');
+    return resourceRuntime.withResource('d1', dbId, async database => {
+        const results = [];
+        for (const statement of statements) results.push(await database.prepare(statement).all());
+        return { statements, results };
+    });
+}
+
+async function executeSQL(dbId, sql) {
+    const { statements, results } = await runStatements(dbId, sql);
+    return toConsoleResult(results[results.length - 1], statements[statements.length - 1]);
+}
+
 async function listTables(dbId) {
-    const sql = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name;";
-    const raw = await runWranglerSQL(dbId, sql);
-    return raw.results || [];
+    const { results } = await runStatements(dbId,
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY name;");
+    return results[0].results || [];
 }
 
-/**
- * Query table data
- * @param {string} dbId - Database ID
- * @param {string} tableName - Table name
- * @param {number} limit - Row limit
- * @returns {Object} - Table data
- */
-function queryTable(dbId, tableName, limit = 100) {
-    // 安全验证表名
+async function queryTable(dbId, tableName, limit = 100) {
     const validation = validateTableName(tableName);
-    if (!validation.valid) {
-        throw new Error(`无效的表名: ${validation.error}`);
-    }
-
-    // 限制 limit 范围
-    const safeLimit = Math.max(1, Math.min(10000, parseInt(limit) || 100));
-
-    const sql = `SELECT * FROM "${validation.safeName}" LIMIT ${safeLimit};`;
-    return executeSQL(dbId, sql);
+    if (!validation.valid) throw new Error(`无效的表名: ${validation.error}`);
+    const safeLimit = Math.max(1, Math.min(10000, Number.parseInt(limit, 10) || 100));
+    return executeSQL(dbId, `SELECT * FROM "${validation.safeName}" LIMIT ${safeLimit};`);
 }
 
-/**
- * Get table structure (schema)
- * @param {string} dbId 
- * @param {string} tableName 
- * @returns {Array} - List of columns
- */
-function getTableStructure(dbId, tableName) {
-    // 安全验证表名
+async function getTableStructure(dbId, tableName) {
     const validation = validateTableName(tableName);
-    if (!validation.valid) {
-        throw new Error(`无效的表名: ${validation.error}`);
-    }
-
-    const sql = `PRAGMA table_info("${validation.safeName}");`;
-    const res = runWranglerSQL(dbId, sql);
-    return res.results || [];
+    if (!validation.valid) throw new Error(`无效的表名: ${validation.error}`);
+    const { results } = await runStatements(dbId, `PRAGMA table_info("${validation.safeName}");`);
+    return results[0].results || [];
 }
 
 module.exports = {

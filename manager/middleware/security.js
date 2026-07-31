@@ -1,13 +1,6 @@
 'use strict';
 
-function splitList(value, fallback = []) {
-    if (!value) return fallback;
-    return value.split(',').map(item => item.trim().toLowerCase()).filter(Boolean);
-}
-
-function normalizeHostname(hostname) {
-    return String(hostname || '').toLowerCase().replace(/\.$/, '');
-}
+const { normalizeHostname, parseProjectHostname, splitList } = require('../utils/project-hostname');
 
 function configureTrustedProxy(app, value = process.env.TRUST_PROXY) {
     if (!value || value === 'false') {
@@ -32,11 +25,7 @@ function createHostGuard(options = {}) {
     return function hostGuard(req, res, next) {
         const hostname = normalizeHostname(req.hostname);
         const consoleMatch = consoleHosts.has(hostname);
-        const projectMatch = projectsBaseDomains.some(base => {
-            if (!base || !hostname.endsWith(`.${base}`)) return false;
-            const label = hostname.slice(0, -(base.length + 1));
-            return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?-(worker|pages)$/.test(label);
-        });
+        const projectMatch = Boolean(parseProjectHostname(hostname, projectsBaseDomains));
 
         if (!consoleMatch && !projectMatch) {
             return res.status(421).json({ error: 'Host is not allowed' });
@@ -50,7 +39,9 @@ function securityHeaders(req, res, next) {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    if (process.env.NODE_ENV === 'production') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     next();

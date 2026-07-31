@@ -1,7 +1,20 @@
 import api from './api';
-import type { Resources } from '../types';
+import type { TrashedResource } from '../types';
 
 export const ResourceService = {
+    getTrash: async (): Promise<TrashedResource[]> => {
+        const res = await api.get<TrashedResource[]>('/trash');
+        return res.data;
+    },
+    restoreTrash: async (id: string) => {
+        const res = await api.post(`/trash/${id}/restore`);
+        return res.data;
+    },
+    purgeTrash: async (id: string) => {
+        const res = await api.delete(`/trash/${id}`);
+        return res.data;
+    },
+
     // KV
     getKV: async () => {
         const res = await api.get('/resources/kv');
@@ -23,7 +36,7 @@ export const ResourceService = {
         const res = await api.get(`/resources/kv/${id}/values/${key}`);
         return res.data;
     },
-    setValue: async (id: string, key: string, value: any) => {
+    setValue: async (id: string, key: string, value: unknown) => {
         const res = await api.put(`/resources/kv/${id}/values/${key}`, { value });
         return res.data;
     },

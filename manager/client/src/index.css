@@ -3,24 +3,20 @@
 @tailwind utilities;
 
 :root {
-  /* =========================================
-     MODERN GLASSMORPHISM DESIGN SYSTEM
-     优化配色方案：更现代、更协调、更舒适
-     ========================================= */
-
-  /* 1. Primary Brand Color - 使用更温暖的蓝紫色 */
-  --color-primary: #6366f1;
-  --color-primary-hover: #4f46e5;
-  --color-primary-active: #4338ca;
-  --color-primary-light: rgba(99, 102, 241, 0.12);
-  --color-primary-lighter: rgba(99, 102, 241, 0.06);
+  --color-primary: #c2410c;
+  --color-primary-hover: #9a3412;
+  --color-primary-active: #7c2d12;
+  --color-primary-light: rgba(194, 65, 12, 0.1);
+  --color-primary-lighter: rgba(194, 65, 12, 0.05);
+  --primary: var(--color-primary);
+  --primary-hover: var(--color-primary-hover);
 
   /* 2. Surface & Glass - 更柔和的半透明效果 */
-  --glass-bg: rgba(255, 255, 255, 0.88);
-  --glass-border: rgba(255, 255, 255, 0.5);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-  --glass-shadow-lg: 0 12px 48px 0 rgba(31, 38, 135, 0.15);
-  --glass-blur: 20px;
+  --glass-bg: #ffffff;
+  --glass-border: #d8dee8;
+  --glass-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --glass-shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.12);
+  --glass-blur: 0px;
 
   /* 3. Text & Contrast - 更舒适的对比度 */
   --text-main: #0f172a;
@@ -29,21 +25,20 @@
   --text-light: #f8fafc;
 
   /* 4. Background Canvas - 更柔和的渐变 */
-  --bg-base: #f8fafc;
-  --bg-gradient-1: rgba(99, 102, 241, 0.08);
-  --bg-gradient-2: rgba(168, 85, 247, 0.06);
-  --bg-gradient-3: rgba(59, 130, 246, 0.06);
+  --bg-base: #f4f6f8;
+  --bg-subtle: #f8fafc;
 
   /* 5. Component Variables - Light Mode */
-  --bg-card: rgba(255, 255, 255, 0.95);
-  --bg-card-hover: rgba(255, 255, 255, 1);
-  --bg-input: rgba(241, 245, 249, 0.6);
-  --bg-input-focus: rgba(255, 255, 255, 0.9);
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-input: #ffffff;
+  --bg-input-focus: #ffffff;
   
   /* Borders */
-  --border-color: rgba(203, 213, 225, 0.5);
-  --border-color-hover: rgba(148, 163, 184, 0.7);
-  --border-focus: rgba(99, 102, 241, 0.4);
+  --border-color: #d8dee8;
+  --border-color-hover: #aab4c3;
+  --border-focus: rgba(194, 65, 12, 0.45);
 
   /* Status Colors - 更柔和的状态色 */
   --color-success: #10b981;
@@ -77,28 +72,27 @@
 
 /* Dark Mode Overrides - 更舒适的深色模式 */
 .dark {
-  --glass-bg: rgba(15, 23, 42, 0.8);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-  --glass-shadow-lg: 0 12px 48px 0 rgba(0, 0, 0, 0.6);
+  --glass-bg: #15191f;
+  --glass-border: #343b45;
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --glass-shadow-lg: 0 10px 28px rgba(0, 0, 0, 0.45);
 
   --text-main: #f1f5f9;
   --text-secondary: #cbd5e1;
   --text-muted: #94a3b8;
 
-  --bg-base: #0f172a;
-  --bg-gradient-1: rgba(99, 102, 241, 0.15);
-  --bg-gradient-2: rgba(168, 85, 247, 0.12);
-  --bg-gradient-3: rgba(59, 130, 246, 0.12);
+  --bg-base: #0f1216;
+  --bg-subtle: #191e25;
 
-  --bg-card: rgba(30, 41, 59, 0.85);
-  --bg-card-hover: rgba(51, 65, 85, 0.9);
-  --bg-input: rgba(30, 41, 59, 0.6);
-  --bg-input-focus: rgba(51, 65, 85, 0.8);
+  --bg-card: #15191f;
+  --bg-card-hover: #1c222a;
+  --bg-hover: #20262e;
+  --bg-input: #11151a;
+  --bg-input-focus: #15191f;
   
-  --border-color: rgba(148, 163, 184, 0.15);
-  --border-color-hover: rgba(148, 163, 184, 0.3);
-  --border-focus: rgba(99, 102, 241, 0.5);
+  --border-color: #343b45;
+  --border-color-hover: #53606e;
+  --border-focus: rgba(251, 146, 60, 0.55);
 
   --kv-theme: #a78bfa;
   --kv-theme-light: rgba(167, 139, 250, 0.15);
@@ -119,72 +113,7 @@
     color: var(--text-main);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    @apply antialiased font-sans transition-colors duration-300 selection:bg-indigo-500/30 selection:text-indigo-600 dark:selection:text-indigo-300;
-  }
-
-  /* Fluid Background Animation Container - 更柔和的渐变背景 */
-  .fluid-bg {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    z-index: -1;
-    overflow: hidden;
-    background-color: var(--bg-base);
-  }
-
-  /* Animated Orbs - 更柔和的光晕效果 */
-  .orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(100px);
-    opacity: 0.5;
-    animation: float 25s infinite ease-in-out alternate;
-  }
-
-  .orb-1 {
-    top: -10%;
-    left: -10%;
-    width: 55vw;
-    height: 55vw;
-    background: var(--bg-gradient-1);
-    animation-duration: 30s;
-  }
-
-  .orb-2 {
-    bottom: -15%;
-    right: -10%;
-    width: 65vw;
-    height: 65vw;
-    background: var(--bg-gradient-2);
-    animation-duration: 35s;
-    animation-delay: -8s;
-  }
-
-  .orb-3 {
-    top: 30%;
-    left: 30%;
-    width: 50vw;
-    height: 50vw;
-    background: var(--bg-gradient-3);
-    animation-duration: 28s;
-    animation-delay: -15s;
-  }
-
-  @keyframes float {
-    0% {
-      transform: translate(0, 0) scale(1);
-    }
-    33% {
-      transform: translate(40px, -60px) scale(1.05);
-    }
-    66% {
-      transform: translate(-30px, 30px) scale(0.95);
-    }
-    100% {
-      transform: translate(0, 0) scale(1);
-    }
+    @apply antialiased font-sans;
   }
 }
 
@@ -197,7 +126,7 @@
     border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     transform: translateZ(0);
-    @apply rounded-2xl transition-all duration-300;
+    @apply rounded-lg transition-colors duration-150;
   }
 
   /* Utility Glass Class */
@@ -206,40 +135,20 @@
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
     border: 1px solid var(--glass-border);
-    @apply rounded-xl transition-all duration-300;
+    @apply rounded-lg transition-colors duration-150;
   }
 
   /* Interactive Glass Card - 更优雅的卡片效果 */
   .neo-card {
-    @apply neo-glass flex flex-col relative overflow-hidden transition-all duration-300;
+    @apply neo-glass flex flex-col relative overflow-hidden transition-colors duration-150;
     background: var(--bg-card);
     border-color: var(--border-color);
   }
 
   .neo-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--glass-shadow-lg);
+    box-shadow: var(--glass-shadow);
     background: var(--bg-card-hover);
     border-color: var(--border-color-hover);
-  }
-
-  /* Subtle shine effect */
-  .neo-card::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    transition: 0.6s;
-    pointer-events: none;
-    opacity: 0;
-  }
-
-  .neo-card:hover::after {
-    left: 100%;
-    opacity: 1;
   }
 
   /* Glass Inputs - 更舒适的输入框 */
@@ -247,7 +156,7 @@
     background: var(--bg-input);
     color: var(--text-main);
     border: 1px solid var(--border-color);
-    @apply backdrop-blur-sm rounded-xl px-4 py-3 outline-none transition-all duration-200;
+    @apply rounded-md px-3 py-2 outline-none transition-colors duration-150;
   }
 
   .neo-input:hover {
@@ -257,18 +166,18 @@
 
   .neo-input:focus {
     border-color: var(--border-focus);
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    box-shadow: 0 0 0 3px rgba(194, 65, 12, 0.12);
     background: var(--bg-input-focus);
   }
 
   /* Primary Button - 更现代的渐变按钮 */
   .btn-gradient {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    @apply text-white font-semibold px-6 py-2.5 rounded-xl shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 border border-transparent;
+    background: var(--color-primary);
+    @apply text-white font-semibold px-4 py-2 rounded-md transition-colors duration-150 border border-transparent;
   }
 
   .btn-gradient:hover {
-    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    background: var(--color-primary-hover);
   }
 
   /* Glass Button - 更优雅的次要按钮 */
@@ -276,11 +185,163 @@
     background: var(--bg-card);
     border: 1px solid var(--border-color);
     color: var(--text-main);
-    @apply font-medium px-5 py-2.5 rounded-xl hover:bg-[var(--bg-card-hover)] active:scale-95 transition-all flex items-center gap-2 shadow-sm hover:shadow-md;
+    @apply font-medium px-4 py-2 rounded-md hover:bg-[var(--bg-card-hover)] transition-colors flex items-center gap-2;
   }
 
   .btn-glass:hover {
     border-color: var(--border-color-hover);
+  }
+
+  .console-topbar {
+    @apply sticky top-0 z-40 flex h-14 items-center gap-4 border-b border-[var(--border-color)] bg-[var(--bg-card)] px-3 sm:px-5;
+  }
+
+  .console-brand {
+    @apply flex shrink-0 items-center gap-2 text-sm font-semibold;
+  }
+
+  .console-brand-mark {
+    @apply flex h-7 w-7 items-center justify-center rounded-md bg-orange-700 text-[10px] font-bold text-white;
+  }
+
+  .console-nav {
+    @apply flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto;
+  }
+
+  .console-nav-item {
+    @apply flex h-full items-center gap-2 border-b-2 border-transparent px-2 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)] sm:px-3;
+  }
+
+  .console-nav-item.active {
+    @apply border-orange-700 text-[var(--text-main)];
+  }
+
+  .console-page {
+    @apply mx-auto w-full max-w-[1600px] px-3 py-5 sm:px-6 sm:py-6;
+  }
+
+  .console-page-header {
+    @apply mb-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-end;
+  }
+
+  .console-page-header h1 {
+    @apply mt-1 text-2xl font-semibold;
+  }
+
+  .console-page-header p {
+    @apply mt-1 text-sm text-[var(--text-muted)];
+  }
+
+  .console-panel,
+  .console-dialog {
+    @apply overflow-hidden rounded-lg border border-[var(--border-color)] bg-[var(--bg-card)];
+    box-shadow: var(--glass-shadow);
+  }
+
+  .console-table {
+    @apply w-full border-collapse text-sm;
+  }
+
+  .console-table thead {
+    @apply bg-[var(--bg-subtle)] text-xs text-[var(--text-muted)];
+  }
+
+  .console-table th {
+    @apply border-b border-[var(--border-color)] px-4 py-2.5 text-left font-medium;
+  }
+
+  .console-table td {
+    @apply border-b border-[var(--border-color)] px-4 py-3 align-middle;
+  }
+
+  .console-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .console-table tbody tr:hover {
+    @apply bg-[var(--bg-hover)];
+  }
+
+  .icon-button {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-[var(--text-muted)] transition-colors hover:border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .icon-button.danger {
+    @apply hover:border-red-500/30 hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400;
+  }
+
+  .console-button {
+    @apply inline-flex min-h-8 items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .console-button.primary {
+    @apply border-orange-700 bg-orange-700 text-white hover:border-orange-800 hover:bg-orange-800;
+  }
+
+  .console-button.secondary {
+    @apply border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-main)] hover:bg-[var(--bg-hover)];
+  }
+
+  .console-button.danger {
+    @apply border-red-700 bg-red-700 text-white hover:border-red-800 hover:bg-red-800;
+  }
+
+  .console-input {
+    @apply min-h-9 rounded-md border border-[var(--border-color)] bg-[var(--bg-input)] px-3 py-2 text-sm text-[var(--text-main)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-orange-700 focus:ring-2 focus:ring-orange-700/15;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium;
+  }
+
+  .status-badge::before {
+    content: '';
+    @apply h-2 w-2 rounded-full bg-slate-400;
+  }
+
+  .status-badge.running {
+    @apply text-emerald-700 dark:text-emerald-400;
+  }
+
+  .status-badge.running::before {
+    @apply bg-emerald-500;
+  }
+
+  .status-badge.pending {
+    @apply text-amber-700 dark:text-amber-400;
+  }
+
+  .status-badge.pending::before {
+    @apply bg-amber-500;
+  }
+
+  .console-alert {
+    @apply mb-4 flex items-center justify-between gap-3 rounded-md border px-4 py-3 text-sm;
+  }
+
+  .console-alert.error {
+    @apply border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300;
+  }
+
+  .console-alert.warning {
+    @apply border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200;
+  }
+
+  .console-toast {
+    @apply flex items-start gap-3 rounded-md border bg-[var(--bg-card)] px-3 py-3 text-[var(--text-main)];
+    box-shadow: var(--glass-shadow-lg);
+  }
+
+  .console-toast-success { @apply border-emerald-500/40; }
+  .console-toast-error { @apply border-red-500/40; }
+  .console-toast-info { @apply border-blue-500/40; }
+
+  .resource-tab {
+    @apply flex min-h-10 shrink-0 items-center gap-2 border-b-2 border-transparent px-3 text-sm text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)];
+  }
+
+  .resource-tab.active {
+    @apply border-orange-700 text-[var(--text-main)];
   }
 }
 

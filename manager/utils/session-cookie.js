@@ -1,7 +1,17 @@
 'use strict';
 
 const SESSION_COOKIE = '__Host-ccfwp_session';
+const DEVELOPMENT_SESSION_COOKIE = 'ccfwp_session';
 const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
+
+function cookieName(secure) {
+    return secure ? SESSION_COOKIE : DEVELOPMENT_SESSION_COOKIE;
+}
+
+function resolveSecure(options = {}) {
+    if (typeof options.secure === 'boolean') return options.secure;
+    return process.env.NODE_ENV === 'production';
+}
 
 function parseCookies(header = '') {
     const cookies = {};
@@ -20,30 +30,36 @@ function parseCookies(header = '') {
 }
 
 function getSessionToken(req) {
-    return parseCookies(req.headers.cookie)[SESSION_COOKIE] || null;
+    const cookies = parseCookies(req.headers.cookie);
+    return cookies[SESSION_COOKIE] || cookies[DEVELOPMENT_SESSION_COOKIE] || null;
 }
 
-function setSessionCookie(res, token) {
-    res.cookie(SESSION_COOKIE, token, {
+function setSessionCookie(res, token, options = {}) {
+    const secure = resolveSecure(options);
+    res.cookie(cookieName(secure), token, {
         httpOnly: true,
-        secure: true,
+        secure,
         sameSite: 'strict',
         path: '/',
         maxAge: SESSION_MAX_AGE_SECONDS * 1000
     });
 }
 
-function clearSessionCookie(res) {
-    res.clearCookie(SESSION_COOKIE, {
+function clearSessionCookie(res, options = {}) {
+    const secure = resolveSecure(options);
+    const attributes = {
         httpOnly: true,
-        secure: true,
+        secure,
         sameSite: 'strict',
         path: '/'
-    });
+    };
+    res.clearCookie(SESSION_COOKIE, attributes);
+    res.clearCookie(DEVELOPMENT_SESSION_COOKIE, { ...attributes, secure: false });
 }
 
 module.exports = {
     SESSION_COOKIE,
+    DEVELOPMENT_SESSION_COOKIE,
     SESSION_MAX_AGE_SECONDS,
     clearSessionCookie,
     getSessionToken,

@@ -1,282 +1,242 @@
-import React, { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
+import { Braces, ChevronLeft, ChevronRight, Loader2, Plus, RefreshCw, Save, Search, Trash2, X } from 'lucide-react';
 import { authenticatedFetch } from '../../api';
+import { getErrorMessage } from '../../utils/errors';
+import { useFeedback } from '../../contexts/feedback-context';
 
 interface KVManagerProps {
     namespace: { id: string; name: string };
     onClose: () => void;
 }
 
-const KVManager: React.FC<KVManagerProps> = ({ namespace, onClose }) => {
+interface KVKey {
+    name: string;
+    expiration?: number;
+    metadata?: unknown;
+}
+
+interface KeyPage {
+    keys: KVKey[];
+    list_complete: boolean;
+    cursor?: string;
+}
+
+function toLocalDateTime(expiration?: number) {
+    if (!expiration) return '';
+    const date = new Date(expiration * 1000);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+export default function KVManager({ namespace, onClose }: KVManagerProps) {
     const { t } = useTranslation();
-    const [keys, setKeys] = useState<Array<{ name: string }>>([]);
+    const { confirm, notify } = useFeedback();
+    const [keys, setKeys] = useState<KVKey[]>([]);
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
-    const [value, setValue] = useState<string>('');
-    const [newKey, setNewKey] = useState('');
-    const [newValue, setNewValue] = useState('');
+    const [keyName, setKeyName] = useState('');
+    const [value, setValue] = useState('');
+    const [metadata, setMetadata] = useState('');
+    const [expiration, setExpiration] = useState('');
+    const [prefix, setPrefix] = useState('');
+    const [activePrefix, setActivePrefix] = useState('');
+    const [currentCursor, setCurrentCursor] = useState('');
+    const [nextCursor, setNextCursor] = useState('');
+    const [history, setHistory] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
 
-    // Confirmation Modal State
-    const [keyToDelete, setKeyToDelete] = useState<string | null>(null);
-
-    // 加载键列表
-    const loadKeys = async () => {
-        try {
-            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/keys`);
-            const data = await res.json();
-            setKeys(data.keys || []);
-        } catch (err) {
-            setError(t('kvManager.loadKeysError'));
-        }
-    };
-
-    // 获取键值
-    const loadValue = async (key: string) => {
-        try {
-            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(key)}`);
-            if (res.ok) {
-                const data = await res.json();
-                setValue(typeof data.value === 'string' ? data.value : JSON.stringify(data.value, null, 2));
-                setSelectedKey(key);
-            }
-        } catch (err) {
-            setError(t('kvManager.loadValueError'));
-        }
-    };
-
-    // 保存键值对
-    const saveKeyValue = async () => {
-        if (!newKey) return;
+    const loadPage = useCallback(async (cursor = '', searchPrefix = '') => {
         setLoading(true);
         setError('');
-
         try {
-            let parsedValue = newValue;
-            try {
-                parsedValue = JSON.parse(newValue);
-            } catch {
-                // 保持字符串格式
-            }
-
-            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(newKey)}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: parsedValue })
-            });
-
-            if (res.ok) {
-                setNewKey('');
-                setNewValue('');
-                await loadKeys();
-            } else {
-                setError(t('kvManager.saveError'));
-            }
-        } catch (err) {
-            setError(t('kvManager.saveError') + ': ' + (err as Error).message);
+            const params = new URLSearchParams({ limit: '100', prefix: searchPrefix });
+            if (cursor) params.set('cursor', cursor);
+            const response = await authenticatedFetch(`/api/resources/kv/${namespace.id}/keys?${params}`);
+            if (!response.ok) throw new Error((await response.json()).error || t('kvManager.loadKeysError'));
+            const data: KeyPage = await response.json();
+            setKeys(data.keys || []);
+            setCurrentCursor(cursor);
+            setNextCursor(data.list_complete ? '' : data.cursor || '');
+        } catch (requestError) {
+            setError(getErrorMessage(requestError, t('kvManager.loadKeysError')));
         } finally {
             setLoading(false);
         }
-    };
+    }, [namespace.id, t]);
 
-    // 删除键 - 请求确认
-    const requestDelete = (key: string) => {
-        setKeyToDelete(key);
-    };
+    useEffect(() => { void loadPage(); }, [loadPage]);
 
-    // 执行删除
-    const executeDelete = async () => {
-        if (!keyToDelete) return;
-
+    const selectKey = async (key: KVKey) => {
+        setError('');
         try {
-            const res = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(keyToDelete)}`, {
-                method: 'DELETE'
-            });
-
-            if (res.ok) {
-                await loadKeys();
-                if (selectedKey === keyToDelete) {
-                    setSelectedKey(null);
-                    setValue('');
-                }
-            }
-        } catch (err) {
-            setError(t('kvManager.deleteError'));
-        } finally {
-            setKeyToDelete(null);
+            const response = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(key.name)}`);
+            if (!response.ok) throw new Error((await response.json()).error || t('kvManager.loadValueError'));
+            const data = await response.json();
+            setSelectedKey(key.name);
+            setKeyName(key.name);
+            setValue(typeof data.value === 'string' ? data.value : JSON.stringify(data.value, null, 2));
+            setMetadata(data.metadata == null ? '' : JSON.stringify(data.metadata, null, 2));
+            setExpiration(toLocalDateTime(key.expiration));
+        } catch (requestError) {
+            setError(getErrorMessage(requestError, t('kvManager.loadValueError')));
         }
     };
 
-    useEffect(() => {
-        loadKeys();
-    }, [namespace.id]);
+    const resetEditor = () => {
+        setSelectedKey(null);
+        setKeyName('');
+        setValue('');
+        setMetadata('');
+        setExpiration('');
+        setError('');
+    };
+
+    const saveKey = async () => {
+        if (!keyName.trim()) return;
+        let parsedValue: unknown = value;
+        let parsedMetadata: unknown;
+        try { parsedValue = JSON.parse(value); } catch { /* Store non-JSON input as text. */ }
+        try {
+            parsedMetadata = metadata.trim() ? JSON.parse(metadata) : undefined;
+        } catch {
+            setError(t('kvManager.invalidMetadata'));
+            return;
+        }
+
+        setSaving(true);
+        setError('');
+        try {
+            const response = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(keyName.trim())}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    value: parsedValue,
+                    metadata: parsedMetadata,
+                    expiration: expiration ? Math.floor(new Date(expiration).getTime() / 1000) : undefined
+                })
+            });
+            if (!response.ok) throw new Error((await response.json()).error || t('kvManager.saveError'));
+            await loadPage(currentCursor, activePrefix);
+            notify(t('kvManager.saveSuccess'), 'success');
+            setSelectedKey(keyName.trim());
+        } catch (requestError) {
+            setError(getErrorMessage(requestError, t('kvManager.saveError')));
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteKey = async (key: string) => {
+        const accepted = await confirm({
+            title: t('common.confirmDelete'),
+            message: t('kvManager.confirmDeleteKey', { key }),
+            confirmLabel: t('common.delete'),
+            destructive: true
+        });
+        if (!accepted) return;
+        try {
+            const response = await authenticatedFetch(`/api/resources/kv/${namespace.id}/values/${encodeURIComponent(key)}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error((await response.json()).error || t('kvManager.deleteError'));
+            if (selectedKey === key) resetEditor();
+            await loadPage(currentCursor, activePrefix);
+            notify(t('kvManager.deleteSuccess'), 'success');
+        } catch (requestError) {
+            setError(getErrorMessage(requestError, t('kvManager.deleteError')));
+        }
+    };
+
+    const search = () => {
+        setActivePrefix(prefix);
+        setHistory([]);
+        void loadPage('', prefix);
+    };
+
+    const previousPage = () => {
+        const previous = history.at(-1);
+        if (previous === undefined) return;
+        setHistory(items => items.slice(0, -1));
+        void loadPage(previous, activePrefix);
+    };
+
+    const nextPage = () => {
+        if (!nextCursor) return;
+        setHistory(items => [...items, currentCursor]);
+        void loadPage(nextCursor, activePrefix);
+    };
 
     return createPortal(
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-            <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-                {/* Header - Purple Theme */}
-                <div className="p-6 border-b border-[var(--border-color)] flex justify-between items-center bg-[var(--bg-card)]/50">
-                    <div className="flex items-center gap-3">
-                        <span className="w-10 h-10 rounded-lg bg-[var(--kv-theme-light)] text-[var(--kv-theme)] flex items-center justify-center text-xl">
-                            🗄️
-                        </span>
-                        <div>
-                            <h2 className="text-xl font-bold text-[var(--text-main)]">{t('kvManager.title')}</h2>
-                            <p className="text-sm text-[var(--text-muted)] mt-0.5">{t('kvManager.namespaceLabel')} <span className="text-[var(--kv-theme)] font-mono">{namespace.name}</span></p>
-                        </div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-3 sm:p-5">
+            <div className="flex h-[min(840px,94vh)] w-full max-w-6xl flex-col overflow-hidden rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] shadow-2xl">
+                <header className="flex min-h-16 items-center justify-between border-b border-[var(--border-color)] px-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--kv-theme-light)] text-[var(--kv-theme)]"><Braces size={18} /></span>
+                        <div className="min-w-0"><h2 className="text-base font-semibold text-[var(--text-main)]">{t('kvManager.title')}</h2><p className="truncate font-mono text-xs text-[var(--text-muted)]">{namespace.name}</p></div>
                     </div>
-                    <button 
-                        onClick={onClose} 
-                        className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
-                    >
-                        ✕
-                    </button>
-                </div>
+                    <button type="button" onClick={onClose} className="console-icon-button" title={t('common.close')}><X size={17} /></button>
+                </header>
 
-                {/* Error Banner */}
-                {error && (
-                    <div className="bg-red-900/20 border border-red-700/50 text-red-300 px-4 py-3 mx-6 mt-4 rounded-lg text-sm flex items-center gap-2">
-                        ⚠️ {error}
-                    </div>
-                )}
+                {error && <div className="border-b border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400" role="alert">{error}</div>}
 
-                {/* Content */}
-                <div className="flex-1 overflow-hidden p-6">
-                    <div className="grid grid-cols-2 gap-6 h-full" style={{ height: 'calc(90vh - 180px)' }}>
-                        {/* 左侧：键列表 */}
-                        <div className="flex flex-col h-full">
-                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <span>📝</span> {t('kvManager.keysList')} ({keys.length})
-                            </h3>
-                            <div className="flex-1 overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-color)] rounded-lg p-3">
-                                {keys.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-[var(--text-muted)]">
-                                        <span className="text-3xl mb-2 opacity-30">📝</span>
-                                        <p>{t('kvManager.noKeys')}</p>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        {keys.map(key => (
-                                            <div
-                                                key={key.name}
-                                                className={`p-2.5 rounded-lg flex justify-between items-center transition-all ${
-                                                    selectedKey === key.name 
-                                                        ? 'bg-[var(--kv-theme)] text-white shadow-md' 
-                                                        : 'bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-main)] border border-[var(--border-color)]'
-                                                }`}
-                                            >
-                                                <button
-                                                    onClick={() => loadValue(key.name)}
-                                                    className="flex-1 text-left truncate font-mono text-sm"
-                                                >
-                                                    {key.name}
-                                                </button>
-                                                <button
-                                                    onClick={() => requestDelete(key.name)}
-                                                    className={`ml-2 p-1.5 rounded-md transition-colors ${
-                                                        selectedKey === key.name 
-                                                            ? 'hover:bg-white/20 text-white/80' 
-                                                            : 'text-red-400 hover:bg-red-900/20 hover:text-red-500'
-                                                    }`}
-                                                    title={t('common.delete')}
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                <main className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(260px,38%)_minmax(0,1fr)]">
+                    <section className="flex min-h-64 flex-col border-b border-[var(--border-color)] md:border-b-0 md:border-r">
+                        <div className="flex min-h-12 items-center gap-2 border-b border-[var(--border-color)] px-3">
+                            <div className="relative min-w-0 flex-1">
+                                <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                                <input value={prefix} onChange={event => setPrefix(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') search(); }} placeholder={t('kvManager.searchPrefix')} className="neo-input h-8 w-full pl-8 text-xs" />
                             </div>
+                            <button type="button" onClick={search} className="console-icon-button" title={t('common.confirm')}><Search size={14} /></button>
+                            <button type="button" onClick={() => void loadPage(currentCursor, activePrefix)} className="console-icon-button" title={t('common.refresh')}><RefreshCw size={14} /></button>
+                            <button type="button" onClick={resetEditor} className="console-icon-button" title={t('kvManager.addKey')}><Plus size={14} /></button>
                         </div>
-
-                        {/* 右侧：值编辑 */}
-                        <div className="flex flex-col h-full">
-                            <h3 className="text-sm font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <span>✏️</span> {selectedKey ? t('kvManager.viewing') + ' ' + selectedKey : t('kvManager.addKeyPair')}
-                            </h3>
-
-                            {/* 键输入 */}
-                            <div className="mb-3">
-                                <label className="text-xs text-[var(--text-muted)] mb-1.5 block">{t('kvManager.keyName')}</label>
-                                <input
-                                    type="text"
-                                    placeholder={t('kvManager.keyName')}
-                                    value={newKey}
-                                    onChange={e => setNewKey(e.target.value)}
-                                    className="w-full px-3 py-2.5 bg-[var(--bg-input)] text-[var(--text-main)] rounded-lg border border-[var(--border-color)] focus:border-[var(--kv-theme)] focus:ring-2 focus:ring-[var(--kv-theme-light)] focus:outline-none transition-all font-mono text-sm"
-                                />
+                        <div className="min-h-0 flex-1 overflow-auto">
+                            {loading ? <Loader2 size={20} className="mx-auto mt-16 animate-spin text-[var(--text-muted)]" /> : keys.length === 0 ? (
+                                <p className="px-4 py-16 text-center text-xs text-[var(--text-muted)]">{t('kvManager.noKeys')}</p>
+                            ) : keys.map(key => (
+                                <div key={key.name} className={`flex items-center border-b border-[var(--border-color)] px-2 py-1 ${selectedKey === key.name ? 'bg-[var(--bg-hover)]' : ''}`}>
+                                    <button type="button" onClick={() => void selectKey(key)} className="min-w-0 flex-1 px-1 py-2 text-left">
+                                        <div className="truncate font-mono text-xs text-[var(--text-main)]">{key.name}</div>
+                                        <div className="text-[10px] text-[var(--text-muted)]">{key.expiration ? new Date(key.expiration * 1000).toLocaleString() : t('kvManager.noExpiration')}</div>
+                                    </button>
+                                    <button type="button" onClick={() => void deleteKey(key.name)} className="console-icon-button text-red-500" title={t('common.delete')}><Trash2 size={14} /></button>
+                                </div>
+                            ))}
+                        </div>
+                        <footer className="flex min-h-11 items-center justify-between border-t border-[var(--border-color)] px-3 text-xs text-[var(--text-muted)]">
+                            <span>{t('kvManager.resultCount', { count: keys.length })}</span>
+                            <div className="flex items-center gap-1">
+                                <button type="button" onClick={previousPage} disabled={history.length === 0} className="console-icon-button" title={t('resourceList.previous')}><ChevronLeft size={14} /></button>
+                                <button type="button" onClick={nextPage} disabled={!nextCursor} className="console-icon-button" title={t('resourceList.next')}><ChevronRight size={14} /></button>
                             </div>
+                        </footer>
+                    </section>
 
-                            {/* 值输入 */}
-                            <div className="flex-1 mb-3">
-                                <label className="text-xs text-[var(--text-muted)] mb-1.5 block">{t('kvManager.valuePlaceholder')}</label>
-                                <textarea
-                                    placeholder={t('kvManager.valuePlaceholder')}
-                                    value={selectedKey ? value : newValue}
-                                    onChange={e => selectedKey ? setValue(e.target.value) : setNewValue(e.target.value)}
-                                    className="w-full h-full min-h-[120px] px-3 py-2.5 bg-[var(--bg-input)] text-[var(--text-main)] rounded-lg border border-[var(--border-color)] focus:border-[var(--kv-theme)] focus:ring-2 focus:ring-[var(--kv-theme-light)] focus:outline-none transition-all font-mono text-sm resize-none"
-                                />
+                    <section className="flex min-h-0 flex-col">
+                        <div className="flex min-h-12 items-center border-b border-[var(--border-color)] px-4 text-xs font-semibold text-[var(--text-main)]">
+                            {selectedKey ? t('kvManager.editKey') : t('kvManager.addKeyPair')}
+                        </div>
+                        <div className="grid min-h-0 flex-1 grid-rows-[auto_auto_minmax(140px,1fr)] gap-3 overflow-auto p-4">
+                            <label className="text-xs text-[var(--text-muted)]">
+                                <span className="mb-1 block">{t('kvManager.keyName')}</span>
+                                <input value={keyName} onChange={event => setKeyName(event.target.value)} disabled={selectedKey !== null} className="neo-input h-9 w-full font-mono text-sm disabled:opacity-70" />
+                            </label>
+                            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                <label className="text-xs text-[var(--text-muted)]"><span className="mb-1 block">{t('kvManager.expiration')}</span><input type="datetime-local" value={expiration} onChange={event => setExpiration(event.target.value)} className="neo-input h-9 w-full text-sm" /></label>
+                                <label className="text-xs text-[var(--text-muted)]"><span className="mb-1 block">{t('kvManager.metadata')}</span><input value={metadata} onChange={event => setMetadata(event.target.value)} placeholder="{}" className="neo-input h-9 w-full font-mono text-sm" /></label>
                             </div>
-
-                            {/* 保存按钮 */}
-                            <button
-                                onClick={saveKeyValue}
-                                disabled={!newKey || loading}
-                                className="px-4 py-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                style={{
-                                    backgroundColor: !newKey || loading ? 'var(--bg-hover)' : 'var(--kv-theme)',
-                                    color: 'white'
-                                }}
-                            >
-                                {loading ? (
-                                    <>
-                                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                        {t('common.saving')}
-                                    </>
-                                ) : (
-                                    <>
-                                        <span>💾</span> {t('common.save')}
-                                    </>
-                                )}
+                            <label className="flex min-h-0 flex-col text-xs text-[var(--text-muted)]"><span className="mb-1 block">{t('kvManager.value')}</span><textarea value={value} onChange={event => setValue(event.target.value)} placeholder={t('kvManager.valuePlaceholder')} spellCheck={false} className="min-h-40 flex-1 resize-none rounded-sm border border-[var(--border-color)] bg-[var(--bg-input)] p-3 font-mono text-sm text-[var(--text-main)] outline-none focus:border-[var(--kv-theme)]" /></label>
+                        </div>
+                        <footer className="flex min-h-14 items-center justify-end gap-2 border-t border-[var(--border-color)] px-4">
+                            <button type="button" onClick={resetEditor} className="console-secondary-button">{t('common.cancel')}</button>
+                            <button type="button" onClick={saveKey} disabled={saving || !keyName.trim()} className="console-primary-button">
+                                {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}{saving ? t('common.saving') : t('common.save')}
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Delete Confirmation Modal */}
-                {keyToDelete && (
-                    <div className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-[110]">
-                        <div className="bg-[var(--bg-card)] border border-[var(--border-color)] p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4">
-                            <h3 className="text-xl font-bold text-[var(--text-main)] mb-2">{t('common.confirmDelete')}</h3>
-                            <p className="text-[var(--text-muted)] mb-6">
-                                {t('kvManager.confirmDeleteKey', { key: keyToDelete })}
-                            </p>
-                            <div className="flex justify-end gap-3">
-                                <button
-                                    onClick={() => setKeyToDelete(null)}
-                                    className="px-4 py-2 rounded-lg font-medium transition-colors"
-                                    style={{
-                                        backgroundColor: 'var(--bg-hover)',
-                                        color: 'var(--text-muted)'
-                                    }}
-                                >
-                                    {t('common.cancel')}
-                                </button>
-                                <button
-                                    onClick={executeDelete}
-                                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition-colors"
-                                >
-                                    {t('common.confirmDelete')}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                        </footer>
+                    </section>
+                </main>
             </div>
         </div>,
         document.body
     );
-};
-
-export default KVManager;
+}

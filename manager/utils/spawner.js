@@ -1,15 +1,124 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
+const crypto = require('node:crypto');
+const config = require('../config');
 const { generateConfig } = require('./generator');
+const { createResourceBindingShim } = require('./resource-binding-shim');
+const { tokenForProject } = require('../services/resource-gateway-auth');
 const { resolveWithin } = require('./path-helper');
 const cryptoHelper = require('./crypto-helper');
+const { getWranglerCommand } = require('./wrangler-command');
+const { isReleasePath, resolveProjectPath } = require('./project-paths');
+const { createRuntimeEnvironment } = require('./runtime-environment');
+const { normalizeProjectCompatibility } = require('../services/project-compatibility');
+const runtimeLogs = require('../services/runtime-log-service');
+
+function terminateManagedProcess(child) {
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
+    const signal = (name) => {
+        if (process.platform !== 'win32' && child.pid) process.kill(-child.pid, name);
+        else child.kill(name);
+    };
+    try {
+        signal('SIGTERM');
+    } catch {
+        return;
+    }
+    const forceTimer = setTimeout(() => {
+        if (child.exitCode !== null || child.signalCode !== null) return;
+        try { signal('SIGKILL'); } catch { }
+    }, 2_000);
+    forceTimer.unref();
+}
+
+function getInspectorPort(port) {
+    const runtimePort = Number(port);
+    if (!Number.isInteger(runtimePort) || runtimePort < 1 || runtimePort > 65535) {
+        throw new Error(`Invalid project runtime port: ${port}`);
+    }
+
+    return runtimePort <= 55535 ? runtimePort + 10000 : runtimePort - 10000;
+}
+
+function runManagedCommand(command, args, options = {}) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, {
+            cwd: options.cwd,
+            env: createRuntimeEnvironment(options.env),
+            detached: process.platform !== 'win32'
+        });
+        const output = [];
+        let settled = false;
+        const capture = chunk => {
+            output.push(chunk);
+            if (output.reduce((size, item) => size + item.length, 0) > 64 * 1024) output.shift();
+        };
+        child.stdout.on('data', capture);
+        child.stderr.on('data', capture);
+        const timer = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            terminateManagedProcess(child);
+            reject(new Error(`Pages Functions build timed out after ${options.timeoutMs}ms`));
+        }, options.timeoutMs);
+        timer.unref();
+        child.once('error', error => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            reject(error);
+        });
+        child.once('close', code => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (code === 0) return resolve();
+            const detail = Buffer.concat(output).toString('utf8').trim();
+            reject(new Error(`Pages Functions build failed with code ${code}${detail ? `: ${detail}` : ''}`));
+        });
+    });
+}
+
+function copyPagesAssets(source, destination) {
+    fs.rmSync(destination, { recursive: true, force: true });
+    fs.mkdirSync(destination, { recursive: true, mode: 0o700 });
+    fs.cpSync(source, destination, {
+        recursive: true,
+        filter: current => {
+            const relative = path.relative(source, current);
+            if (!relative) return true;
+            const [first] = relative.split(path.sep);
+            return first !== 'functions' && relative !== '_worker.js';
+        }
+    });
+}
+
+function preparePagesReleaseWorkspace(source, controlDirectory) {
+    const workspace = resolveWithin(controlDirectory, 'source');
+    fs.rmSync(controlDirectory, { recursive: true, force: true });
+    fs.mkdirSync(workspace, { recursive: true, mode: 0o700 });
+    fs.cpSync(source, workspace, { recursive: true, force: false, errorOnExist: true });
+    return workspace;
+}
 
 class ProjectRuntime {
-    constructor(uploadsDir, resources = { kv: [], d1: [] }) {
+    constructor(uploadsDir, resources = { kv: [], d1: [] }, options = {}) {
         this.processes = new Map(); // projectId -> ChildProcess
         this.uploadsDir = uploadsDir;
         this.resources = resources;
+        this.logService = options.logService || runtimeLogs;
+    }
+
+    appendLog(projectId, stream, content) {
+        try {
+            this.logService.append(projectId, stream, content);
+            return true;
+        } catch (error) {
+            console.error(`[Runtime] Failed to persist ${stream} log for project ${projectId}: ${error.message}`);
+            return false;
+        }
     }
 
     /**
@@ -17,8 +126,9 @@ class ProjectRuntime {
      * @param {Object} project 
      * @returns {Promise<void>}
      */
-    async start(project) {
-        if (this.processes.has(project.id)) {
+    async start(project, options = {}) {
+        const runtimeKey = options.runtimeKey || project.id;
+        if (this.processes.has(runtimeKey)) {
             console.log(`Project ${project.name} is already running.`);
             return;
         }
@@ -26,11 +136,68 @@ class ProjectRuntime {
         console.log(`Starting project ${project.name} on port ${project.port}...`);
 
         // Determine command and args based on project type
-        let cmd = 'npx';
-        let args = ['wrangler'];
+        const wrangler = getWranglerCommand();
+        let cmd = wrangler.command;
+        let args = [...wrangler.args];
         let cwd = this.uploadsDir;
+        let controlDirectory = null;
+        let usesGatewayPages = false;
+        const { compatibilityDate, compatibilityFlags } = normalizeProjectCompatibility(project);
 
         if (project.type === 'pages') {
+            if (isReleasePath(project.mainFile)) {
+                const releaseDirectory = resolveProjectPath(project.mainFile);
+                const suffix = crypto.createHash('sha256').update(runtimeKey).digest('hex').slice(0, 20);
+                controlDirectory = resolveWithin(config.RUNTIME_CONTROL_DIR, suffix);
+                cwd = preparePagesReleaseWorkspace(releaseDirectory, controlDirectory);
+                const functionsDirectory = path.join(cwd, 'functions');
+                const customWorker = path.join(cwd, '_worker.js');
+                const hasFunctions = fs.existsSync(functionsDirectory) && fs.statSync(functionsDirectory).isDirectory();
+                const hasCustomWorker = fs.existsSync(customWorker) && fs.statSync(customWorker).isFile();
+
+                if (hasFunctions || hasCustomWorker) {
+                    usesGatewayPages = true;
+                    let workerEntry = customWorker;
+                    if (hasFunctions) {
+                        const workerDirectory = resolveWithin(controlDirectory, 'pages-worker');
+                        workerEntry = resolveWithin(workerDirectory, 'index.js');
+                        await runManagedCommand(wrangler.command, [
+                            ...wrangler.args,
+                            'pages', 'functions', 'build', functionsDirectory,
+                            '--outdir', workerDirectory
+                        ], {
+                            cwd,
+                            env: { FORCE_COLOR: '0', NO_COLOR: '1' },
+                            timeoutMs: (project.limits?.buildTimeoutSeconds || 600) * 1000
+                        });
+                    }
+
+                    const wrapperPath = resolveWithin(controlDirectory, 'entry.mjs');
+                    const configPath = resolveWithin(controlDirectory, 'wrangler.toml');
+                    const assetsDirectory = resolveWithin(controlDirectory, 'assets');
+                    copyPagesAssets(cwd, assetsDirectory);
+                    fs.writeFileSync(wrapperPath, createResourceBindingShim(project, {
+                        entry: workerEntry,
+                        gatewayUrl: `http://127.0.0.1:${config.RESOURCE_GATEWAY_PORT}`,
+                        token: tokenForProject(project.id)
+                    }), { mode: 0o600 });
+                    fs.writeFileSync(configPath, generateConfig({
+                        ...project,
+                        type: 'worker',
+                        mainFile: wrapperPath
+                    }, this.resources, {
+                        includeResourceBindings: false,
+                        assetsDirectory,
+                        assetsBinding: 'ASSETS',
+                        runWorkerFirst: true
+                    }), { mode: 0o600 });
+                    args.push('dev', wrapperPath, '--config', configPath);
+                    console.log(`[Runtime] Dynamic Pages release ${project.name}: CWD=${cwd}`);
+                } else {
+                    args.push('pages', 'dev', '.');
+                    console.log(`[Runtime] Static Pages release ${project.name}: CWD=${cwd}`);
+                }
+            } else {
             // Logic to determine Project Root (where functions/ or _worker.js might be)
             // and Static Assets Dir (which is passed to 'wrangler pages dev [DIR]')
 
@@ -102,14 +269,15 @@ class ProjectRuntime {
                 args.push('pages', 'dev', staticArg);
                 console.log(`[Runtime] Direct Upload ${project.name}: CWD=${cwd}, Target=${staticArg}`);
             }
+            }
 
-            // Sync KV Data before starting
-            await this.seedKV(project, cwd);
+            // Legacy mutable Pages projects retain native bindings until migrated.
+            if (!usesGatewayPages) await this.seedKV(project, cwd);
 
             // Add bindings via CLI for Pages
             // ...
             // KV Bindings
-            if (project.bindings && project.bindings.kv && project.bindings.kv.length > 0) {
+            if (!usesGatewayPages && project.bindings && project.bindings.kv && project.bindings.kv.length > 0) {
                 project.bindings.kv.forEach(binding => {
                     const kvResource = this.resources.kv.find(r => r.id === binding.resourceId);
                     if (kvResource) {
@@ -119,7 +287,7 @@ class ProjectRuntime {
             }
 
             // D1 Bindings
-            if (project.bindings && project.bindings.d1 && project.bindings.d1.length > 0) {
+            if (!usesGatewayPages && project.bindings && project.bindings.d1 && project.bindings.d1.length > 0) {
                 project.bindings.d1.forEach(binding => {
                     const d1Resource = this.resources.d1.find(r => r.id === binding.resourceId);
                     if (d1Resource) {
@@ -129,7 +297,7 @@ class ProjectRuntime {
             }
 
             // R2 Bindings
-            if (project.bindings && project.bindings.r2 && project.bindings.r2.length > 0) {
+            if (!usesGatewayPages && project.bindings && project.bindings.r2 && project.bindings.r2.length > 0) {
                 project.bindings.r2.forEach(binding => {
                     const r2Resource = this.resources.r2.find(r => r.id === binding.resourceId);
                     if (r2Resource) {
@@ -139,7 +307,7 @@ class ProjectRuntime {
             }
 
             // 环境变量 (envVars) - 通过 --binding 参数传递
-            if (project.envVars && Object.keys(project.envVars).length > 0) {
+            if (!usesGatewayPages && project.envVars && Object.keys(project.envVars).length > 0) {
                 Object.entries(project.envVars).forEach(([key, varData]) => {
                     let value;
                     if (varData.type === 'json') {
@@ -157,94 +325,164 @@ class ProjectRuntime {
                 });
             }
 
-            // Force shared persistence so Pages see the same D1 data
-            const sharedStateDir = path.join(path.dirname(this.uploadsDir), 'wrangler-shared-state');
-            args.push('--persist-to', sharedStateDir);
+            const projectStateDir = resolveWithin(config.PROJECT_RUNTIME_STATE_DIR, project.id);
+            fs.mkdirSync(projectStateDir, { recursive: true, mode: 0o700 });
+            args.push('--persist-to', projectStateDir);
 
             // Port and IP
             args.push('--port', project.port.toString());
             args.push('--ip', '0.0.0.0');
 
-            // Compatibility Flags
-            args.push('--compatibility-date', '2024-09-23');
-            args.push('--compatibility-flags', 'nodejs_compat');
+            args.push('--compatibility-date', compatibilityDate);
+            for (const flag of compatibilityFlags) args.push('--compatibility-flag', flag);
 
             // Unique Inspector Port to avoid conflicts
-            args.push('--inspector-port', (project.port + 10000).toString());
+            args.push('--inspector-port', getInspectorPort(project.port).toString());
 
         } else {
-            // For Workers: wrangler dev <file> --config <toml>
-            const configContent = generateConfig(project, this.resources);
-            const configPath = resolveWithin(this.uploadsDir, `${project.id}.toml`);
-            fs.writeFileSync(configPath, configContent);
+            const suffix = crypto.createHash('sha256').update(runtimeKey).digest('hex').slice(0, 20);
+            controlDirectory = resolveWithin(config.RUNTIME_CONTROL_DIR, suffix);
+            fs.rmSync(controlDirectory, { recursive: true, force: true });
+            fs.mkdirSync(controlDirectory, { recursive: true, mode: 0o700 });
+            const wrapperPath = resolveWithin(controlDirectory, 'entry.mjs');
+            const configPath = resolveWithin(controlDirectory, 'wrangler.toml');
+            fs.writeFileSync(wrapperPath, createResourceBindingShim(project, {
+                entry: resolveProjectPath(project.mainFile),
+                gatewayUrl: `http://127.0.0.1:${config.RESOURCE_GATEWAY_PORT}`,
+                token: tokenForProject(project.id)
+            }), { mode: 0o600 });
+            fs.writeFileSync(configPath, generateConfig({ ...project, mainFile: wrapperPath }, this.resources, {
+                includeResourceBindings: false
+            }), { mode: 0o600 });
 
-            args.push('dev', project.mainFile);
+            args.push('dev', wrapperPath);
             args.push('--config', configPath);
             args.push('--port', project.port.toString());
             args.push('--ip', '0.0.0.0');
 
             // Unique Inspector Port to avoid conflicts
-            args.push('--inspector-port', (project.port + 10000).toString());
+            args.push('--inspector-port', getInspectorPort(project.port).toString());
 
-            // Force shared persistence so all workers supply the same DBs
-            const sharedStateDir = path.join(path.dirname(this.uploadsDir), 'wrangler-shared-state');
-            args.push('--persist-to', sharedStateDir);
+            const projectStateDir = resolveWithin(config.PROJECT_RUNTIME_STATE_DIR, project.id);
+            fs.mkdirSync(projectStateDir, { recursive: true, mode: 0o700 });
+            args.push('--persist-to', projectStateDir);
         }
 
         // Spawn process
         const child = spawn(cmd, args, {
             cwd: cwd,
-            env: { ...process.env, FORCE_COLOR: '1' }
+            env: createRuntimeEnvironment({ FORCE_COLOR: '1' }),
+            detached: process.platform !== 'win32'
         });
+
+        const persistentObservability = runtimeKey === project.id;
+        let resolveClosed;
+        const closePromise = new Promise(resolve => { resolveClosed = resolve; });
+        const processData = {
+            child,
+            port: project.port,
+            spawnError: null,
+            controlDirectory,
+            persistentObservability,
+            projectId: project.id,
+            closePromise
+        };
 
         child.stdout.on('data', (data) => {
             console.log(`[${project.name}] ${data}`);
+            if (persistentObservability) this.appendLog(project.id, 'stdout', data.toString());
         });
 
         child.stderr.on('data', (data) => {
             console.error(`[${project.name}] ${data}`);
+            if (persistentObservability) this.appendLog(project.id, 'stderr', data.toString());
+        });
+
+        child.on('error', error => {
+            processData.spawnError = error;
+            console.error(`[${project.name}] Failed to spawn runtime: ${error.message}`);
+            if (persistentObservability) this.appendLog(project.id, 'stderr', `Runtime spawn failed: ${error.message}`);
         });
 
         child.on('close', (code) => {
             console.log(`[${project.name}] Process exited with code ${code}`);
-            this.processes.delete(project.id);
+            const current = this.processes.get(runtimeKey);
+            if (current && current.child === child) {
+                this.processes.delete(runtimeKey);
+                if (current.controlDirectory) fs.rmSync(current.controlDirectory, { recursive: true, force: true });
+            }
+            if (persistentObservability) this.appendLog(project.id, 'system', `Runtime process exited with code ${code}`);
+            resolveClosed({ code, signal: child.signalCode });
         });
 
-        this.processes.set(project.id, { child, port: project.port });
+        this.processes.set(runtimeKey, processData);
+        try {
+            await this.waitUntilReady(runtimeKey, options.readinessTimeoutMs);
+            if (persistentObservability) this.appendLog(project.id, 'system', 'Runtime started');
+        } catch (error) {
+            await this.stop(runtimeKey);
+            throw error;
+        }
+    }
+
+    async waitUntilReady(runtimeKey, timeoutMs = 20_000) {
+        const deadline = Date.now() + timeoutMs;
+        let lastError;
+        while (Date.now() < deadline) {
+            const processData = this.processes.get(runtimeKey);
+            if (!processData) throw new Error('Runtime exited before becoming ready');
+            if (processData.spawnError) throw processData.spawnError;
+            if (processData.child.exitCode !== null) {
+                throw new Error(`Runtime exited before becoming ready (code ${processData.child.exitCode})`);
+            }
+            try {
+                await new Promise((resolve, reject) => {
+                    const socket = net.createConnection({ host: '127.0.0.1', port: processData.port });
+                    socket.setTimeout(300);
+                    socket.once('connect', () => {
+                        socket.destroy();
+                        resolve();
+                    });
+                    socket.once('timeout', () => {
+                        socket.destroy();
+                        reject(new Error('connection timed out'));
+                    });
+                    socket.once('error', reject);
+                });
+                return;
+            } catch (error) {
+                lastError = error;
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+        }
+        throw new Error(`Runtime readiness check timed out: ${lastError ? lastError.message : 'unknown error'}`);
     }
 
     /**
      * Stop a project
      * @param {string} projectId 
      */
-    stop(projectId) {
+    async stop(projectId) {
         const processData = this.processes.get(projectId);
         if (processData) {
             const { child, port } = processData;
 
             console.log(`[Runtime] Stopping project ${projectId} on port ${port}...`);
+            if (processData.persistentObservability) this.appendLog(processData.projectId, 'system', 'Runtime stopping');
 
-            // 1. Try graceful kill (SIGTERM)
-            if (child && !child.killed) {
-                child.kill('SIGTERM');
+            terminateManagedProcess(child);
+            let timeoutId;
+            try {
+                await Promise.race([
+                    processData.closePromise,
+                    new Promise((_, reject) => {
+                        timeoutId = setTimeout(() => reject(new Error(`Runtime ${projectId} did not stop within 5 seconds`)), 5_000);
+                        timeoutId.unref();
+                    })
+                ]);
+            } finally {
+                if (timeoutId) clearTimeout(timeoutId);
             }
-
-            // 2. Force kill any process on this port (Zombie cleanup)
-            // Since we are stopping the project that OWNS this port, this is safe and necessary
-            // because npx/wrangler often leaves subprocesses running.
-            if (port) {
-                try {
-                    const { execSync } = require('child_process');
-                    // fuser -k <port>/tcp kills processes on that port
-                    // -k: kill, -s: silent (optional, but we want logs if it fails?)
-                    execSync(`fuser -k ${port}/tcp`, { stdio: 'ignore' });
-                    console.log(`[Runtime] Force-freed port ${port}`);
-                } catch (e) {
-                    // Ignore error (exit code 1 means no process found to kill, which is good)
-                }
-            }
-
-            this.processes.delete(projectId);
             return true;
         }
         return false;
@@ -325,10 +563,15 @@ class ProjectRuntime {
         fs.writeFileSync(configPath, tomlContent);
 
         return new Promise((resolve) => {
-            const { spawn } = require('child_process');
-            const seedChild = spawn('npx', ['wrangler', 'dev', `seeder-${seedId}.js`, '--config', `seeder-${seedId}.toml`, '--port', port.toString()], {
+            const wrangler = getWranglerCommand();
+            const sharedStateDir = path.join(path.dirname(this.uploadsDir), 'wrangler-shared-state');
+            const seedChild = spawn(wrangler.command, [
+                ...wrangler.args, 'dev', `seeder-${seedId}.js`, '--config', `seeder-${seedId}.toml`,
+                '--port', port.toString(), '--inspector-port', String(port + 10000), '--persist-to', sharedStateDir
+            ], {
                 cwd,
-                env: { ...process.env, FORCE_COLOR: '1' }
+                env: createRuntimeEnvironment({ FORCE_COLOR: '1' }),
+                detached: process.platform !== 'win32'
             });
 
             // Handle logging slightly to confirm it runs
@@ -365,12 +608,7 @@ class ProjectRuntime {
 
             function cleanupAndResolve() {
                 // Kill seeder
-                try {
-                    process.kill(seedChild.pid, 'SIGTERM');
-                    // Force kill if needed? logic for spawner.js tracks pids, but this is temp.
-                    // Just emit sigtikill slightly later if needed?
-                    // Usually wrangler dev dies on sigterm.
-                } catch (e) { }
+                terminateManagedProcess(seedChild);
 
                 // Clean files
                 // Wait a moment for process to release locks on windows? (Mac is fine)
@@ -384,3 +622,6 @@ class ProjectRuntime {
 }
 
 module.exports = ProjectRuntime;
+module.exports.terminateManagedProcess = terminateManagedProcess;
+module.exports.getInspectorPort = getInspectorPort;
+module.exports.preparePagesReleaseWorkspace = preparePagesReleaseWorkspace;

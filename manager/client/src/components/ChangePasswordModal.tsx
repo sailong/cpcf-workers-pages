@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useTranslation } from 'react-i18next';
 import { AuthService } from '../services/auth';
+import { Loader2 } from 'lucide-react';
 
 interface ChangePasswordModalProps {
     onClose: () => void;
@@ -16,6 +17,15 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (required) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, required]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -43,56 +53,71 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ onClose, onSu
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-[70] backdrop-blur-sm">
-            <div className="neo-glass p-6 rounded-xl shadow-2xl w-full max-w-md mx-4">
-                <h3 className="text-xl font-bold text-[var(--text-main)] mb-4">{t('auth.changePasswordTitle')}</h3>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 p-4" onMouseDown={() => { if (!required) onClose(); }}>
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="change-password-title"
+                className="console-dialog w-full max-w-md"
+                onMouseDown={event => event.stopPropagation()}
+            >
+                <div className="border-b border-[var(--border-color)] px-5 py-4">
+                    <h2 id="change-password-title" className="text-base font-semibold text-[var(--text-main)]">{t('auth.changePasswordTitle')}</h2>
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit}>
+                    <div className="space-y-4 px-5 py-5">
                     <div>
-                        <label className="block text-[var(--text-muted)] text-sm mb-1">{t('auth.oldPassword')}</label>
+                        <label htmlFor="old-password" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('auth.oldPassword')}</label>
                         <input
+                            id="old-password"
                             type="password"
                             value={oldPassword}
                             onChange={e => setOldPassword(e.target.value)}
-                            className="neo-input w-full"
+                            className="console-input w-full"
+                            autoFocus
                         />
                     </div>
                     <div>
-                        <label className="block text-[var(--text-muted)] text-sm mb-1">{t('auth.newPassword')}</label>
+                        <label htmlFor="new-password" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('auth.newPassword')}</label>
                         <input
+                            id="new-password"
                             type="password"
                             value={newPassword}
                             onChange={e => setNewPassword(e.target.value)}
-                            className="neo-input w-full"
+                            className="console-input w-full"
                         />
                     </div>
                     <div>
-                        <label className="block text-[var(--text-muted)] text-sm mb-1">{t('auth.confirmPassword')}</label>
+                        <label htmlFor="confirm-password" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{t('auth.confirmPassword')}</label>
                         <input
+                            id="confirm-password"
                             type="password"
                             value={confirmPassword}
                             onChange={e => setConfirmPassword(e.target.value)}
-                            className="neo-input w-full"
+                            className="console-input w-full"
                         />
                     </div>
 
                     {error && (
-                        <div className="bg-red-500/10 border border-red-500/20 text-red-500 px-4 py-3 rounded-xl text-sm text-center font-medium backdrop-blur-md">
+                        <div role="alert" className="console-alert error mb-0">
                             {error}
                         </div>
                     )}
+                    </div>
 
-                    <div className="flex justify-end gap-3 mt-6">
+                    <div className="flex justify-end gap-2 border-t border-[var(--border-color)] bg-[var(--bg-subtle)] px-5 py-3">
                         {!required && (
-                            <button type="button" onClick={onClose} className="btn-glass">
+                            <button type="button" onClick={onClose} className="console-button secondary">
                                 {t('common.cancel')}
                             </button>
                         )}
                         <button
                             type="submit"
                             disabled={loading}
-                            className="btn-gradient disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="console-button primary"
                         >
+                            {loading && <Loader2 size={15} className="animate-spin" aria-hidden="true" />}
                             {loading ? t('common.saving') : t('auth.changePasswordButton')}
                         </button>
                     </div>

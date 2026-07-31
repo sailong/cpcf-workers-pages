@@ -8,12 +8,15 @@ const { clearSessionCookie, setSessionCookie } = require('../utils/session-cooki
 
 function createAuthRouter(options = {}) {
     const service = options.authService || authService;
+    const secureCookies = options.secureCookies ?? process.env.NODE_ENV === 'production';
     const loginRateLimiter = options.loginRateLimiter || createLoginRateLimiter();
     const captchaRateLimiter = options.captchaRateLimiter || createLoginRateLimiter({
         maxAttempts: 30,
         windowMs: 5 * 60 * 1000,
         errorMessage: '验证码请求过多，请稍后重试'
     });
+    const fixedCaptchaAnswer = options.fixedCaptchaAnswer
+        || (process.env.NODE_ENV === 'test' ? process.env.CAPTCHA_TEST_ANSWER : null);
     const router = express.Router();
 
     router.get('/health', (req, res) => {
@@ -27,7 +30,7 @@ function createAuthRouter(options = {}) {
             noise: 2,
             color: true
         });
-        const captchaId = service.createCaptchaChallenge(captcha.text);
+        const captchaId = service.createCaptchaChallenge(fixedCaptchaAnswer || captcha.text);
         res.setHeader('Cache-Control', 'no-store');
         res.json({ image: captcha.data, captchaId });
     });
@@ -43,7 +46,8 @@ function createAuthRouter(options = {}) {
         }
 
         const token = await service.createSession();
-        setSessionCookie(res, token);
+        loginRateLimiter.reset(req.ip || req.socket.remoteAddress || 'unknown');
+        setSessionCookie(res, token, { secure: secureCookies });
         res.setHeader('Cache-Control', 'no-store');
         res.json({ success: true, requirePasswordChange: service.isDefaultPassword() });
     });
@@ -59,7 +63,7 @@ function createAuthRouter(options = {}) {
 
     router.post('/logout', async (req, res) => {
         await service.revokeSession(req.sessionToken);
-        clearSessionCookie(res);
+        clearSessionCookie(res, { secure: secureCookies });
         res.json({ success: true });
     });
 
@@ -78,7 +82,7 @@ function createAuthRouter(options = {}) {
         }
 
         await service.setPassword(newPassword);
-        clearSessionCookie(res);
+        clearSessionCookie(res, { secure: secureCookies });
         res.json({ success: true, sessionRevoked: true });
     });
 

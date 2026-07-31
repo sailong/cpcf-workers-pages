@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            manager/package-lock.json
+            manager/client/package-lock.json
+            tests/e2e/package-lock.json
+      - name: Install backend dependencies
+        working-directory: manager
+        run: npm ci
+      - name: Run backend tests
+        working-directory: manager
+        run: npm test
+      - name: Verify local Pages resource runtime
+        working-directory: manager
+        run: npm run test:pages-runtime
+      - name: Audit backend production dependencies
+        working-directory: manager
+        run: npm audit --omit=dev --audit-level=high
+      - name: Install frontend dependencies
+        working-directory: manager/client
+        run: npm ci
+      - name: Run frontend tests with coverage thresholds
+        working-directory: manager/client
+        run: npm run test:coverage
+      - name: Lint frontend
+        working-directory: manager/client
+        run: npm run lint
+      - name: Type-check frontend
+        working-directory: manager/client
+        run: npm run typecheck
+      - name: Build frontend
+        working-directory: manager/client
+        run: npm run build
+      - name: Audit all frontend dependencies
+        working-directory: manager/client
+        run: npm audit --audit-level=high
+      - name: Validate Compose files
+        env:
+          CCFWP_TEST_PASSWORD: ComposeValidationOnly
+          CCFWP_TEST_CAPTCHA: ComposeValidationOnly
+        run: |
+          docker compose --env-file .env.production.example -f docker-compose.yml config >/dev/null
+          docker compose -f docker-compose.dev.yml config >/dev/null
+          docker compose -f docker-compose.test.yml config >/dev/null
+
+  runtime-isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Docker Runtime Broker isolation
+        run: ./scripts/test-runtime-broker.sh
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      - name: Generate isolated test credentials
+        run: |
+          echo "CCFWP_TEST_PASSWORD=E2E-a$(node -e \"process.stdout.write(require('node:crypto').randomBytes(24).toString('hex'))\")" >> "$GITHUB_ENV"
+          echo "CCFWP_TEST_CAPTCHA=$(node -e \"process.stdout.write(require('node:crypto').randomBytes(16).toString('hex'))\")" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/ccfwp-test-data"
+          echo "CCFWP_TEST_DATA_DIR=$RUNNER_TEMP/ccfwp-test-data" >> "$GITHUB_ENV"
+      - name: Start isolated platform
+        run: docker compose -p ccfwp-test -f docker-compose.test.yml up -d --build --wait
+      - name: Install browser test dependencies
+        working-directory: tests/e2e
+        run: npm ci
+      - name: Install Chromium
+        working-directory: tests/e2e
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright
+        working-directory: tests/e2e
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:18001
+        run: npm test
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            tests/e2e/playwright-report
+            tests/e2e/test-results
+      - name: Show isolated platform logs
+        if: failure()
+        run: docker compose -p ccfwp-test -f docker-compose.test.yml logs --no-color
+      - name: Stop isolated platform
+        if: always()
+        run: docker compose -p ccfwp-test -f docker-compose.test.yml down -v

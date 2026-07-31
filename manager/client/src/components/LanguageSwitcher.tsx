@@ -1,21 +1,21 @@
-import React from 'react';
+import { Languages } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-const LanguageSwitcher: React.FC<{ className?: string }> = ({ className = "" }) => {
+const LanguageSwitcher = ({ className = '' }: { className?: string }) => {
     const { t, i18n } = useTranslation();
-
-    const toggleLanguage = () => {
-        const newLang = i18n.language.startsWith('zh') ? 'en' : 'zh';
-        i18n.changeLanguage(newLang);
-    };
+    const chinese = i18n.language.startsWith('zh');
+    const label = chinese ? t('theme.switchToEn') : t('theme.switchToZh');
 
     return (
         <button
-            onClick={toggleLanguage}
-            className={`p-2 rounded-xl hover:bg-white/20 transition-all text-[var(--text-muted)] hover:text-[var(--text-main)] font-bold ${className}`}
-            title={i18n.language.startsWith('zh') ? t('theme.switchToEn') : t('theme.switchToZh')}
+            type="button"
+            onClick={() => void i18n.changeLanguage(chinese ? 'en' : 'zh')}
+            className={`console-button secondary ${className}`}
+            title={label}
+            aria-label={label}
         >
-            {i18n.language.startsWith('zh') ? '中' : 'EN'}
+            <Languages size={15} aria-hidden="true" />
+            <span>{chinese ? '中文' : 'EN'}</span>
         </button>
     );
 };

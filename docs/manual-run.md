@@ -5,7 +5,7 @@
 
 ## 前置要求 (Prerequisites)
 
-*   **Node.js**: v18.0.0 或更高版本
+*   **Node.js**: v22.0.0 或更高版本
 *   **npm**: 生成环境通常自带
 *   **Linux/macOS**: 建议环境 (Windows 可能需要 WSL)
 
@@ -53,12 +53,17 @@ npm run build
 | 变量名 | 默认值 | 说明 |
 | :--- | :--- | :--- |
 | `MANAGER_SERVICE_PORT` | `3000` | 后端服务监听端口 |
-| `R2_ADMIN_PORT` | `9099` | R2 管理界面端口 (可选) |
+| `RUNTIME_PROVIDER` | `docker` | 隔离运行时；默认 Docker。`process` 仅用于非隔离调试 |
+| `ALLOW_UNISOLATED_RUNTIME` | 未设置 | 必须设为 `true` 才能启用 `RUNTIME_PROVIDER=process`；公网禁止 |
+| `BUILD_NETWORK_MODE` | `prefer-offline` | 构建安装网络策略：`online` / `prefer-offline` / `offline` |
+| `BUILD_REGISTRY_ALLOWLIST` | npm 官方与 npmmirror | 允许访问的 npm registry 列表 |
+| `BUILD_DEFAULT_REGISTRY` | `https://registry.npmmirror.com/` | 非白名单 registry 会被替换为该值 |
+| `AUTH_PASSWORD` | 开发默认密码 | 初次启动管理员密码；已有数据目录不会被环境变量覆盖 |
 
 
 ## 4. 启动服务 (Start Server)
 
-回到 `manager` 目录，启动后端服务。
+回到 `manager` 目录，启动后端服务。满足项目隔离要求时必须使用 Docker Runtime Broker；直接运行 Node 只适合明确接受非隔离风险的调试场景。
 
 ### 方式 A：直接启动 (开发/调试)
 
@@ -68,7 +73,10 @@ npm run build
 在 `manager` 目录下创建一个名为 `.env` 的文件，填入以下内容：
 ```bash
 MANAGER_SERVICE_PORT=8001
-R2_ADMIN_PORT=9100
+RUNTIME_PROVIDER=docker
+BUILD_NETWORK_MODE=prefer-offline
+BUILD_REGISTRY_ALLOWLIST=https://registry.npmmirror.com/,https://registry.npmjs.org/
+BUILD_DEFAULT_REGISTRY=https://registry.npmmirror.com/
 ```
 然后直接运行：
 ```bash
@@ -83,21 +91,18 @@ node server.js
 **Linux / macOS / Git Bash:**
 ```bash
 export MANAGER_SERVICE_PORT=8001
-export R2_ADMIN_PORT=9100
 node server.js
 ```
 
 **Windows (CMD):**
 ```cmd
 set MANAGER_SERVICE_PORT=8001
-set R2_ADMIN_PORT=9100
 node server.js
 ```
 
 **Windows (PowerShell):**
 ```powershell
 $env:MANAGER_SERVICE_PORT="8001"
-$env:R2_ADMIN_PORT="9100"
 node server.js
 ```
 
@@ -116,7 +121,7 @@ pm2 start server.js --name "cf-platform" --env MANAGER_SERVICE_PORT=8001
 
 启动成功后，打开浏览器访问：
 
-*   **管理面板**: `http://localhost:3000` (或您配置的端口)
+*   **管理面板**: `http://localhost:8001` (或您配置的端口)
 
 
 ## 6. 数据备份

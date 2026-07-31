@@ -11,6 +11,7 @@ dist/
 build/
 **/dist/
 **/build/
+**/coverage/
 
 # Local Data & State (Platform Specific)
 .platform-data/
@@ -45,7 +46,9 @@ Thumbs.db
 # tmp
 tmp/
 examples/
-tests/
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tests/e2e/TEST_REPORT.md
 .workbuddy/
 .claude/
 .codegraph/

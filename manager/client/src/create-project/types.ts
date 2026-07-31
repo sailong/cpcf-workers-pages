@@ -15,7 +15,16 @@ export interface CreateProjectPayload {
     buildId?: string;
     outputDir?: string;
     buildCommand?: string;
-    deployCommand?: string;
+    limits?: {
+        cpu?: number;
+        memoryMb?: number;
+        diskMb?: number;
+        uploadMb?: number;
+        concurrentRequests?: number;
+        buildTimeoutSeconds?: number;
+        pids?: number;
+    };
+    _file?: File;
 }
 
 /** 子表单组件通过 ref 暴露的方法 */
@@ -33,4 +42,6 @@ export interface SubFormProps {
     setError: (msg: string) => void;
     /** Toast 提示 */
     showToast: (msg: string, type?: 'success' | 'error') => void;
+    /** Limits used by pre-creation uploads and builds. */
+    limits?: NonNullable<CreateProjectPayload['limits']>;
 }

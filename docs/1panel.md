@@ -1,110 +1,56 @@
-# 1Panel 部署指南 (支持自定义域名)
+# Public Deployment with Automatic TLS
 
-本文档将指导你如何在 1Panel 面板中部署 CCFWP 管理平台，并配置泛域名访问（例如 `*.ccfwp.example.com`）。
+The production Compose stack includes Caddy and does not publish the Manager's internal port. Caddy obtains one certificate for the console host and one DNS-01 wildcard certificate for project hosts.
 
-## 1. 准备工作
+## DNS
 
-*   **1Panel 面板**: 已安装并运行正常的 1Panel。
-*   **域名**: 一个你拥有的域名（例如 `example.com`）。
-*   **DNS 解析**: 能够添加 DNS 记录。
+Choose two explicit names, for example:
 
-## 2. DNS 解析配置 (关键)
+- Console: `console.example.com`
+- Projects base: `apps.example.com`
 
-为了让每个项目都能通过子域名访问（如 `my-app.worker.ccfwp.example.com`），你需要配置 **泛域名解析 (Wildcard DNS)**。
+Create an `A`/`AAAA` record for `console.example.com` and a wildcard record for `*.apps.example.com`, both pointing to the server. Project URLs use exactly one label, such as `demo-worker.apps.example.com` or `site-pages.apps.example.com`.
 
-假设你想使用的根域名通过前缀是 `ccfwp.example.com`：
+## Cloudflare Token
 
-1.  登录你的域名服务商控制台。
-2.  添加一条 **A 记录**：
-    *   **主机记录 (Host)**: `*.ccfwp` (如果是直接用根域名则填 `*`)
-    *   **记录值 (Value)**: 你的服务器 IP 地址
-    *   **TTL**: 默认即可
+Create a scoped Cloudflare API token with `Zone:DNS:Edit` for only the relevant zone. Do not use the Global API Key. Caddy uses this token only for DNS-01 challenges.
 
-> **注意**: 这样配置后，所有 `xxx.ccfwp.example.com` 的请求都会指向你的服务器。
+## Configuration
 
-## 3. 在 1Panel 中部署容器
+Create the deployment environment from `.env.production.example` and replace every placeholder. Generate the ingress secret with:
 
-1.  登录 1Panel，进入 **容器** -> **编排** -> **创建编排**。
-2.  **名称**: `ccfwp-platform` (任意)
-3.  **编辑器**: 粘贴以下 `docker-compose.yml` 内容：
-
-```yaml
-version: '3'
-services:
-  ccfwp-platform:
-    image: yours/ccfwp:latest  # <--- 请替换为你构建或拉取的镜像名 (如果没有私有镜像，需先在本地构建并推送到 Docker Hub)
-    container_name: ccfwp-platform
-    ports:
-      - "8001:8001" # 管理面板端口
-      - "9100:9100" # R2 服务端口
-    volumes:
-      - ./data:/app/.platform-data
-    environment:
-      - NODE_ENV=production
-      - MANAGER_SERVICE_PORT=8001
-      - R2_ADMIN_PORT=9100
-    restart: unless-stopped
+```bash
+openssl rand -hex 32
 ```
 
-4.  点击 **确认** 启动服务。
+The `CONSOLE_HOST`, `PROJECTS_BASE_DOMAIN`, `AUTH_PASSWORD`, `INGRESS_PROXY_TOKEN`, `ACME_EMAIL`, and `CLOUDFLARE_API_TOKEN` values are mandatory. Use the Let's Encrypt staging URL in `ACME_CA` while testing DNS to avoid production rate limits:
 
-## 4. 配置反向代理 (Nginx)
-
-容器启动后，你需要通过 1Panel 的 OpenResty (Nginx) 将域名请求转发给容器。
-
-1.  进入 **网站** -> **创建网站**。
-2.  **运行环境**: `反向代理`。
-3.  **主域名**: `ccfwp.example.com`。
-4.  **其他域名**: `*.ccfwp.example.com` (**这一步非常重要，必须添加泛域名**)。
-5.  **代理地址**: `http://127.0.0.1:8001`。
-6.  点击 **确认** 创建。
-
-### 配置 WebSocket 支持
-
-由于平台使用 WebSocket 进行热重载和状态通讯，你需要修改 Nginx 配置以支持 WS 协议。
-
-1.  在网站列表中找到刚才创建的网站，点击 **配置**。
-2.  进入 **反向代理** -> **配置文件** (或直接编辑网站的 Nginx 配置文件)。
-3.  在 `location /` 块中确保包含以下 WebSocket 头配置：
-
-```nginx
-location ^~ / {
-    proxy_pass http://127.0.0.1:8001; 
-    proxy_set_header Host $host; 
-    proxy_set_header X-Real-IP $remote_addr; 
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; 
-    proxy_set_header REMOTE-HOST $remote_addr; 
-    
-    # WebSocket 支持 (必须)
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    
-    add_header X-Cache $upstream_cache_status; 
-    #Set Nginx Cache
-    
-    # ... 其他默认配置
-}
+```text
+https://acme-staging-v02.api.letsencrypt.org/directory
 ```
 
-4.  保存并重载 Nginx。
+`.env.acme-staging.example` is the repository validation fixture. It proves Compose and Caddy variable wiring without contacting ACME or DNS. Replace its reserved example domains and placeholder token before an external staging issuance test; a successful local configuration check does not prove DNS permissions or public reachability.
 
-## 5. 验证
+## Start and Verify
 
-1.  访问管理后台: `http://ccfwp.example.com` (如果配置了 HTTPS 则是 https)。
-2.  创建一个测试 Worker 项目，名称为 `demo`。
-3.  启动项目。
-4.  点击 "打开应用"，浏览器应跳转至 `http://demo-worker.ccfwp.example.com` 并成功显示内容。
+```bash
+docker compose --env-file .env.production up -d --build --wait
+docker compose --env-file .env.production ps
+docker compose --env-file .env.production logs caddy
+```
 
-## 故障排查
+Only ports 80 and 443 should be publicly reachable. Ports 8001 and 9200 are internal; port 9100 is no longer used. Verify:
 
-*   **访问 404**: 检查 DNS 是否泛解析成功（ping `test.ccfwp.example.com` 是否指向服务器 IP）。
-*   **Bad Gateway (502)**: 检查 1Panel 网站反代目标是否填写正确 (`http://127.0.0.1:8001`)。
-*   **Worker 无法访问**: 检查 `ROOT_DOMAIN` 环境变量是否与你在 Nginx 绑定的域名一致。
-*   **SSL 报错 (ERR_SSL_VERSION...)**:
-    *   **关键检查**: 泛域名证书 **不支持多级子域名**。
-        *   ❌ 错误: 证书是 `*.example.com`，访问域名是 `app.ccfwp.example.com` (三级子域名) -> **握手失败**。
-        *   ✅ 正确 A: 申请 `*.ccfwp.example.com` 的证书。
-        *   ✅ 正确 B: 将 `ROOT_DOMAIN` 改为 `example.com`，访问 `app-ccfwp.example.com` (二级子域名)。
-    *   确保申请了 **泛域名证书** (例如 `*.ccfwp.example.com`)。
-    *   注意：系统使用 **连字符** (`demo-worker`) 连接项目名和类型，这确保了所有子域名都是一级子域名，因此一张泛域名证书即可覆盖所有项目。
+```bash
+curl -I https://console.example.com/api/health
+curl -I https://demo-worker.apps.example.com/
+```
+
+For 1Panel, deploy this Compose stack directly and allow inbound TCP 80/443 plus UDP 443. Do not add another public reverse proxy in front unless it preserves `Host`, supports WebSockets, and is explicitly added to `TRUST_PROXY`. Direct access to Manager is rejected in production without the private ingress token.
+
+## Troubleshooting
+
+- Certificate errors: confirm the token can edit the correct zone and wildcard DNS resolves publicly.
+- HTTP 421: `CONSOLE_HOST` or `PROJECTS_BASE_DOMAIN` does not match the requested host.
+- HTTP 403 trusted-ingress error: traffic bypassed Caddy or the two containers use different `INGRESS_PROXY_TOKEN` values.
+- Project 404: the hostname must be `<project-name>-worker` or `<project-name>-pages`, and the project must be running.

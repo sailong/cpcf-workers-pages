@@ -1,0 +1,24 @@
+{
+	email {$ACME_EMAIL}
+	acme_ca {$ACME_CA}
+}
+
+(manager_proxy) {
+	reverse_proxy ccfwp:8001 {
+		header_up X-CCFWP-Ingress-Token {$INGRESS_PROXY_TOKEN}
+	}
+}
+
+{$CONSOLE_HOST} {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+	}
+	import manager_proxy
+}
+
+*.{$PROJECTS_BASE_DOMAIN} {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+	}
+	import manager_proxy
+}

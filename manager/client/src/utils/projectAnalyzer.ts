@@ -4,45 +4,42 @@ export interface ProjectAnalysis {
     framework: string;
     buildCommand: string;
     outputDir: string;
-    deployCommand?: string; // New field
     detected: boolean;
 }
 
-export const analyzePackageJson = (pkg: any): ProjectAnalysis => {
+interface PackageJsonLike {
+    scripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+}
+
+export const analyzePackageJson = (pkg: PackageJsonLike): ProjectAnalysis => {
     const scripts = pkg.scripts || {};
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
 
-    let analysis: ProjectAnalysis = {
+    const analysis: ProjectAnalysis = {
         framework: 'Other',
         buildCommand: '',
         outputDir: 'dist',
-        deployCommand: '', // Default
         detected: true
     };
-
-    // Detect Deploy Command
-    if (scripts['deploy']) {
-        analysis.deployCommand = 'npm run deploy';
-    } else if (scripts['pages:deploy']) {
-        analysis.deployCommand = 'npm run pages:deploy';
-    }
 
     // Detect Framework
     if (deps['next']) {
         analysis.framework = 'Next.js (Static)';
-        analysis.buildCommand = 'npm install && npm run build';
+        analysis.buildCommand = 'npm ci && npm run build';
         analysis.outputDir = 'out'; // Next.js static export default
     } else if (deps['react-scripts']) {
         analysis.framework = 'React (CRA)';
-        analysis.buildCommand = 'npm install && npm run build';
+        analysis.buildCommand = 'npm ci && npm run build';
         analysis.outputDir = 'build';
     } else if (deps['vite']) {
         analysis.framework = 'Vite';
-        analysis.buildCommand = 'npm install && npm run build';
+        analysis.buildCommand = 'npm ci && npm run build';
         analysis.outputDir = 'dist';
     } else if (deps['vue']) {
         analysis.framework = 'Vue';
-        analysis.buildCommand = 'npm install && npm run build';
+        analysis.buildCommand = 'npm ci && npm run build';
         analysis.outputDir = 'dist';
     } else if (deps['tailwindcss'] && !deps['react'] && !deps['vue']) {
         // Tailwind Static Site (like iori-nav)
@@ -50,17 +47,17 @@ export const analyzePackageJson = (pkg: any): ProjectAnalysis => {
         analysis.outputDir = 'public'; // Common for simple static sites
         // Try to find a build script
         if (scripts['build']) {
-            analysis.buildCommand = 'npm install && npm run build';
+            analysis.buildCommand = 'npm ci && npm run build';
         } else if (scripts['build:css']) {
-            analysis.buildCommand = 'npm install && npm run build:css';
+            analysis.buildCommand = 'npm ci && npm run build:css';
         } else {
-            analysis.buildCommand = 'npm install'; // Safe fallback?
+            analysis.buildCommand = 'npm ci'; // lockfile-only install
         }
     } else {
         // Generic Fallback
         analysis.detected = false;
         if (scripts['build']) {
-            analysis.buildCommand = 'npm install && npm run build';
+            analysis.buildCommand = 'npm ci && npm run build';
         }
     }
 

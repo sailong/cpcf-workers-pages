@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Project } from '../../types';
 import { ProjectService, FileService } from '../../services';
@@ -6,6 +6,12 @@ import ConfigPanel from './ConfigPanel';
 import DeployPanel from './DeployPanel';
 import FileTree from './FileTree';
 import Editor from './Editor';
+import ReleasesPanel from './ReleasesPanel';
+import DeploymentsPanel from './DeploymentsPanel';
+import RuntimeLogsPanel from './RuntimeLogsPanel';
+import OverviewPanel from './OverviewPanel';
+import { useFeedback } from '../../contexts/feedback-context';
+import { Activity, ArrowLeft, Boxes, FileCode2, Gauge, Loader2, Rocket, Save, Settings } from 'lucide-react';
 
 interface IDEProps {
     project: Project;
@@ -13,11 +19,14 @@ interface IDEProps {
     onSaved: () => void;
 }
 
-type TabType = 'code' | 'config' | 'deploy';
+type TabType = 'overview' | 'code' | 'deployments' | 'bindings' | 'logs' | 'settings';
+type DeploymentView = 'releases' | 'activity' | 'deploy';
 
 const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
     const { t } = useTranslation();
-    const [activeTab, setActiveTab] = useState<TabType>('code');
+    const { notify } = useFeedback();
+    const [activeTab, setActiveTab] = useState<TabType>('overview');
+    const [deploymentView, setDeploymentView] = useState<DeploymentView>('releases');
     const [code, setCode] = useState('');
     const [language, setLanguage] = useState('javascript');
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -34,27 +43,7 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
 
-    // Initial Load
-    useEffect(() => {
-        if (!isPages) {
-            loadWorkerCode();
-        }
-    }, [project.id]);
-
-    // Keyboard shortcut: Ctrl+S / Cmd+S to save
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-                e.preventDefault();
-                handleSaveCode();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [code, selectedFile, isPages, saving]);
-
-    const loadWorkerCode = async () => {
+    const loadWorkerCode = useCallback(async () => {
         setLoading(true);
         try {
             const data = await ProjectService.getCode(project.id);
@@ -63,12 +52,13 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
             setLanguage(data.language || 'javascript');
         } catch (e) {
             console.error(e);
+            notify(t('ide.editor.loadFailed'), 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [notify, project.id, t]);
 
-    const handleFileSelect = async (path: string) => {
+    const handleFileSelect = useCallback(async (path: string) => {
         setSelectedFile(path);
         setLoading(true);
         try {
@@ -84,88 +74,90 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
 
         } catch (e) {
             console.error(e);
+            notify(t('ide.editor.loadFailed'), 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [notify, project.id, t]);
 
-    const handleSaveCode = async () => {
+    const handleSaveCode = useCallback(async () => {
+        if (isPages) return;
         setSaving(true);
         setSaveSuccess(false);
         try {
-            if (isPages) {
-                if (!selectedFile) return;
-                await FileService.writeContent(project.id, selectedFile, code);
-            } else {
-                await ProjectService.updateCode(project.id, code);
-            }
+            await ProjectService.updateCode(project.id, code);
             onSaved(); // Notify parent for data refresh
             setSaveSuccess(true);
+            notify(t('common.saveSuccess'), 'success');
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch (e) {
             console.error(e);
-            alert(t('ide.editor.saveFailed'));
+            notify(t('ide.editor.saveFailed'), 'error');
         } finally {
             setSaving(false);
         }
-    };
+    }, [code, isPages, notify, onSaved, project.id, t]);
+
+    // Initial Load
+    useEffect(() => {
+        if (!isPages) {
+            void loadWorkerCode();
+        }
+    }, [isPages, loadWorkerCode]);
+
+    // Keyboard shortcut: Ctrl+S / Cmd+S to save
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!isPages && (e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                void handleSaveCode();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleSaveCode, isPages]);
+
+    const tabs = [
+        { id: 'overview' as const, label: t('ide.tabs.overview'), icon: Gauge },
+        { id: 'code' as const, label: t('ide.tabs.code'), icon: FileCode2 },
+        { id: 'deployments' as const, label: t('ide.tabs.deployments'), icon: Activity },
+        { id: 'bindings' as const, label: t('ide.tabs.bindings'), icon: Boxes },
+        { id: 'logs' as const, label: t('ide.tabs.logs'), icon: Activity },
+        { id: 'settings' as const, label: t('ide.tabs.settings'), icon: Settings }
+    ];
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col font-sans transition-colors duration-300">
-            {/* Flat Header */}
-            <div className="h-12 bg-[var(--bg-card)] border-b border-[var(--border-color)] flex justify-between items-center px-4 shadow-sm z-10">
-                <div className="flex items-center gap-4">
-                    <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors flex items-center gap-1 text-sm font-bold hover:bg-[var(--bg-hover)] px-2 py-1 rounded">
-                        <span>←</span> {t('ide.back')}
+        <div className="fixed inset-0 z-50 flex flex-col bg-[var(--bg-base)] font-sans">
+            <header className="z-10 border-b border-[var(--border-color)] bg-[var(--bg-card)]">
+                <div className="flex min-h-12 items-center justify-between gap-3 px-3 sm:px-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                    <button type="button" onClick={onClose} className="console-button secondary shrink-0">
+                        <ArrowLeft size={15} aria-hidden="true" /> {t('ide.back')}
                     </button>
-                    <div className="h-4 w-px bg-[var(--border-color)]"></div>
-                    <span className="font-bold tracking-wide text-[var(--text-main)]">{project.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${project.type === 'worker'
+                    <div className="min-w-0"><span className="block truncate text-sm font-semibold text-[var(--text-main)]">{project.name}</span><span className="block truncate font-mono text-[10px] text-[var(--text-muted)]">{project.id}</span></div>
+                    <span className={`hidden border px-1.5 py-0.5 text-[10px] sm:inline ${project.type === 'worker'
                         ? 'border-blue-500/30 bg-blue-500/10 text-blue-500'
                         : 'border-purple-500/30 bg-purple-500/10 text-purple-500'
                         }`}>
                         {project.type === 'worker' ? t('createProjectPage.worker') : t('createProjectPage.pages')}
                     </span>
+                    </div>
+                    <span className={`status-badge ${project.status}`}>{project.status === 'running' ? t('dashboardPage.running') : t('dashboardPage.stopped')}</span>
                 </div>
-                <div className="flex bg-[var(--bg-hover)] rounded-lg p-0.5 border border-[var(--border-color)]">
-                    <button
-                        onClick={() => setActiveTab('code')}
-                        className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'code'
-                            ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
-                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
-                    >
-                        {t('ide.tabs.code')}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('config')}
-                        className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'config'
-                            ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
-                            : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
-                    >
-                        {t('ide.tabs.config')}
-                    </button>
-                    {isPages && (
-                        <button
-                            onClick={() => setActiveTab('deploy')}
-                            className={`px-4 py-1 rounded-md text-xs font-bold transition-all ${activeTab === 'deploy'
-                                ? 'bg-[var(--bg-card)] text-[var(--primary)] shadow-sm'
-                                : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
-                        >
-                            {t('ide.tabs.deploy')}
-                        </button>
-                    )}
-                </div>
-                <div className="w-20 flex justify-end">
-                    {/* Placeholder for right side actions */}
-                </div>
-            </div>
+                <nav className="flex overflow-x-auto px-2 sm:px-4" role="tablist" aria-label={t('ide.projectNavigation')}>
+                    {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" role="tab" aria-selected={activeTab === id} onClick={() => setActiveTab(id)} className={activeTab === id ? 'resource-tab active shrink-0' : 'resource-tab shrink-0'}><Icon size={14} aria-hidden="true" />{label}</button>)}
+                </nav>
+            </header>
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden">
+                {activeTab === 'overview' && <div className="flex-1 overflow-y-auto"><OverviewPanel project={project} /></div>}
+
                 {activeTab === 'code' && (
                     <>
                         {isPages && (
-                            <div className="w-64 bg-[var(--bg-card)] border-r border-[var(--border-color)] flex flex-col">
+                            <div className="flex w-40 shrink-0 flex-col border-r border-[var(--border-color)] bg-[var(--bg-card)] sm:w-64">
                                 <div className="h-9 flex items-center px-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest border-b border-[var(--border-color)] bg-[var(--bg-base)]">
                                     {t('ide.fileTree.explorer')}
                                 </div>
@@ -176,48 +168,49 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                             {/* Editor Toolbar */}
                             <div className="h-9 border-b border-[var(--border-color)] flex items-center justify-between px-4 bg-[var(--bg-base)]">
                                 <div className="flex items-center gap-2 text-xs">
-                                    <span className="text-blue-400">📄</span>
+                                    <FileCode2 size={15} className="text-[var(--primary)]" aria-hidden="true" />
                                     <span className="text-[var(--text-muted)] font-mono">{selectedFile || (isPages ? t('ide.editor.selectFilePages') : 'worker.js')}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    {saveSuccess && (
+                                    {isPages ? (
+                                        <>
+                                            <span className="text-xs text-[var(--text-muted)]">{t('ide.editor.readOnly')}</span>
+                                            <button
+                                                type="button"
+                                                className="console-button primary"
+                                                onClick={() => { setActiveTab('deployments'); setDeploymentView('deploy'); }}
+                                            >
+                                                <Rocket size={14} aria-hidden="true" /> {t('ide.editor.goToDeploy')}
+                                            </button>
+                                        </>
+                                    ) : saveSuccess && (
                                         <span className="text-xs text-[var(--color-success)] animate-fade-in flex items-center gap-1">
                                             <span className="w-1.5 h-1.5 bg-[var(--color-success)] rounded-full"></span>
                                             {t('ide.editor.saved')}
                                         </span>
                                     )}
-                                    <button
+                                    {!isPages && <button
+                                        type="button"
                                         onClick={handleSaveCode}
-                                        disabled={saving || (isPages && !selectedFile)}
-                                        className={`text-xs px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-medium ${saving || (isPages && !selectedFile)
-                                            ? 'bg-[var(--bg-hover)] text-[var(--text-muted)] cursor-not-allowed'
-                                            : 'bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white shadow-sm hover:shadow-md'
-                                            }`}
+                                        disabled={saving}
+                                        className="console-button primary"
                                     >
-                                        {saving ? (
-                                            <>
-                                                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                                                {t('ide.editor.saving')}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span>💾</span> {t('ide.editor.save')}
-                                            </>
-                                        )}
-                                    </button>
+                                        {saving ? <><Loader2 size={14} className="animate-spin" aria-hidden="true" /> {t('ide.editor.saving')}</> : <><Save size={14} aria-hidden="true" /> {t('ide.editor.save')}</>}
+                                    </button>}
                                 </div>
                             </div>
                             <div className="flex-1 relative">
                                 {loading ? (
                                     <div className="absolute inset-0 flex flex-col items-center justify-center text-[var(--text-muted)]">
-                                        <div className="w-8 h-8 border-2 border-[var(--border-color)] border-t-[var(--primary)] rounded-full animate-spin mb-3"></div>
+                                        <Loader2 size={24} className="mb-3 animate-spin text-[var(--primary)]" aria-hidden="true" />
                                         {t('ide.editor.loading')}
                                     </div>
                                 ) : (
                                     <Editor
                                         code={code}
                                         language={language}
-                                        onChange={(v) => setCode(v || '')}
+                                        readOnly={isPages}
+                                        onChange={(v) => { if (!isPages) setCode(v || ''); }}
                                     />
                                 )}
                             </div>
@@ -225,37 +218,39 @@ const IDE: React.FC<IDEProps> = ({ project, onClose, onSaved }) => {
                     </>
                 )}
 
-                {activeTab === 'config' && (
-                    <div className="flex-1 overflow-y-auto p-8 glass border-0">
-                        <div className="max-w-4xl mx-auto">
-                            <ConfigPanel project={project} onSave={onSaved} />
+                {activeTab === 'bindings' && (
+                    <div className="flex-1 overflow-y-auto bg-[var(--bg-base)] p-4 sm:p-6">
+                        <div className="mx-auto max-w-5xl">
+                            <ConfigPanel project={project} onSave={onSaved} view="bindings" />
                         </div>
                     </div>
                 )}
 
-                {activeTab === 'deploy' && (
-                    <div className="flex-1 flex flex-col bg-[var(--bg-base)] overflow-hidden">
-                        <div className="flex-1 p-8 overflow-y-auto">
-                            <div className="max-w-4xl mx-auto">
-                                <DeployPanel
-                                    project={project}
-                                    onLog={(msg) => setLogs(prev => [...prev, msg])}
-                                    onSuccess={() => {
-                                        onSaved();
-                                    }}
-                                />
-                            </div>
+                {activeTab === 'deployments' && (
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--bg-base)]">
+                        <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-[var(--border-color)] px-3" role="tablist" aria-label={t('ide.deployments.views')}>
+                            {(['releases', 'activity', ...(isPages ? ['deploy'] : [])] as DeploymentView[]).map(view => <button key={view} type="button" role="tab" aria-selected={deploymentView === view} className={deploymentView === view ? 'resource-tab active shrink-0' : 'resource-tab shrink-0'} onClick={() => setDeploymentView(view)}>{t(`ide.deployments.${view}`)}</button>)}
                         </div>
-                        {/* Logs Panel */}
-                        <div className="h-64 bg-[var(--bg-card)] border-t border-[var(--border-color)] font-mono text-xs flex flex-col shadow-2xl">
-                            <div className="px-4 py-2 bg-[var(--bg-base)] border-b border-[var(--border-color)] text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">{t('ide.deploy.buildLogs')}</div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-1 bg-[var(--bg-card)] text-[var(--text-muted)]">
-                                {logs.map((log, i) => <div key={i} className="border-b border-[var(--border-color)] pb-0.5">{log}</div>)}
-                                {logs.length === 0 && <div className="opacity-50 italic">{t('ide.deploy.noLogs')}</div>}
-                                <div ref={logsEndRef} />
+                        {deploymentView === 'releases' && <div className="flex-1 overflow-y-auto"><ReleasesPanel project={project} onChanged={onSaved} /></div>}
+                        {deploymentView === 'activity' && <div className="min-h-0 flex-1 overflow-hidden"><DeploymentsPanel project={project} /></div>}
+                        {deploymentView === 'deploy' && isPages && <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6"><div className="mx-auto max-w-4xl"><DeployPanel project={project} onLog={message => setLogs(current => [...current, message])} onSuccess={() => { onSaved(); setDeploymentView('releases'); }} /></div></div>
+                            <div className="flex h-52 shrink-0 flex-col border-t border-[var(--border-color)] bg-[#101418] font-mono text-xs">
+                                <div className="border-b border-white/10 px-4 py-2 text-[10px] font-semibold uppercase text-slate-400">{t('ide.deploy.buildLogs')}</div>
+                                <div className="flex-1 space-y-1 overflow-y-auto p-4 text-slate-300">{logs.map((log, index) => <div key={`${index}:${log}`} className="border-b border-white/5 pb-1">{log}</div>)}{logs.length === 0 && <div className="text-slate-500">{t('ide.deploy.noLogs')}</div>}<div ref={logsEndRef} /></div>
                             </div>
-                        </div>
+                        </div>}
                     </div>
+                )}
+
+                {activeTab === 'logs' && (
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                        <RuntimeLogsPanel project={project} />
+                    </div>
+                )}
+
+                {activeTab === 'settings' && (
+                    <div className="flex-1 overflow-y-auto bg-[var(--bg-base)] p-4 sm:p-6"><div className="mx-auto max-w-5xl"><ConfigPanel project={project} onSave={onSaved} view="settings" /></div></div>
                 )}
             </div>
         </div>

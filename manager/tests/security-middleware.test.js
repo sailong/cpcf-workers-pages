@@ -5,6 +5,46 @@ const assert = require('node:assert/strict');
 const express = require('express');
 const http = require('http');
 const { createHostGuard, sameOrigin, securityHeaders } = require('../middleware/security');
+const { parseProjectHostname } = require('../utils/project-hostname');
+const { assertProductionIngressConfigured, createIngressGuard } = require('../middleware/ingress');
+
+test('project hostnames match exactly one allowed base-domain label', () => {
+    const bases = ['apps.example.test'];
+    assert.deepEqual(parseProjectHostname('Demo-Worker.apps.example.test.', bases), {
+        projectName: 'demo', projectType: 'worker', baseDomain: 'apps.example.test'
+    });
+    assert.equal(parseProjectHostname('demo-worker.evil.test', bases), null);
+    assert.equal(parseProjectHostname('demo-worker.apps.example.test.evil.test', bases), null);
+    assert.equal(parseProjectHostname('nested.demo-worker.apps.example.test', bases), null);
+    assert.equal(parseProjectHostname('-worker.apps.example.test', bases), null);
+});
+
+test('production ingress requires explicit domain settings and a trusted proxy token', () => {
+    assert.throws(() => assertProductionIngressConfigured({ NODE_ENV: 'production' }), /INGRESS_PROXY_TOKEN/);
+    assert.throws(() => assertProductionIngressConfigured({
+        NODE_ENV: 'production', INGRESS_PROXY_TOKEN: 'x'.repeat(32)
+    }), /CONSOLE_HOST/);
+    assert.doesNotThrow(() => assertProductionIngressConfigured({
+        NODE_ENV: 'production',
+        INGRESS_PROXY_TOKEN: 'x'.repeat(32),
+        CONSOLE_HOST: 'console.example.test',
+        PROJECTS_BASE_DOMAIN: 'apps.example.test'
+    }));
+});
+
+test('production ingress rejects direct non-loopback requests without the shared proxy token', () => {
+    const guard = createIngressGuard({ required: true, token: 'x'.repeat(32), allowLoopback: false });
+    let status;
+    guard({ get: () => undefined, socket: { remoteAddress: '10.0.0.8' } }, {
+        status(code) { status = code; return this; },
+        json() {}
+    }, () => { throw new Error('unexpected next'); });
+    assert.equal(status, 403);
+
+    let passed = false;
+    guard({ get: () => 'x'.repeat(32), socket: { remoteAddress: '10.0.0.8' } }, {}, () => { passed = true; });
+    assert.equal(passed, true);
+});
 
 async function withServer(run) {
     const app = express();
@@ -50,6 +90,17 @@ test('host allowlist, same-origin policy, security headers, and JSON limit are e
         assert.equal(allowed.status, 200);
         assert.equal(allowed.headers['x-content-type-options'], 'nosniff');
         assert.match(allowed.headers['content-security-policy'], /frame-ancestors 'none'/);
+        assert.equal(allowed.headers['strict-transport-security'], undefined);
+
+        const previousNodeEnv = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+        try {
+            const production = await request(baseUrl, { headers: { Host: 'console.example.test' } });
+            assert.match(production.headers['strict-transport-security'], /max-age=31536000/);
+        } finally {
+            if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+            else process.env.NODE_ENV = previousNodeEnv;
+        }
 
         assert.equal((await request(baseUrl, { headers: { Host: 'demo-worker.apps.example.test' } })).status, 200);
         assert.equal((await request(baseUrl, { headers: { Host: 'console.example.test', 'X-Forwarded-Host': 'evil.example.test' } })).status, 200);

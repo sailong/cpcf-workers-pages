@@ -1,81 +1,143 @@
 'use strict';
-const path = require('path');
 const config = require('../config');
 const resourceService = require('./resource-service');
 const projectService = require('./project-service');
-const ProjectRuntime = require('../utils/spawner');
-const R2AdminManager = require('../utils/r2-admin-manager');
-const killPort = require('../utils/port-killer');
+const { RuntimeBroker } = require('./runtime-broker');
+const resourceRuntime = require('./resource-runtime');
+const resourceGateway = require('./resource-gateway-server');
+const fs = require('node:fs');
+const { directorySize } = require('./docker-runtime-provider');
+const { resolveWithin } = require('../utils/path-helper');
+const { reconcileResourceDeletion: reconcileDeletedResource } = require('./runtime-resource-reconciler');
 
 // Initialize Runtime
-const runtime = new ProjectRuntime(config.UPLOADS_DIR, resourceService.getAll());
+const runtime = new RuntimeBroker(config.UPLOADS_DIR, resourceService.getAll());
+let observabilityTimer = null;
+let collectingObservability = false;
 
-// Initialize R2 Admin
-const R2_PORT = process.env.R2_ADMIN_PORT || 9099;
-const r2Admin = new R2AdminManager(path.join(__dirname, '../system-workers/r2-admin'), resourceService.getAll(), R2_PORT);
+async function collectObservability() {
+    if (collectingObservability) return;
+    collectingObservability = true;
+    try {
+        await runtime.collectObservability();
+    } finally {
+        collectingObservability = false;
+    }
+}
+
+function startObservability() {
+    if (observabilityTimer) return;
+    void collectObservability();
+    observabilityTimer = setInterval(() => void collectObservability(), 5_000);
+    observabilityTimer.unref();
+}
+
+function stopObservability() {
+    if (!observabilityTimer) return;
+    clearInterval(observabilityTimer);
+    observabilityTimer = null;
+}
+
+function getProjectMetrics(project, concurrentRequests = 0) {
+    const live = runtime.getMetrics(project.id);
+    const projectRoot = resolveWithin(config.PROJECTS_DIR, project.id);
+    const storageBytes = fs.existsSync(projectRoot) ? directorySize(projectRoot) : 0;
+    return {
+        supported: runtime.providerName === 'docker',
+        running: runtime.isRunning(project.id),
+        cpuPercent: live?.cpuPercent ?? null,
+        memoryBytes: live?.memoryBytes ?? null,
+        memoryLimitBytes: live?.memoryLimitBytes || project.limits.memoryMb * 1024 * 1024,
+        pids: live?.pids ?? null,
+        storageBytes,
+        storageLimitBytes: project.limits.diskMb * 1024 * 1024,
+        concurrentRequests,
+        concurrencyLimit: project.limits.concurrentRequests,
+        collectedAt: live?.collectedAt || null
+    };
+}
 
 /**
- * Restart running projects and System Worker on boot (并行优化)
+ * Start the canonical resource runtime before restoring project runtimes.
  */
 async function startAll() {
-    const projects = projectService.getAll();
-    
-    // 并行启动所有项目
-    const startPromises = projects
-        .filter(p => p.status === 'running')
-        .map(async (p) => {
-            console.log(`[Auto-Start] Restoring project ${p.name}...`);
+    await resourceRuntime.start(resourceService.getAllIncludingDeleted());
+    try {
+        await resourceGateway.start();
+        const capabilities = await runtime.assertReady();
+        console.log(`[Runtime] Provider ready: ${capabilities.provider}`);
+        const projects = projectService.getAll();
 
-            // Fix legacy projects without port
-            if (!p.port) {
-                try {
-                    console.log(`[Auto-Start] Project ${p.name} has no port, assigning internal port...`);
-                    p.port = await projectService.getAvailablePort();
-                    projectService.save();
-                } catch (e) {
-                    console.error(`[Auto-Start] Failed to assign port for ${p.name}: ${e.message}`);
-                    p.status = 'stopped';
-                    projectService.save();
-                    return;
-                }
-            }
+        const startPromises = projects
+            .filter(project => project.status === 'running')
+            .map(async project => {
+                console.log(`[Auto-Start] Restoring project ${project.name}...`);
 
-            try {
-                // Always attempt to release port before starting
-                try {
-                    console.log(`[Auto-Start] Ensuring port ${p.port} is free for ${p.name}...`);
-                    await killPort(p.port);
-                } catch (e) {
-                    console.warn(`[Auto-Start] Kill port error: ${e.message}`);
+                if (!project.port) {
+                    try {
+                        project = projectService.update(project.id, { port: await projectService.getAvailablePort() });
+                    } catch (error) {
+                        console.error(`[Auto-Start] Failed to assign port for ${project.name}: ${error.message}`);
+                        projectService.update(project.id, { status: 'stopped' });
+                        return;
+                    }
                 }
 
-                await runtime.start(p);
-            } catch (e) {
-                console.error(`[Auto-Start] Failed to start ${p.name}:`, e);
-                p.status = 'stopped';
-                projectService.save();
-            }
-        });
+                try {
+                    const portCheck = await projectService.isPortAvailable(project.port, project.id);
+                    if (!portCheck.valid) throw new Error(portCheck.error);
+                    await runtime.start(project);
+                } catch (error) {
+                    console.error(`[Auto-Start] Failed to start ${project.name}:`, error);
+                    projectService.update(project.id, { status: 'stopped' });
+                }
+            });
 
-    // 等待所有项目启动
-    await Promise.allSettled(startPromises);
-    
-    // 启动 R2 Admin
-    r2Admin.start();
+        await Promise.allSettled(startPromises);
+        startObservability();
+    } catch (error) {
+        await resourceGateway.stop().catch(() => {});
+        await resourceRuntime.dispose().catch(() => {});
+        throw error;
+    }
+}
+
+async function stopAll() {
+    stopObservability();
+    await collectObservability();
+    await runtime.stopAll();
+    await resourceGateway.stop();
+    await resourceRuntime.dispose();
 }
 
 /**
  * Update runtime resources reference when they change
  */
-function updateResources() {
+async function updateResources() {
     const freshRef = resourceService.getAll();
     runtime.resources = freshRef;
-    // Note: R2 Admin might need explicit restart if R2 buckets changed
+    await resourceRuntime.sync(resourceService.getAllIncludingDeleted());
+}
+
+/**
+ * Remove a deleted resource from every live process. A failed restart leaves
+ * the project stopped, which is preferable to retaining a revoked binding.
+ */
+async function reconcileResourceDeletion(deleted, dependencies = {}) {
+    return reconcileDeletedResource(deleted, {
+        runtime: dependencies.runtime || runtime,
+        projectService: dependencies.projectService || projectService,
+        updateResources: dependencies.updateResources || updateResources,
+    });
 }
 
 module.exports = {
     runtime,
-    r2Admin,
+    resourceRuntime,
+    resourceGateway,
     startAll,
-    updateResources
+    stopAll,
+    updateResources,
+    reconcileResourceDeletion,
+    getProjectMetrics
 };

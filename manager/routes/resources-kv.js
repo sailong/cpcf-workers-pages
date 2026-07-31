@@ -2,7 +2,12 @@ const express = require('express');
 const router = express.Router();
 const resourceService = require('../services/resource-service');
 const runtimeService = require('../services/runtime-service');
-const kvStorage = require('../utils/kv-storage');
+const auditService = require('../services/audit-service');
+const { errorStatus } = require('../utils/http-error');
+
+function hasNamespace(id) {
+    return resourceService.getKV().some(namespace => namespace.id === id);
+}
 
 // Get All KV Namespaces
 router.get('/', (req, res) => {
@@ -10,109 +15,114 @@ router.get('/', (req, res) => {
 });
 
 // Create KV Namespace
-router.post('/', (req, res) => {
+router.post('/', async (req, res, next) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: "Name is required" });
 
-    const kvs = resourceService.getKV();
-    if (kvs.find(kv => kv.name === name)) {
-        return res.status(400).json({ error: "KV Namespace already exists" });
+    let newKV;
+    try {
+        newKV = resourceService.create('kv', name);
+    } catch (error) {
+        return res.status(error.statusCode || 500).json({ error: error.publicMessage || error.message });
     }
 
-    const id = `kv-${Date.now().toString(36)}`;
-    const newKV = { id, name, created: new Date().toISOString() };
-
-    resourceService.getAll().kv.push(newKV);
-    resourceService.save();
-
-    // Init storage (create empty file)
-    // Actually kvStorage lazy creates. But init ensures dir exists.
-    // kvStorage.init(id); // Doesn't exist, logic was in server.js to just save resources?
-    // server.js 1459: just saves resources.
-
-    runtimeService.updateResources();
-    res.json(newKV);
+    try {
+        await runtimeService.updateResources();
+        auditService.record('resource.create', 'resource', newKV.id, { kind: 'kv', name: newKV.name });
+        res.json(newKV);
+    } catch (error) {
+        resourceService.rollbackCreate('kv', newKV.id);
+        await runtimeService.updateResources().catch(() => {});
+        next(error);
+    }
 });
 
 // Delete KV Namespace
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res, next) => {
     const { id } = req.params;
-    const resources = resourceService.getAll();
-    const idx = resources.kv.findIndex(k => k.id === id);
+    const deleted = resourceService.softDelete('kv', id);
+    if (!deleted) return res.status(404).json({ error: "KV Namespace not found" });
 
-    if (idx === -1) return res.status(404).json({ error: "KV Namespace not found" });
-
-    // Delete data file
     try {
-        kvStorage.deleteNamespace(id);
-    } catch (e) { console.error("Failed to delete KV data", e); }
-
-    resources.kv.splice(idx, 1);
-    resourceService.save();
-
-    runtimeService.updateResources();
-    res.json({ success: true, id });
+        const runtime = await runtimeService.reconcileResourceDeletion(deleted);
+        res.json({ success: true, id, purgeAfter: deleted.purgeAfter, runtime });
+    } catch (error) {
+        next(error);
+    }
 });
 
 // List Keys
-router.get('/:id/keys', (req, res) => {
+router.get('/:id/keys', async (req, res) => {
     const { id } = req.params;
-    const { prefix, limit } = req.query;
+    const { prefix, limit, cursor } = req.query;
 
-    if (!resourceService.getKV().find(k => k.id === id)) {
+    if (!hasNamespace(id)) {
         return res.status(404).json({ error: "KV Namespace not found" });
     }
 
     try {
-        const keys = kvStorage.listKeys(id, prefix, parseInt(limit));
-        res.json({ keys, list_complete: true });
+        const parsedLimit = Math.max(1, Math.min(1000, Number.parseInt(limit, 10) || 1000));
+        const options = { prefix: typeof prefix === 'string' ? prefix : '', limit: parsedLimit };
+        if (typeof cursor === 'string' && cursor) options.cursor = cursor;
+        const result = await runtimeService.resourceRuntime.withResource('kv', id,
+            namespace => namespace.list(options));
+        res.json(result);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(errorStatus(error)).json({ error: error.message });
     }
 });
 
 // Get Value
-router.get('/:id/values/:key', (req, res) => {
+router.get('/:id/values/:key', async (req, res) => {
     const { id, key } = req.params;
-    if (!resourceService.getKV().find(k => k.id === id)) {
+    if (!hasNamespace(id)) {
         return res.status(404).json({ error: "KV Namespace not found" });
     }
     try {
-        const value = kvStorage.getValue(id, key);
-        if (value === undefined || value === null) return res.status(404).json({ error: "Key not found" });
-        res.json(value);
+        const result = await runtimeService.resourceRuntime.withResource('kv', id,
+            namespace => namespace.getWithMetadata(key, 'text'));
+        if (!result || result.value === null) return res.status(404).json({ error: "Key not found" });
+        const value = result.metadata?.ccfwpEncoding === 'json' ? JSON.parse(result.value) : result.value;
+        res.json({ value, metadata: result.metadata || null });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(errorStatus(e)).json({ error: e.message });
     }
 });
 
 // Put Value
-router.put('/:id/values/:key', (req, res) => {
+router.put('/:id/values/:key', async (req, res) => {
     const { id, key } = req.params;
-    const { value } = req.body;
+    const { value, metadata, expiration, expirationTtl } = req.body;
 
-    if (!resourceService.getKV().find(k => k.id === id)) {
+    if (!hasNamespace(id)) {
         return res.status(404).json({ error: "KV Namespace not found" });
     }
     try {
-        kvStorage.setValue(id, key, value);
+        const encoded = typeof value === 'string' ? value : JSON.stringify(value);
+        const options = {};
+        if (metadata !== undefined) options.metadata = metadata;
+        if (typeof value !== 'string') options.metadata = { ...(metadata || {}), ccfwpEncoding: 'json' };
+        if (expiration !== undefined && expiration !== null) options.expiration = expiration;
+        if (expirationTtl !== undefined && expirationTtl !== null) options.expirationTtl = expirationTtl;
+        await runtimeService.resourceRuntime.withResource('kv', id,
+            namespace => namespace.put(key, encoded, options));
         res.json({ success: true, key, value });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(errorStatus(e)).json({ error: e.message });
     }
 });
 
 // Delete Key
-router.delete('/:id/values/:key', (req, res) => {
+router.delete('/:id/values/:key', async (req, res) => {
     const { id, key } = req.params;
-    if (!resourceService.getKV().find(k => k.id === id)) {
+    if (!hasNamespace(id)) {
         return res.status(404).json({ error: "KV Namespace not found" });
     }
     try {
-        kvStorage.deleteKey(id, key);
+        await runtimeService.resourceRuntime.withResource('kv', id, namespace => namespace.delete(key));
         res.json({ success: true, key });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(errorStatus(e)).json({ error: e.message });
     }
 });
 
