@@ -59,7 +59,7 @@ Tag。该状态文件不包含密钥，已加入 Git 忽略规则。该操作用
 ## 发布职责边界
 
 - Docker Hub 镜像：只运行本机 `scripts/docker-release.sh publish vX.Y.Z` 构建并上传。
-- GitHub Actions：保留 CI 和 `app-release.yml`；后者只生成并签名在线升级所需的应用程序包。
+- GitHub Actions：`ci.yml` 仅由 `app-release.yml` 调用；CI 全部通过后才生成并签名在线升级所需的应用程序包。
 - Docker 镜像包含固定运行环境、系统依赖、Caddy 和初始应用快照；日常代码更新由 GitHub Release 完成。
 
 ## 在线应用升级
@@ -74,19 +74,17 @@ CCFWP_RELEASE_RETENTION=3
 CCFWP_MAX_RELEASE_BYTES=2147483648
 ```
 
-发布应用版本有两种入口，实际应用程序包打包和签名都由 GitHub Actions 完成，不会构建或推送
-Docker 镜像：
+发布应用版本的唯一入口是推送严格 SemVer Tag。普通分支推送、Pull Request 和手动操作都不会
+启动工作流；应用程序包打包和签名由 GitHub Actions 完成，不会构建或推送 Docker 镜像：
 
 ```bash
-# 自动：推送不可变版本 Tag
+# 推送不可变版本 Tag
 git tag v1.2.4 && git push origin v1.2.4
-
-# 手动：触发同一个 OIDC 无密钥签名工作流
-gh workflow run app-release.yml --ref v1.2.4 -f version=v1.2.4
 ```
 
-工作流为 amd64、arm64 分别生成包含生产 `node_modules` 和前端 `dist` 的 `tar.zst`，并使用
-Cosign GitHub OIDC 对 `manifest.json` 无密钥签名。已存在的 GitHub Release 不允许覆盖。
+工作流先执行后端、前端、运行时隔离和 E2E 测试；任何 CI 作业失败都会阻止发布。通过后再为
+amd64、arm64 分别生成包含生产 `node_modules` 和前端 `dist` 的 `tar.zst`，并使用 Cosign GitHub
+OIDC 对 `manifest.json` 无密钥签名。已存在的 GitHub Release 不允许覆盖。
 升级器会根据仓库、固定工作流路径和目标 Tag 自动生成唯一证书身份，不接受可放宽的身份正则配置。
 
 管理员在“设置 > 应用版本”填写明确的 `vX.Y.Z` 后执行升级。升级器依次完成 Cosign 身份校验、
