@@ -4,17 +4,18 @@
 
 ## 📦 目录结构
 
-- `Dockerfile`: 多阶段构建脚本，负责编译前端 React 应用并打包 Node.js 后端。
+- `Dockerfile`: 多阶段构建脚本，负责编译前端 React 应用、Node.js 后端和带 Cloudflare DNS 插件的 Caddy。
 - `docker-compose.yml`: 生产环境编排配置，定义了端口映射和数据持久化。
 
-生产编排默认使用 `ccfwp-platform:0.1.0`，管理服务和项目运行时共用同一个显式版本标签。升级时通过 `.env` 中的 `CCFWP_IMAGE_TAG` 选择新标签，不要使用 `latest`。
+生产编排的管理服务、项目运行时和 Caddy 共用同一个显式版本镜像。镜像仓库通过
+`CCFWP_IMAGE_REPOSITORY` 配置，版本通过 `CCFWP_IMAGE_TAG` 配置；不要使用 `latest`。
 
 ## 🚀 部署步骤
 
 ### 1. 确保环境
 确保本机或服务器已安装 Docker 和 Docker Compose。
 
-### 2. 启动服务
+### 2. 本地构建并启动
 
 **⚠️ 重要**: 请务必在 **项目根目录** 下执行命令，而不是进入 `deploy` 目录。
 
@@ -23,7 +24,39 @@
 docker compose up -d --build
 ```
 
-### 3. 访问
+### 3. 发布到 Docker Hub
+
+镜像必须使用不可变 Tag，建议使用 Git 提交短 SHA。Dockerfile 会同时构建 amd64 和 arm64
+所需的 Caddy 与平台镜像：
+
+```bash
+export DOCKERHUB_USERNAME=<你的 Docker Hub 用户名>
+export CCFWP_IMAGE_REPOSITORY=docker.io/$DOCKERHUB_USERNAME/ccfwp-platform
+./scripts/docker-release.sh publish "$(git rev-parse --short=12 HEAD)"
+```
+
+先在 Docker Hub 创建 `ccfwp-platform` 仓库，再执行 `docker login`；使用 Docker Hub Access Token，
+不要把密码写进命令或镜像。发布脚本拒绝脏工作区，保证 Git SHA Tag 对应确定的源代码。
+
+### 4. 服务器部署与回滚
+
+服务器准备好 `.env`、Caddy 数据卷和 `.platform-data` 后执行：
+
+```bash
+export CCFWP_IMAGE_REPOSITORY=docker.io/<你的 Docker Hub 用户名>/ccfwp-platform
+./scripts/docker-release.sh deploy <git-sha-tag>
+./scripts/docker-release.sh rollback
+```
+
+脚本会拉取同一镜像启动 `ccfwp` 与 `caddy`，并在 `.ccfwp-image-state` 保存当前和上一版本
+Tag。该状态文件不包含密钥，已加入 Git 忽略规则。
+
+### 5. GitHub Actions 发布
+
+在仓库 Secrets 中配置 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`。推送 `v1.2.3` 格式的 Git
+Tag，或手动运行 `Publish Docker Image` 并填写 `image_tag`，即可发布 amd64/arm64 镜像。
+
+### 6. 访问
 生产环境通过 Caddy 访问 `CONSOLE_HOST`（仅公开 80/443）。`http://localhost:8001` 只适用于
 `docker-compose.dev.yml` 的本机开发编排，不应作为公网入口。
 

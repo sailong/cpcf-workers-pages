@@ -1,4 +1,4 @@
-x-platform-image: &platform-image "ccfwp-platform:${CCFWP_IMAGE_TAG:-0.1.0}"
+x-platform-image: &platform-image "${CCFWP_IMAGE_REPOSITORY:-ccfwp-platform}:${CCFWP_IMAGE_TAG:-0.1.0}"
 
 services:
   ccfwp:
@@ -35,10 +35,9 @@ services:
     restart: unless-stopped
 
   caddy:
-    build:
-      context: .
-      dockerfile: Caddy.Dockerfile
-    image: ccfwp-caddy:2.10.0-cloudflare
+    build: .
+    image: *platform-image
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
     ports:
       - "80:80"
       - "443:443"

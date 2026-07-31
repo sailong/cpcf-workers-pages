@@ -5,6 +5,8 @@ node_modules/
 # Environment Variables
 .env
 .env.*
+!.env.production.example
+!.env.acme-staging.example
 
 # Build Outputs
 dist/
@@ -16,6 +18,7 @@ build/
 # Local Data & State (Platform Specific)
 .platform-data/
 **/.platform-data/
+.ccfwp-image-state
 .wrangler/
 **/.wrangler/
 

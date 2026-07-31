@@ -5,6 +5,7 @@ import type { SystemStatus } from '../types';
 import { SystemService } from '../services';
 import { useFeedback } from '../contexts/feedback-context';
 import { getErrorMessage } from '../utils/errors';
+import { getSystemWarningTranslationKey } from '../utils/system-warnings';
 
 const Settings = () => {
     const { t } = useTranslation();
@@ -61,7 +62,10 @@ const Settings = () => {
 
             {error && <div className="console-alert error" role="alert"><span>{error}</span><button type="button" className="console-button secondary" onClick={() => void load()}>{t('common.retry')}</button></div>}
             {loading && !status ? <div className="console-panel p-8 text-center text-sm text-[var(--text-muted)]">{t('common.loading')}</div> : status && <>
-                {status.warnings.length > 0 && <div className="console-alert warning mb-4" role="status"><ShieldAlert size={18} aria-hidden="true" /><span>{status.warnings.join(' · ')}</span></div>}
+                {status.warnings.length > 0 && <div className="console-alert warning mb-4" role="status"><ShieldAlert size={18} aria-hidden="true" /><span>{status.warnings.map(warning => {
+                    const translationKey = getSystemWarningTranslationKey(warning);
+                    return translationKey ? t(translationKey) : warning;
+                }).join(' · ')}</span></div>}
 
                 <section className="console-panel mb-4">
                     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-color)] px-4 py-3">

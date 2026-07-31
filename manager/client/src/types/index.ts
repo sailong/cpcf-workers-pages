@@ -95,6 +95,16 @@ export interface CertificateProbe {
     error?: string;
 }
 
+export type SystemWarningCode =
+  | 'domain_environment_incomplete'
+  | 'console_host_mismatch'
+  | 'cloudflare_token_missing'
+  | 'console_dns_unresolved'
+  | 'wildcard_dns_unresolved'
+  | 'console_tls_unhealthy'
+  | 'wildcard_tls_unhealthy'
+  | 'domain_confirmation_missing';
+
 export interface SystemStatus {
     configuration: {
         consoleHost: string;
@@ -114,7 +124,7 @@ export interface SystemStatus {
     };
     dns: { console: NetworkProbe; wildcard: NetworkProbe; probeHost: string };
     tls: { console: CertificateProbe; wildcard: CertificateProbe; probeHost: string };
-    warnings: string[];
+    warnings: SystemWarningCode[];
     healthy: boolean;
     checkedAt: string;
 }

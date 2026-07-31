@@ -8,6 +8,16 @@ const { normalizeHostname, splitList } = require('../utils/project-hostname');
 
 const DOMAIN_SETTING_KEY = 'domain_configuration_confirmation';
 const HOSTNAME_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const WARNING_CODES = Object.freeze({
+    DOMAIN_ENVIRONMENT_INCOMPLETE: 'domain_environment_incomplete',
+    CONSOLE_HOST_MISMATCH: 'console_host_mismatch',
+    CLOUDFLARE_TOKEN_MISSING: 'cloudflare_token_missing',
+    CONSOLE_DNS_UNRESOLVED: 'console_dns_unresolved',
+    WILDCARD_DNS_UNRESOLVED: 'wildcard_dns_unresolved',
+    CONSOLE_TLS_UNHEALTHY: 'console_tls_unhealthy',
+    WILDCARD_TLS_UNHEALTHY: 'wildcard_tls_unhealthy',
+    DOMAIN_CONFIRMATION_MISSING: 'domain_confirmation_missing'
+});
 
 function configuredDomains(environment) {
     const consoleHosts = splitList(environment.CONSOLE_HOSTS || environment.CONSOLE_HOST);
@@ -99,16 +109,16 @@ function createSystemDiagnosticsService(options = {}) {
             && confirmation.consoleHost === domains.consoleHost
             && confirmation.projectsBaseDomain === domains.projectsBaseDomain);
         const warnings = [];
-        if (!domains.consoleHost || !domains.projectsBaseDomain) warnings.push('Domain environment variables are incomplete');
+        if (!domains.consoleHost || !domains.projectsBaseDomain) warnings.push(WARNING_CODES.DOMAIN_ENVIRONMENT_INCOMPLETE);
         if (observed && domains.consoleHost && observed !== domains.consoleHost && !['localhost', '127.0.0.1', '::1'].includes(observed)) {
-            warnings.push('The current request host does not match the configured console host');
+            warnings.push(WARNING_CODES.CONSOLE_HOST_MISMATCH);
         }
-        if (!environment.CLOUDFLARE_API_TOKEN) warnings.push('Cloudflare DNS API token is not configured');
-        if (!consoleDns.ok) warnings.push('Console DNS does not resolve');
-        if (!wildcardDns.ok) warnings.push('Wildcard project DNS does not resolve');
-        if (!consoleTls.ok || !consoleTls.authorized) warnings.push('Console TLS certificate is not healthy');
-        if (!wildcardTls.ok || !wildcardTls.authorized) warnings.push('Wildcard project TLS certificate is not healthy');
-        if (!confirmed) warnings.push('Domain configuration has not been confirmed by the administrator');
+        if (!environment.CLOUDFLARE_API_TOKEN) warnings.push(WARNING_CODES.CLOUDFLARE_TOKEN_MISSING);
+        if (!consoleDns.ok) warnings.push(WARNING_CODES.CONSOLE_DNS_UNRESOLVED);
+        if (!wildcardDns.ok) warnings.push(WARNING_CODES.WILDCARD_DNS_UNRESOLVED);
+        if (!consoleTls.ok || !consoleTls.authorized) warnings.push(WARNING_CODES.CONSOLE_TLS_UNHEALTHY);
+        if (!wildcardTls.ok || !wildcardTls.authorized) warnings.push(WARNING_CODES.WILDCARD_TLS_UNHEALTHY);
+        if (!confirmed) warnings.push(WARNING_CODES.DOMAIN_CONFIRMATION_MISSING);
 
         return {
             configuration: {
@@ -172,6 +182,7 @@ function service() {
 
 module.exports = {
     DOMAIN_SETTING_KEY,
+    WARNING_CODES,
     certificateProbe,
     createSystemDiagnosticsService,
     dnsProbe,

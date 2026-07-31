@@ -142,7 +142,7 @@ const Login = ({ onLogin }: LoginProps) => {
                                 <div className="grid grid-cols-[minmax(0,1fr)_8rem] gap-2">
                                     <input id="login-captcha" type="text" value={captcha} onChange={event => setCaptcha(event.target.value)} autoComplete="off" className="console-input min-w-0" required />
                                     <button type="button" onClick={() => void fetchCaptcha()} disabled={captchaLoading} className="flex h-10 items-center justify-center overflow-hidden rounded-md border border-[var(--border-color)] bg-white" title={t('loginPage.refreshCaptcha')} aria-label={t('loginPage.refreshCaptcha')}>
-                                        {captchaLoading ? <RefreshCw size={16} className="animate-spin text-slate-500" aria-hidden="true" /> : captchaSvg ? <span className="block h-full w-full" dangerouslySetInnerHTML={{ __html: captchaSvg }} /> : <RefreshCw size={16} className="text-slate-500" aria-hidden="true" />}
+                                        {captchaLoading ? <RefreshCw size={16} className="animate-spin text-slate-500" aria-hidden="true" /> : captchaSvg ? <span className="block h-full w-full [&>svg]:block [&>svg]:h-full [&>svg]:w-full" dangerouslySetInnerHTML={{ __html: captchaSvg }} /> : <RefreshCw size={16} className="text-slate-500" aria-hidden="true" />}
                                     </button>
                                 </div>
                                 {captchaError && <div className="flex items-center justify-between gap-3 text-xs text-red-600" role="alert"><span>{captchaError}</span><button type="button" className="underline" onClick={() => void fetchCaptcha()}>{t('common.retry')}</button></div>}

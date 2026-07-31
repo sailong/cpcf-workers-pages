@@ -7,7 +7,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { createDatabase } = require('../services/database');
 const { createAuditService } = require('../services/audit-service');
-const { createSystemDiagnosticsService, dnsProbe } = require('../services/system-diagnostics-service');
+const { WARNING_CODES, createSystemDiagnosticsService, dnsProbe } = require('../services/system-diagnostics-service');
 
 function fixture() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ccfwp-system-diagnostics-'));
@@ -59,7 +59,7 @@ test('system diagnostics report DNS and TLS health without returning configured 
         assert.equal(status.dns.wildcard.ok, true);
         assert.equal(status.tls.console.authorized, true);
         assert.equal(status.healthy, false);
-        assert.match(status.warnings.join('\n'), /not been confirmed/);
+        assert.deepEqual(status.warnings, [WARNING_CODES.DOMAIN_CONFIRMATION_MISSING]);
         assert.doesNotMatch(JSON.stringify(status), /must-never-leak/);
     } finally {
         f.cleanup();

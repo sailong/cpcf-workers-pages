@@ -88,7 +88,17 @@
     "certificates": "证书健康状态",
     "consoleCertificate": "控制台证书",
     "wildcardCertificate": "泛域名证书",
-    "daysRemaining": "天后到期"
+    "daysRemaining": "天后到期",
+    "warnings": {
+      "domainEnvironmentIncomplete": "域名环境变量配置不完整",
+      "consoleHostMismatch": "当前访问域名与配置的控制台域名不一致",
+      "cloudflareTokenMissing": "未配置 Cloudflare DNS API Token",
+      "consoleDnsUnresolved": "控制台域名 DNS 无法解析",
+      "wildcardDnsUnresolved": "项目泛域名 DNS 无法解析",
+      "consoleTlsUnhealthy": "控制台 TLS 证书状态异常",
+      "wildcardTlsUnhealthy": "项目泛域名 TLS 证书状态异常",
+      "domainConfirmationMissing": "管理员尚未确认域名配置"
+    }
   },
   "loginPage": {
     "welcomeBack": "欢迎回来",

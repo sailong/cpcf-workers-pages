@@ -1,4 +1,12 @@
 # ==========================================
+# Stage 0: Build Caddy with the Cloudflare DNS plugin
+# ==========================================
+FROM caddy:2.10.0-builder AS caddy-builder
+
+RUN xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.1
+
+
+# ==========================================
 # Stage 1: Build Frontend
 # ==========================================
 FROM node:22-slim AS frontend-builder
@@ -61,8 +69,11 @@ RUN npm ci --omit=dev --registry=https://registry.npmmirror.com
 # Copy Built Frontend from Stage 1
 COPY --from=frontend-builder /app/manager/client/dist ./client/dist
 
+# The production Compose stack runs Caddy from this same image.
+COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
+
 # Expose ports
-EXPOSE 8001
+EXPOSE 8001 80 443 443/udp
 
 # Environment Variables
 ENV NODE_ENV=production

@@ -88,7 +88,17 @@
     "certificates": "Certificate health",
     "consoleCertificate": "Console certificate",
     "wildcardCertificate": "Wildcard certificate",
-    "daysRemaining": "days remaining"
+    "daysRemaining": "days remaining",
+    "warnings": {
+      "domainEnvironmentIncomplete": "Domain environment variables are incomplete",
+      "consoleHostMismatch": "The current request host does not match the configured console host",
+      "cloudflareTokenMissing": "Cloudflare DNS API token is not configured",
+      "consoleDnsUnresolved": "Console DNS does not resolve",
+      "wildcardDnsUnresolved": "Wildcard project DNS does not resolve",
+      "consoleTlsUnhealthy": "Console TLS certificate is not healthy",
+      "wildcardTlsUnhealthy": "Wildcard project TLS certificate is not healthy",
+      "domainConfirmationMissing": "Domain configuration has not been confirmed by the administrator"
+    }
   },
   "loginPage": {
     "welcomeBack": "Welcome Back",
