@@ -47,6 +47,23 @@ function securityHeaders(req, res, next) {
     next();
 }
 
+function requestOrigin(req) {
+    let protocol = req.protocol;
+    if (req.ccfwpTrustedIngress) {
+        const forwardedProtocol = String(req.get('x-forwarded-proto') || '').trim().toLowerCase();
+        if (forwardedProtocol) protocol = forwardedProtocol;
+    }
+    if (protocol !== 'http' && protocol !== 'https') return null;
+
+    const host = req.get('host');
+    if (!host) return null;
+    try {
+        return new URL(`${protocol}://${host}`).origin;
+    } catch {
+        return null;
+    }
+}
+
 function sameOrigin(req, res, next) {
     const origin = req.headers.origin;
     if (!origin) return next();
@@ -58,9 +75,8 @@ function sameOrigin(req, res, next) {
         return res.status(403).json({ error: 'Invalid Origin' });
     }
 
-    const requestHost = String(req.headers.host || '').toLowerCase();
-    const requestProtocol = req.protocol;
-    if (parsed.host.toLowerCase() !== requestHost || parsed.protocol !== `${requestProtocol}:`) {
+    const expectedOrigin = requestOrigin(req);
+    if (!expectedOrigin || parsed.origin !== expectedOrigin) {
         return res.status(403).json({ error: 'Cross-origin requests are not allowed' });
     }
 

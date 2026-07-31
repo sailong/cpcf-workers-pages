@@ -37,6 +37,7 @@ function createIngressGuard(options = {}) {
         if (!tokenMatches(provided, expected)) {
             return res.status(403).json({ error: 'Request did not arrive through the trusted ingress' });
         }
+        req.ccfwpTrustedIngress = true;
         next();
     };
 }

@@ -49,3 +49,12 @@ test('GitHub workflows use Node 24-based checkout and setup actions', () => {
     assert.match(workflows, /actions\/checkout@v7/);
     assert.match(workflows, /actions\/setup-node@v7/);
 });
+
+test('application release containers write mounted files as the runner user', () => {
+    const script = fs.readFileSync(path.join(ROOT, 'scripts/build-app-release.sh'), 'utf8');
+    assert.match(script, /HOST_UID="\$\(id -u\)"/);
+    assert.match(script, /HOST_GID="\$\(id -g\)"/);
+    assert.equal((script.match(/--user "\$HOST_UID:\$HOST_GID"/g) || []).length, 2);
+    assert.equal((script.match(/--env HOME=\/tmp\/ccfwp-home/g) || []).length, 2);
+    assert.equal((script.match(/--env NPM_CONFIG_CACHE=\/tmp\/ccfwp-npm-cache/g) || []).length, 2);
+});

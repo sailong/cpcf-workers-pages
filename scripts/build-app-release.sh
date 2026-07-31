@@ -15,6 +15,8 @@ command -v zstd >/dev/null || fail "zstd is required"
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "$WORK_DIR"' EXIT
 mkdir -p "$WORK_DIR/package/manager" "$OUTPUT_DIR"
+HOST_UID="$(id -u)"
+HOST_GID="$(id -g)"
 
 rsync -a \
     --exclude node_modules \
@@ -24,6 +26,9 @@ rsync -a \
     "$ROOT_DIR/manager/" "$WORK_DIR/package/manager/"
 
 docker run --rm \
+    --user "$HOST_UID:$HOST_GID" \
+    --env HOME=/tmp/ccfwp-home \
+    --env NPM_CONFIG_CACHE=/tmp/ccfwp-npm-cache \
     --volume "$WORK_DIR/package:/workspace" \
     --workdir /workspace/manager/client \
     node:22-bookworm \
@@ -32,6 +37,9 @@ docker run --rm \
 # Backend dependencies can contain native binaries. Install them inside the
 # target architecture while reusing the architecture-independent frontend build.
 docker run --rm --platform "linux/$ARCH" \
+    --user "$HOST_UID:$HOST_GID" \
+    --env HOME=/tmp/ccfwp-home \
+    --env NPM_CONFIG_CACHE=/tmp/ccfwp-npm-cache \
     --volume "$WORK_DIR/package:/workspace" \
     --workdir /workspace/manager \
     node:22-bookworm \

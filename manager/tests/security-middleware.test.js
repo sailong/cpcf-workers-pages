@@ -42,13 +42,18 @@ test('production ingress rejects direct non-loopback requests without the shared
     assert.equal(status, 403);
 
     let passed = false;
-    guard({ get: () => 'x'.repeat(32), socket: { remoteAddress: '10.0.0.8' } }, {}, () => { passed = true; });
+    const trustedRequest = { get: () => 'x'.repeat(32), socket: { remoteAddress: '10.0.0.8' } };
+    guard(trustedRequest, {}, () => { passed = true; });
     assert.equal(passed, true);
+    assert.equal(trustedRequest.ccfwpTrustedIngress, true);
 });
 
-async function withServer(run) {
+async function withServer(run, options = {}) {
     const app = express();
     app.set('trust proxy', false);
+    if (options.ingressToken) {
+        app.use(createIngressGuard({ required: true, token: options.ingressToken, allowLoopback: false }));
+    }
     app.use(securityHeaders);
     app.use(createHostGuard({ consoleHosts: ['console.example.test'], projectsBaseDomains: ['apps.example.test'] }));
     app.use(sameOrigin);
@@ -115,6 +120,38 @@ test('host allowlist, same-origin policy, security headers, and JSON limit are e
             headers: { Host: 'console.example.test', 'Content-Type': 'application/json' },
             body: JSON.stringify({ value: 'x'.repeat(64) })
         })).status, 413);
+    });
+});
+
+test('same-origin uses forwarded HTTPS only after trusted ingress authentication', async () => {
+    const token = 'x'.repeat(32);
+    await withServer(async baseUrl => {
+        const allowed = await request(baseUrl, {
+            method: 'POST',
+            headers: {
+                Host: 'console.example.test:443',
+                Origin: 'https://console.example.test',
+                'X-CCFWP-Ingress-Token': token,
+                'X-Forwarded-Proto': 'https',
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        });
+        assert.equal(allowed.status, 200);
+    }, { ingressToken: token });
+
+    await withServer(async baseUrl => {
+        const spoofed = await request(baseUrl, {
+            method: 'POST',
+            headers: {
+                Host: 'console.example.test',
+                Origin: 'https://console.example.test',
+                'X-Forwarded-Proto': 'https',
+                'Content-Type': 'application/json'
+            },
+            body: '{}'
+        });
+        assert.equal(spoofed.status, 403);
     });
 });
 
