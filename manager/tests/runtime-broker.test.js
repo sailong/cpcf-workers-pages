@@ -98,7 +98,7 @@ test('Docker runtime spec enforces container and network isolation', () => {
     assert.equal(host.NanoCpus, 500_000_000);
     assert.equal(host.NetworkMode, spec.networkName);
     assert.equal(host.PortBindings, undefined);
-    assert.equal(spec.networkConfiguration.Options['com.docker.network.bridge.enable_icc'], 'false');
+    assert.equal(spec.networkConfiguration.Options['com.docker.network.bridge.enable_icc'], 'true');
     assert.equal(spec.labels[OWNER_LABEL], 'true');
     assert.match(host.Tmpfs['/tmp'], /size=128m/);
     assert.equal(container.WorkingDir, '/tmp');

@@ -20,7 +20,13 @@ cleanup() {
             --filter label=io.ccfwp.runtime=true \
             --filter label=io.ccfwp.project-id="$project_id")
     done
-    rm -rf "$FIXTURE_DIR"
+    if docker image inspect "$IMAGE" >/dev/null 2>&1; then
+        docker run --rm --network none --user 0 \
+            -v "$FIXTURE_DIR:/cleanup" \
+            "$IMAGE" /bin/sh -c 'rm -rf /cleanup/* /cleanup/.[!.]* /cleanup/..?*' \
+            >/dev/null 2>&1 || true
+    fi
+    rm -rf "$FIXTURE_DIR" || true
 }
 trap cleanup EXIT
 

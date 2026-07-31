@@ -266,7 +266,9 @@ function createDockerRuntimeSpec(project, resources, options = {}) {
             Internal: false,
             Attachable: false,
             Labels: labels,
-            Options: { 'com.docker.network.bridge.enable_icc': 'false' }
+            // Each bridge contains only the manager and one project runtime.
+            // They must communicate for readiness checks and resource bindings.
+            Options: { 'com.docker.network.bridge.enable_icc': 'true' }
         },
         containerConfiguration: {
             Image: process.env.PROJECT_RUNTIME_IMAGE || 'ccfwp-platform:dev',

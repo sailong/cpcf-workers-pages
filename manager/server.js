@@ -25,8 +25,9 @@ function assertProductionPasswordConfigured(service = authService, environment =
     }
 }
 
-function createApp() {
+function createApp(options = {}) {
     const app = express();
+    const clientDistDirectory = options.clientDistDirectory || path.join(__dirname, 'client/dist');
     configureTrustedProxy(app);
 
     app.disable('x-powered-by');
@@ -36,7 +37,7 @@ function createApp() {
     // Worker and Pages responses own their CORS and CSP behavior.
     app.use(securityHeaders);
     app.use(sameOrigin);
-    app.use(express.static(path.join(__dirname, 'client/dist')));
+    app.use(express.static(clientDistDirectory));
     app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb', strict: true }));
     app.use(require('./middleware/auth'));
 
@@ -63,6 +64,10 @@ function createApp() {
     app.use('/api/system', require('./routes/system'));
     app.use('/api/projects', require('./routes/files'));
 
+    // Use a relative file with an explicit root. Express otherwise treats the
+    // .platform-data segment in application release paths as a hidden file.
+    app.get('/{*splat}', (req, res) => res.sendFile('index.html', { root: clientDistDirectory }));
+
     app.use((err, req, res, next) => {
         if (res.headersSent) return next(err);
         const isDev = process.env.NODE_ENV !== 'production';
@@ -76,7 +81,6 @@ function createApp() {
         });
     });
 
-    app.get('/{*splat}', (req, res) => res.sendFile(path.join(__dirname, 'client/dist/index.html')));
     return app;
 }
 

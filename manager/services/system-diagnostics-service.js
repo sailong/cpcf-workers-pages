@@ -68,7 +68,6 @@ async function dnsProbe(hostname, lookup = dns.lookup, timeoutMs = 3_000) {
                 error.code = 'ETIMEDOUT';
                 reject(error);
             }, timeoutMs);
-            timer.unref?.();
         });
         const records = await Promise.race([lookup(hostname, { all: true }), timeout]);
         return { ok: records.length > 0, addresses: [...new Set(records.map(record => record.address))] };
