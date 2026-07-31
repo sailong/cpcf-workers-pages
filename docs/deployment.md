@@ -78,9 +78,12 @@ CCFWP_MAX_RELEASE_BYTES=2147483648
 启动工作流；应用程序包打包和签名由 GitHub Actions 完成，不会构建或推送 Docker 镜像：
 
 ```bash
-# 推送不可变版本 Tag
+# 先提交 docs/releases/v1.2.4.md，再推送不可变版本 Tag
 git tag v1.2.4 && git push origin v1.2.4
 ```
+
+`docs/releases/vX.Y.Z.md` 必须和代码一起提交到该 Tag。工作流会在上传签名资产前校验文件存在，
+并将其作为 GitHub Release 的正式介绍；缺少文件会阻止发布。
 
 工作流先执行后端、前端、运行时隔离和 E2E 测试；任何 CI 作业失败都会阻止发布。通过后再为
 amd64、arm64 分别生成包含生产 `node_modules` 和前端 `dist` 的 `tar.gz`，并使用 Cosign GitHub

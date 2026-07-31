@@ -89,3 +89,14 @@ test('application releases use tar.gz bundles from build through online extracti
     assert.match(dockerfile, /apt-get install -y ca-certificates python3 build-essential gzip/);
     assert.doesNotMatch(releaseSources, /tar\.zst|--zstd|\bzstd\b/i);
 });
+
+test('application release requires checked-in version notes', () => {
+    const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/app-release.yml'), 'utf8');
+    const notes = fs.readFileSync(path.join(ROOT, 'docs/releases/v1.2.2.md'), 'utf8');
+
+    assert.match(workflow, /notes_file="docs\/releases\/\$\{VERSION\}\.md"/);
+    assert.match(workflow, /Missing release notes file: \$notes_file/);
+    assert.match(workflow, /gh release create "\$VERSION" --verify-tag --notes-file "\$notes_file" dist\/releases\/\*/);
+    assert.match(notes, /^# v1\.2\.2$/m);
+    assert.match(notes, /tar\.gz/);
+});

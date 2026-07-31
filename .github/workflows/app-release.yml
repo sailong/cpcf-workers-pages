@@ -100,4 +100,9 @@ jobs:
             echo "Release $VERSION already exists; immutable SemVer releases cannot be overwritten" >&2
             exit 1
           fi
-          gh release create "$VERSION" --verify-tag --generate-notes dist/releases/*
+          notes_file="docs/releases/${VERSION}.md"
+          if [[ ! -f "$notes_file" ]]; then
+            echo "Missing release notes file: $notes_file" >&2
+            exit 1
+          fi
+          gh release create "$VERSION" --verify-tag --notes-file "$notes_file" dist/releases/*
