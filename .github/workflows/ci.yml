@@ -71,7 +71,6 @@ jobs:
     env:
       CCFWP_TEST_PASSWORD: E2E-Cleanup-Fallback-Only-123
       CCFWP_TEST_CAPTCHA: cleanup-fallback-only
-      CCFWP_TEST_DATA_DIR: ${{ runner.temp }}/ccfwp-test-data
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -80,6 +79,8 @@ jobs:
           cache: npm
           cache-dependency-path: tests/e2e/package-lock.json
       - name: Generate isolated test credentials
+        env:
+          CCFWP_TEST_DATA_DIR: ${{ runner.temp }}/ccfwp-test-data
         run: node scripts/generate-e2e-env.js
       - name: Start isolated platform
         run: docker compose -p ccfwp-test -f docker-compose.test.yml up -d --build --wait

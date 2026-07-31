@@ -36,7 +36,7 @@ test('CI credential generation writes bounded random values without shell interp
 test('CI workflow keeps cleanup-safe defaults and invokes the credential generator', () => {
     const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
     assert.match(workflow, /CCFWP_TEST_PASSWORD: E2E-Cleanup-Fallback-Only-123/);
-    assert.match(workflow, /CCFWP_TEST_DATA_DIR: \$\{\{ runner\.temp \}\}\/ccfwp-test-data/);
-    assert.match(workflow, /run: node scripts\/generate-e2e-env\.js/);
+    assert.doesNotMatch(workflow, /^ {6}CCFWP_TEST_DATA_DIR:/m);
+    assert.match(workflow, /- name: Generate isolated test credentials\n {8}env:\n {10}CCFWP_TEST_DATA_DIR: \$\{\{ runner\.temp \}\}\/ccfwp-test-data\n {8}run: node scripts\/generate-e2e-env\.js/);
     assert.doesNotMatch(workflow, /node -e \\"/);
 });
