@@ -40,3 +40,12 @@ test('CI workflow keeps cleanup-safe defaults and invokes the credential generat
     assert.match(workflow, /- name: Generate isolated test credentials\n {8}env:\n {10}CCFWP_TEST_DATA_DIR: \$\{\{ runner\.temp \}\}\/ccfwp-test-data\n {8}run: node scripts\/generate-e2e-env\.js/);
     assert.doesNotMatch(workflow, /node -e \\"/);
 });
+
+test('GitHub workflows use Node 24-based checkout and setup actions', () => {
+    const workflows = ['ci.yml', 'app-release.yml']
+        .map(file => fs.readFileSync(path.join(ROOT, '.github/workflows', file), 'utf8'))
+        .join('\n');
+    assert.doesNotMatch(workflows, /actions\/(?:checkout|setup-node)@v[1-6]\b/);
+    assert.match(workflows, /actions\/checkout@v7/);
+    assert.match(workflows, /actions\/setup-node@v7/);
+});

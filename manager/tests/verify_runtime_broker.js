@@ -140,7 +140,9 @@ async function main() {
             assert.equal(inspection.HostConfig.PidsLimit, 128);
             assert.equal(inspection.HostConfig.Memory, 512 * 1024 * 1024);
             assert.equal(inspection.HostConfig.NanoCpus, 250_000_000);
-            assert.deepEqual(inspection.HostConfig.PortBindings, {});
+            const portBindings = inspection.HostConfig.PortBindings;
+            assert.equal(portBindings === null || (typeof portBindings === 'object' && !Array.isArray(portBindings)), true);
+            assert.deepEqual(Object.keys(portBindings || {}), []);
             assert.match(inspection.HostConfig.Tmpfs['/tmp'], /size=64m/);
             const mounts = inspection.Mounts.map(mount => mount.Source);
             assert.equal(mounts.some(source => source.includes('/var/run/docker.sock')), false);

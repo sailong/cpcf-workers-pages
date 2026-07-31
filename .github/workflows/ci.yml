@@ -11,8 +11,8 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -62,7 +62,7 @@ jobs:
   runtime-isolation:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify Docker Runtime Broker isolation
         run: ./scripts/test-runtime-broker.sh
 
@@ -72,8 +72,8 @@ jobs:
       CCFWP_TEST_PASSWORD: E2E-Cleanup-Fallback-Only-123
       CCFWP_TEST_CAPTCHA: cleanup-fallback-only
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
