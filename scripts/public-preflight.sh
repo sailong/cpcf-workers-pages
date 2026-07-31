@@ -26,7 +26,7 @@ set -a
 source .env
 set +a
 
-required_vars=(AUTH_PASSWORD INGRESS_PROXY_TOKEN CONSOLE_HOST PROJECTS_BASE_DOMAIN ACME_EMAIL CLOUDFLARE_API_TOKEN)
+required_vars=(AUTH_PASSWORD INGRESS_PROXY_TOKEN CCFWP_UPDATER_TOKEN CCFWP_GITHUB_REPOSITORY CONSOLE_HOST PROJECTS_BASE_DOMAIN ACME_EMAIL CLOUDFLARE_API_TOKEN)
 for key in "${required_vars[@]}"; do
     if [[ -z "${!key:-}" ]]; then
         fail "missing required environment variable: $key"
@@ -43,6 +43,12 @@ if [[ "${AUTH_PASSWORD}" == "admin" || "${AUTH_PASSWORD}" == "password" || "${#A
     fail "AUTH_PASSWORD is too weak for public deployment"
 fi
 pass "AUTH_PASSWORD length/strength baseline checks passed"
+
+if [[ "${#CCFWP_UPDATER_TOKEN}" -lt 32 || "$CCFWP_UPDATER_TOKEN" == "$INGRESS_PROXY_TOKEN" ]]; then
+    fail "CCFWP_UPDATER_TOKEN must be an independent secret of at least 32 characters"
+fi
+[[ "$CCFWP_GITHUB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail "CCFWP_GITHUB_REPOSITORY must be owner/name"
+pass "signed application release configuration is present"
 
 if docker compose config >/dev/null 2>&1; then
     compose_config="$(docker compose config)"
@@ -92,3 +98,4 @@ echo "  2. Cloudflare API token can create DNS-01 challenges"
 echo "  3. Only 80/443 are reachable from the public internet"
 echo "  4. Default admin password is rotated after first login"
 echo "  5. BUILD_REGISTRY_ALLOWLIST only includes trusted registries"
+echo "  6. GitHub release workflow runs on the exact SemVer tag"

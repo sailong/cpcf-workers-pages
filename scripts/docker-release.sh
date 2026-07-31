@@ -25,12 +25,12 @@ else
 fi
 
 valid_tag() {
-    [[ "$1" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$ ]]
+    [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
 }
 
 require_tag() {
     local tag="$1"
-    valid_tag "$tag" || fail "invalid Docker image tag: $tag"
+    valid_tag "$tag" || fail "Docker image tag must be strict SemVer with a v prefix: $tag"
 }
 
 state_value() {
@@ -71,10 +71,11 @@ publish() {
     [[ "$IMAGE_REPOSITORY" == */* ]] || fail "publishing requires CCFWP_IMAGE_REPOSITORY or DOCKERHUB_USERNAME"
     [[ -z "$(git status --porcelain)" ]] || fail "refusing to publish a dirty working tree; commit or stash changes first"
 
-    info "Building and publishing ${IMAGE_REPOSITORY}:${tag} for ${PLATFORMS}"
+    info "Building locally and pushing ${IMAGE_REPOSITORY}:${tag} for ${PLATFORMS}"
     docker buildx build \
         --platform "$PLATFORMS" \
         --tag "${IMAGE_REPOSITORY}:${tag}" \
+        --build-arg "CCFWP_BUILTIN_VERSION=${tag}" \
         --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
         --push \
         .
@@ -90,9 +91,9 @@ deploy() {
     export CCFWP_IMAGE_REPOSITORY="$IMAGE_REPOSITORY"
     export CCFWP_IMAGE_TAG="$tag"
     info "Pulling ${IMAGE_REPOSITORY}:${tag}"
-    docker compose pull ccfwp caddy
+    docker compose pull ccfwp ccfwp-updater caddy
     info "Starting the platform and Caddy from ${IMAGE_REPOSITORY}:${tag}"
-    docker compose up -d --no-build --wait --wait-timeout 180 ccfwp caddy
+    docker compose up -d --no-build --wait --wait-timeout 180 ccfwp-updater ccfwp caddy
     docker compose ps
     write_state "$tag" "${previous:-none}"
     info "Deployment state saved to ${STATE_FILE}"
@@ -110,7 +111,7 @@ rollback() {
 usage() {
     cat <<'EOF'
 Usage:
-  scripts/docker-release.sh publish [tag]
+  scripts/docker-release.sh publish <vX.Y.Z>  # local build and registry push
   scripts/docker-release.sh deploy <tag>
   scripts/docker-release.sh rollback
 
@@ -119,13 +120,17 @@ Environment:
   CCFWP_IMAGE_REPOSITORY      Full image repository, e.g. docker.io/acme/ccfwp-platform
   CCFWP_PLATFORMS             Buildx platforms (default: linux/amd64,linux/arm64)
   CCFWP_DEPLOY_STATE_FILE     Optional deployment state path override
+
+Docker images are never built by GitHub Actions. Log in to Docker Hub on this
+machine before running publish; Buildx pushes the multi-platform image directly.
 EOF
 }
 
 action="${1:-}"
 case "$action" in
     publish)
-        publish "${2:-$(git rev-parse --short=12 HEAD)}"
+        [[ $# -eq 2 ]] || fail "publish requires exactly one strict SemVer tag"
+        publish "$2"
         ;;
     deploy)
         [[ $# -eq 2 ]] || fail "deploy requires exactly one image tag"

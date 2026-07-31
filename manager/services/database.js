@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const Database = require('better-sqlite3');
 const config = require('../config');
@@ -166,6 +167,59 @@ function applyMigrations(db) {
     }
 }
 
+async function dryRunMigrations(options = {}) {
+    const databaseFile = options.databaseFile || config.DATABASE_FILE;
+    const temporaryDirectory = await fs.promises.mkdtemp(path.join(options.tempDirectory || os.tmpdir(), 'ccfwp-migration-dry-run-'));
+    const temporaryFile = path.join(temporaryDirectory, 'control-plane.sqlite3');
+    let source;
+    let testDb;
+    try {
+        if (fs.existsSync(databaseFile)) {
+            source = new Database(databaseFile, { readonly: true, fileMustExist: true });
+            const fromVersion = source.pragma('user_version', { simple: true });
+            await source.backup(temporaryFile);
+            source.close();
+            source = null;
+            testDb = new Database(temporaryFile);
+            testDb.pragma('journal_mode = WAL');
+            testDb.pragma('foreign_keys = ON');
+            testDb.pragma('busy_timeout = 5000');
+            applyMigrations(testDb);
+            return { fromVersion, toVersion: testDb.pragma('user_version', { simple: true }) };
+        }
+
+        testDb = new Database(temporaryFile);
+        testDb.pragma('foreign_keys = ON');
+        applyMigrations(testDb);
+        return { fromVersion: 0, toVersion: testDb.pragma('user_version', { simple: true }) };
+    } finally {
+        if (source) source.close();
+        if (testDb) testDb.close();
+        await fs.promises.rm(temporaryDirectory, { recursive: true, force: true });
+    }
+}
+
+async function backupDatabase(databaseFile, targetFile) {
+    if (!fs.existsSync(databaseFile)) return null;
+    await fs.promises.mkdir(path.dirname(targetFile), { recursive: true, mode: 0o700 });
+    const source = new Database(databaseFile, { readonly: true, fileMustExist: true });
+    try {
+        await source.backup(targetFile);
+        return targetFile;
+    } finally {
+        source.close();
+    }
+}
+
+async function restoreDatabaseBackup(backupFile, databaseFile) {
+    if (!backupFile || !fs.existsSync(backupFile)) return false;
+    const temporary = `${databaseFile}.${process.pid}.restore`;
+    await fs.promises.copyFile(backupFile, temporary);
+    for (const suffix of ['-wal', '-shm']) await fs.promises.rm(`${databaseFile}${suffix}`, { force: true });
+    await fs.promises.rename(temporary, databaseFile);
+    return true;
+}
+
 function normalizeBindings(bindings) {
     const rows = [];
     for (const kind of ['kv', 'd1', 'r2']) {
@@ -282,4 +336,13 @@ function getDatabase() {
     return singleton;
 }
 
-module.exports = { SCHEMA_VERSION, createDatabase, getDatabase, validateLegacyData };
+module.exports = {
+    SCHEMA_VERSION,
+    applyMigrations,
+    backupDatabase,
+    createDatabase,
+    dryRunMigrations,
+    getDatabase,
+    restoreDatabaseBackup,
+    validateLegacyData
+};

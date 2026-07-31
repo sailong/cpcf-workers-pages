@@ -125,6 +125,11 @@ docker compose -f docker-compose.dev.yml up -d
 
 GitHub Actions 会在推送和拉取请求时执行相同的质量、运行时隔离和 Playwright 阶段。
 
+Docker 镜像只在维护者本机通过 `./scripts/docker-release.sh publish vX.Y.Z` 构建并上传到 Docker Hub；
+GitHub Actions 不发布镜像，只生成并签名在线升级使用的应用程序包。生产环境首次部署后，可在
+“设置 > 应用版本”从已签名的 GitHub SemVer Release 在线升级和一键回滚；发行、Cosign OIDC
+校验、数据库 dry-run 与保留策略见 [部署指南](docs/deployment.md)。
+
 ---
 
 ### ❓ 常见问题 (FAQ)

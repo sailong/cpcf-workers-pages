@@ -119,6 +119,10 @@ class DockerEngineClient {
         return this.request('POST', `/containers/${encodeURIComponent(idOrName)}/start`, { expected: [204] });
     }
 
+    restartContainer(idOrName, timeoutSeconds = 10) {
+        return this.request('POST', `/containers/${encodeURIComponent(idOrName)}/restart?t=${timeoutSeconds}`, { expected: [204] });
+    }
+
     stopContainer(idOrName, timeoutSeconds = 3) {
         return this.request('POST', `/containers/${encodeURIComponent(idOrName)}/stop?t=${timeoutSeconds}`, {
             expected: [204, 304]

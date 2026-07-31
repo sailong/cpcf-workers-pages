@@ -1,71 +1,61 @@
-# Docker Hub 发布指南
+# Docker Hub 本地发布指南
 
-本文档将指导你如何将 CCFWP 平台打包成镜像并推送到 Docker Hub，以便其他人可以直接下载使用。
+Docker 镜像只在维护者本机构建并推送到 Docker Hub。GitHub Actions 不构建镜像；GitHub 上的
+`app-release.yml` 只生成和签名线上升级使用的应用程序包。
 
-## 1. 前置准备
+## 前置准备
 
-1.  **注册账号**: 确保你拥有 [Docker Hub](https://hub.docker.com/) 账号。
-2.  **本地登录**:
-    在终端中运行以下命令并输入你的用户名和密码：
-    ```bash
-    docker login
-    ```
+1. 在 Docker Hub 创建 `ccfwp-platform` 仓库，并创建 Access Token。
+2. 本机安装 Docker Desktop 或 Docker Engine、Compose 与 Buildx。
+3. 确保待发布代码已提交；发布脚本会拒绝脏工作区。
+4. 登录 Docker Hub，不要把 Token 写入仓库、脚本参数或镜像：
 
-## 2. 构建并推送 (标准方法)
+```bash
+docker login
+```
 
-如果你只需要支持与你当前开发机相同架构的设备 (例如你用的是 Intel Mac，对方也是 Intel 服务器)，可以使用标准构建。
+## 构建并上传多架构镜像
 
-### 步骤
+在仓库根目录执行：
 
-1.  **构建镜像**
-    将 `your-username` 替换为你的 Docker Hub 用户名。
-    ```bash
-    # 在项目根目录下执行 (兼容当前架构)
-    docker build -t your-username/ccfwp:0.1.0 .
-    ```
+```bash
+export DOCKERHUB_USERNAME=<你的 Docker Hub 用户名>
+export CCFWP_IMAGE_REPOSITORY=docker.io/$DOCKERHUB_USERNAME/ccfwp-platform
+./scripts/docker-release.sh publish v1.2.3
+```
 
-    > 注意：必须在项目根目录执行，因为 Dockerfile 需要访问 manager 目录。
+脚本只接受 `vX.Y.Z` 严格 SemVer，不接受 `latest`、预发布版本或无 `v` 前缀版本。它会在本机调用
+Buildx 构建 `linux/amd64` 与 `linux/arm64`，将 Caddy、固定运行环境和初始应用快照放入同一个镜像，
+然后直接推送多架构清单到 Docker Hub。跨架构构建使用 QEMU 时较慢属于正常现象。
 
-2.  **推送镜像**
-    ```bash
-    docker push your-username/ccfwp:0.1.0
-    ```
+可用以下命令确认两个平台均已发布：
 
-## 3. 构建多架构镜像 (推荐)
+```bash
+docker buildx imagetools inspect \
+  docker.io/<你的 Docker Hub 用户名>/ccfwp-platform:v1.2.3
+```
 
-为了让镜像同时支持 **AMD64** (普通 Linux 服务器/Windows) 和 **ARM64** (Apple Silicon M1/M2/M3, 树莓派)，强烈建议使用 `buildx` 进行构建。
+## 服务器首次部署
 
-### 步骤
+服务器使用仓库中的 `docker-compose.yml` 和 `.env.production.example`。至少配置镜像仓库、镜像
+版本、管理员密码、域名、Cloudflare DNS Token、升级器独立 Token 和 GitHub 仓库：
 
-1.  **创建构建实例 (首次需要)**
-    ```bash
-    # 创建并启动一个新的构建器实例，支持多架构
-    docker buildx create --use --name mybuilder --driver docker-container --bootstrap
-    ```
+```dotenv
+CCFWP_IMAGE_REPOSITORY=docker.io/<你的 Docker Hub 用户名>/ccfwp-platform
+CCFWP_IMAGE_TAG=v1.2.3
+CCFWP_GITHUB_REPOSITORY=sailong/cpcf-workers-pages
+CCFWP_UPDATER_TOKEN=<独立的 32 字节以上随机密钥>
+```
 
-2.  **构建并直接推送**
-    这条命令会自动构建 `linux/amd64` (x86_64) 和 `linux/arm64` (Apple Silicon) 两种架构的镜像，并合并推送到 Docker Hub。
-    
-    > **注意**: 
-    > *   由于我们优化了 Dockerfile，`better-sqlite3` 等原生依赖会在容器内根据目标架构自动编译，因此兼容性得到了保证。
-    > *   跨架构构建 (例如在 Mac 上构建 amd64 镜像) 需要 QEMU 模拟，速度会比本地构建慢，这是正常的。
-    
-    ```bash
-    docker buildx build \
-      --platform linux/amd64,linux/arm64 \
-      -t your-username/ccfwp:0.1.0 \
-      --push .
-    ```
-
-## 4. 用户如何使用你的镜像？
-
-公网部署必须同时运行管理服务与仓库提供的 Caddy 入口。使用根目录的
-`docker-compose.yml` 和 `.env.production.example`，填写管理员密码、控制台域名、
-项目根域名、Cloudflare DNS Token 与内部入口凭证。生产环境只开放 80/443；
-管理端口 8001 和资源网关 9200 均保持在容器网络内部。
-
-完成配置后先执行：
 ```bash
 ./scripts/public-preflight.sh
-docker compose --env-file .env -f docker-compose.yml up -d
+docker compose --env-file .env -f docker-compose.yml pull
+docker compose --env-file .env -f docker-compose.yml up -d --no-build --wait
+```
+
+此后普通前后端代码通过已签名的 GitHub Release 应用包在线升级；只有 Node、Wrangler、Caddy、
+Cosign 或系统依赖发生变化时，才需要再次发布并部署 Docker 镜像。镜像级回滚使用：
+
+```bash
+./scripts/docker-release.sh rollback
 ```

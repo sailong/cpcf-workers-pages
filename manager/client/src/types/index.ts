@@ -127,6 +127,30 @@ export interface SystemStatus {
     warnings: SystemWarningCode[];
     healthy: boolean;
     checkedAt: string;
+    application?: ApplicationReleaseStatus;
+}
+
+export interface ApplicationReleaseStatus {
+    available: boolean;
+    currentVersion: string;
+    previousVersion?: string | null;
+    retainedVersions?: string[];
+    operation?: {
+        id: string;
+        kind: 'upgrade' | 'rollback';
+        targetVersion?: string | null;
+        status: 'queued' | 'running' | 'succeeded' | 'failed' | 'rolled_back';
+        phase?: 'queued' | 'preparing' | 'migrationDryRun' | 'rollbackCompatibility' | 'restarting' | 'completed' | 'restored' | 'failed';
+        message?: string;
+        startedAt?: string;
+        completedAt?: string | null;
+    } | null;
+    candidate?: {
+        version: string;
+        name?: string;
+        publishedAt?: string;
+    };
+    error?: string;
 }
 
 export interface ProjectRuntimeMetrics {

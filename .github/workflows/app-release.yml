@@ -1,0 +1,106 @@
+name: Publish Signed Application Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing strict SemVer tag to publish, for example v1.2.3
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release version
+        id: version
+        shell: bash
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+        run: |
+          version="${DISPATCH_VERSION:-$GITHUB_REF_NAME}"
+          if [[ ! "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Version must be strict SemVer with a v prefix: $version" >&2
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/tags/$version" ]]; then
+            echo "Run this workflow on the exact tag with --ref $version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.version.outputs.version }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Install zstd
+        run: sudo apt-get update && sudo apt-get install -y zstd
+
+      - name: Build amd64 release bundle
+        run: ./scripts/build-app-release.sh "${{ steps.version.outputs.version }}" amd64 dist/releases
+
+      - name: Build arm64 release bundle
+        run: ./scripts/build-app-release.sh "${{ steps.version.outputs.version }}" arm64 dist/releases
+
+      - name: Create release manifest
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const version = process.env.VERSION;
+          const directory = 'dist/releases';
+          const bundles = {};
+          for (const arch of ['amd64', 'arm64']) {
+            const asset = `ccfwp-app-${version}-linux-${arch}.tar.zst`;
+            const file = path.join(directory, asset);
+            bundles[`linux-${arch}`] = {
+              asset,
+              sha256: crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex'),
+              size: fs.statSync(file).size
+            };
+          }
+          fs.writeFileSync(path.join(directory, 'manifest.json'), JSON.stringify({
+            schemaVersion: 1,
+            version,
+            gitSha: process.env.GITHUB_SHA,
+            createdAt: new Date().toISOString(),
+            bundles
+          }, null, 2) + '\n');
+          fs.writeFileSync(path.join(directory, 'checksums.txt'), Object.values(bundles)
+            .map(bundle => `${bundle.sha256}  ${bundle.asset}`).join('\n') + '\n');
+          NODE
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.9.2
+        with:
+          cosign-release: v2.5.0
+
+      - name: Sign manifest with GitHub OIDC
+        working-directory: dist/releases
+        run: cosign sign-blob --yes --bundle manifest.sig manifest.json
+
+      - name: Publish immutable GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION already exists; immutable SemVer releases cannot be overwritten" >&2
+            exit 1
+          fi
+          gh release create "$VERSION" --verify-tag --generate-notes dist/releases/*

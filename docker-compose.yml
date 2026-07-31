@@ -1,9 +1,10 @@
-x-platform-image: &platform-image "${CCFWP_IMAGE_REPOSITORY:-ccfwp-platform}:${CCFWP_IMAGE_TAG:-0.1.0}"
+x-platform-image: &platform-image "${CCFWP_IMAGE_REPOSITORY:-ccfwp-platform}:${CCFWP_IMAGE_TAG:-v1.0.0}"
 
 services:
   ccfwp:
     build: .
     image: *platform-image
+    command: ["node", "/app/updater/entrypoint.js"]
     container_name: ccfwp-container
     expose:
       - "8001"
@@ -13,6 +14,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       NODE_ENV: production
+      PLATFORM_DATA_DIR: /app/.platform-data
+      CCFWP_APP_RELEASE_ROOT: /app/.platform-data/app-releases
+      CCFWP_UPDATER_URL: http://ccfwp-updater:8002
+      CCFWP_UPDATER_TOKEN: ${CCFWP_UPDATER_TOKEN:?Set CCFWP_UPDATER_TOKEN in .env}
       MANAGER_SERVICE_PORT: 8001
       RUNTIME_PROVIDER: docker
       BUILD_NETWORK_MODE: ${BUILD_NETWORK_MODE:-prefer-offline}
@@ -32,6 +37,38 @@ services:
       timeout: 5s
       retries: 12
 
+    depends_on:
+      ccfwp-updater:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  ccfwp-updater:
+    build: .
+    image: *platform-image
+    container_name: ccfwp-updater
+    command: ["node", "/app/updater/server.js"]
+    expose:
+      - "8002"
+    volumes:
+      - ./.platform-data:/app/.platform-data
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      NODE_ENV: production
+      PLATFORM_DATA_DIR: /app/.platform-data
+      CCFWP_APP_RELEASE_ROOT: /app/.platform-data/app-releases
+      CCFWP_GITHUB_REPOSITORY: ${CCFWP_GITHUB_REPOSITORY:-}
+      CCFWP_RELEASE_SIGNER_ISSUER: ${CCFWP_RELEASE_SIGNER_ISSUER:-https://token.actions.githubusercontent.com}
+      CCFWP_RELEASE_RETENTION: ${CCFWP_RELEASE_RETENTION:-3}
+      CCFWP_MAX_RELEASE_BYTES: ${CCFWP_MAX_RELEASE_BYTES:-2147483648}
+      CCFWP_UPDATER_TOKEN: ${CCFWP_UPDATER_TOKEN:?Set CCFWP_UPDATER_TOKEN in .env}
+      MANAGER_CONTAINER_ID: ccfwp-container
+      UPDATER_PORT: 8002
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8002/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
     restart: unless-stopped
 
   caddy:

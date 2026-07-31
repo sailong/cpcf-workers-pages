@@ -5,6 +5,8 @@ FROM caddy:2.10.0-builder AS caddy-builder
 
 RUN xcaddy build --with github.com/caddy-dns/cloudflare@v0.2.1
 
+FROM gcr.io/projectsigstore/cosign:v2.5.0 AS cosign
+
 
 # ==========================================
 # Stage 1: Build Frontend
@@ -39,6 +41,8 @@ RUN npm run build
 # ==========================================
 FROM node:22-slim
 
+ARG CCFWP_BUILTIN_VERSION=v1.0.0
+
 # 【Config】Env Vars
 ENV CI=true \
     WRANGLER_SEND_METRICS=false \
@@ -51,7 +55,7 @@ ENV CI=true \
 # 【Config】System Dependencies with Aliyun Mirror
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources && \
     apt-get update && \
-    apt-get install -y ca-certificates python3 build-essential && \
+    apt-get install -y ca-certificates python3 build-essential zstd && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -71,6 +75,12 @@ COPY --from=frontend-builder /app/manager/client/dist ./client/dist
 
 # The production Compose stack runs Caddy from this same image.
 COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
+COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
+
+# The image is the stable runtime. Application releases are seeded from this
+# snapshot and later switched through the persistent release volume.
+RUN mkdir -p /opt/ccfwp-builtin && cp -a /app/manager /opt/ccfwp-builtin/manager
+COPY updater/ /app/updater/
 
 # Expose ports
 EXPOSE 8001 80 443 443/udp
@@ -78,6 +88,7 @@ EXPOSE 8001 80 443 443/udp
 # Environment Variables
 ENV NODE_ENV=production
 ENV MANAGER_SERVICE_PORT=8001
+ENV CCFWP_BUILTIN_VERSION=${CCFWP_BUILTIN_VERSION}
 
 # Start command
-CMD ["node", "server.js"]
+CMD ["node", "/app/updater/entrypoint.js"]
