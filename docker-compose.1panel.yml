@@ -1,17 +1,18 @@
 x-platform-image: &platform-image "${CCFWP_IMAGE_REPOSITORY:?Set CCFWP_IMAGE_REPOSITORY}:${CCFWP_IMAGE_TAG:?Set CCFWP_IMAGE_TAG (strict vX.Y.Z)}"
 
-# Standalone production mode: Caddy terminates HTTPS on host ports 80/443.
-# For 1Panel, which terminates HTTPS itself, use docker-compose.1panel.yml.
+# 1Panel mode: 1Panel terminates HTTPS and reverse-proxies both the console
+# host and the wildcard project host to 127.0.0.1:38003 on the Docker host.
+# Caddy remains embedded in the image for the standalone 80/443 deployment,
+# but is intentionally not started by this file.
 services:
   ccfwp:
     image: *platform-image
     pull_policy: always
     command: ["node", "/app/updater/entrypoint.js"]
     container_name: ccfwp-container
-    expose:
-      - "8001"
+    ports:
+      - "127.0.0.1:${CCFWP_MANAGER_HOST_PORT:-38003}:8001"
     volumes:
-      # 持久化数据卷
       - ${CCFWP_DATA_DIR:-/opt/1panel/apps/ccfwp/data}:/app/.platform-data
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -33,17 +34,17 @@ services:
       INGRESS_PROXY_TOKEN: ${INGRESS_PROXY_TOKEN:?Set INGRESS_PROXY_TOKEN in .env}
       CONSOLE_HOSTS: ${CONSOLE_HOST:?Set CONSOLE_HOST in .env}
       PROJECTS_BASE_DOMAIN: ${PROJECTS_BASE_DOMAIN:?Set PROJECTS_BASE_DOMAIN in .env}
-      TRUST_PROXY: linklocal,uniquelocal
+      TRUST_PROXY: loopback,linklocal,uniquelocal
+      PROJECTS_PROTOCOL: https
+      PROJECTS_PUBLIC_PORT: ""
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/api/health',{headers:{host:process.env.CONSOLE_HOSTS}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/api/health',{headers:{host:process.env.CONSOLE_HOSTS,'x-ccfwp-ingress-token':process.env.INGRESS_PROXY_TOKEN}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 12
-
     depends_on:
       ccfwp-updater:
         condition: service_healthy
-
     restart: unless-stopped
 
   ccfwp-updater:
@@ -74,30 +75,3 @@ services:
       timeout: 5s
       retries: 12
     restart: unless-stopped
-
-  caddy:
-    image: *platform-image
-    pull_policy: always
-    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
-      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN in .env}
-      CONSOLE_HOST: ${CONSOLE_HOST:?Set CONSOLE_HOST in .env}
-      PROJECTS_BASE_DOMAIN: ${PROJECTS_BASE_DOMAIN:?Set PROJECTS_BASE_DOMAIN in .env}
-      INGRESS_PROXY_TOKEN: ${INGRESS_PROXY_TOKEN:?Set INGRESS_PROXY_TOKEN in .env}
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      ccfwp:
-        condition: service_healthy
-    restart: unless-stopped
-
-volumes:
-  caddy_data:
-  caddy_config:

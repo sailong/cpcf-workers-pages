@@ -17,6 +17,8 @@ npm audit --audit-level=high
 
 cd "$ROOT_DIR"
 docker compose --env-file .env.production.example -f docker-compose.yml config >/dev/null
+docker compose --env-file .env.production.example -f docker-compose.1panel.yml config >/dev/null
+docker compose --env-file .env.1panel.example -f docker-compose.1panel.yml config >/dev/null
 docker compose --env-file .env.acme-staging.example -f docker-compose.yml config >/dev/null
 docker compose -f docker-compose.dev.yml config >/dev/null
 CCFWP_TEST_PASSWORD=ComposeValidationOnly CCFWP_TEST_CAPTCHA=ComposeValidationOnly \

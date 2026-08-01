@@ -80,18 +80,23 @@ docker compose -f docker-compose.dev.yml up --build
 *   忘记已保存密码时使用下方的 `reset-admin-password.js`，不要直接修改 SQLite 或删除 `.platform-data/`。
 
 ### ⚙️ 环境配置 (Environment Configuration)
-本机开发使用 `docker-compose.dev.yml`。生产和 1Panel 直接粘贴 `docker-compose.yml`，只填写环境变量即可
-拉取远程镜像；不需要上传源码或创建 `Caddyfile`：
+本机开发使用 `docker-compose.dev.yml`。标准生产部署使用 `docker-compose.yml`，由镜像内 Caddy 负责
+80/443；1Panel 反向代理部署使用 `docker-compose.1panel.yml`，只绑定本机 `127.0.0.1:38003`，再由
+1Panel 负责证书和 HTTPS。两种方式都只拉取远程镜像，不需要上传源码或创建 `Caddyfile`：
 
 *   `MANAGER_SERVICE_PORT`: 管理后台服务内部监听端口，Compose 默认 `8001`。
+*   `CCFWP_MANAGER_HOST_PORT`: 仅限 1Panel 编排使用的宿主机反代端口，默认 `38003`；如修改，必须同步修改 1Panel 上游地址。
+*   `DOCKER_API_VERSION`: Docker Engine API 版本，生产编排默认 `v1.44`，必须保留 `v` 前缀。
 *   `CCFWP_IMAGE_REPOSITORY` / `CCFWP_IMAGE_TAG`: Docker Hub 镜像和严格 SemVer 版本，禁止 `latest`。
 *   `CCFWP_DATA_DIR`: 宿主机持久化目录，默认 `/opt/1panel/apps/ccfwp/data`；升级时保持不变。
 *   `AUTH_PASSWORD`: 管理后台初始密码。生产环境必须显式设置，且不能使用默认密码 `Admin@123`。
 *   `CONSOLE_HOST`: 公网管理控制台域名。
 *   `PROJECTS_BASE_DOMAIN`: 项目子域名的根域名；项目地址为 `<项目名>-<类型>.<根域名>`。
-*   `INGRESS_PROXY_TOKEN`: Caddy 到管理服务的内部请求凭证，至少 32 个字符。
+*   `INGRESS_PROXY_TOKEN`: 反向代理到管理服务的可信请求凭证，至少 32 个字符；1Panel 模式需通过
+    `X-CCFWP-Ingress-Token` 转发。
 
-    *   **公网部署**: 仅开放 80/443，由 Caddy 自动签发控制台和项目泛域名证书；不要直接暴露管理端口或内部资源网关。
+    *   **标准公网部署**: 仅开放 80/443，由 Caddy 自动签发控制台和项目泛域名证书。
+    *   **1Panel 部署**: 仅把 `127.0.0.1:38003` 提供给 1Panel 反代，证书由 1Panel 管理；不要直接暴露管理端口或内部资源网关。
 *   **运行时隔离**: 默认 Docker。`RUNTIME_PROVIDER=process` 必须同时设置 `ALLOW_UNISOLATED_RUNTIME=true`，仅用于本机非隔离调试，禁止用于公网。
 
 ### 测试与质量闸门
@@ -163,6 +168,8 @@ GitHub Actions 不发布镜像，只生成并签名在线升级使用的应用�
 .
 ├── Dockerfile                # 多阶段生产构建
 ├── docker-compose.yml        # 生产环境编排
+├── docker-compose.1panel.yml # 1Panel 反向代理编排
+├── .env.1panel.example       # 1Panel 环境变量模板
 ├── docker-compose.dev.yml    # 开发环境编排 (挂载源码)
 ├── README.md
 │

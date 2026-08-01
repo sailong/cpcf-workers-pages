@@ -5,7 +5,9 @@
 ## 📦 目录结构
 
 - `Dockerfile`: 多阶段构建脚本，负责编译前端 React 应用、Node.js 后端和带 Cloudflare DNS 插件的 Caddy。
-- `docker-compose.yml`: 生产环境和 1Panel 的粘贴式编排配置，直接使用远程镜像。
+- `docker-compose.yml`: 标准生产编排，由镜像内的 Caddy 终止 80/443。
+- `docker-compose.1panel.yml`: 1Panel 反向代理编排，只绑定宿主机 `127.0.0.1:38003`。
+- `.env.1panel.example`: 1Panel 专用环境变量模板，不包含 Caddy/ACME 配置。
 
 生产编排的管理服务、升级器、项目运行时和 Caddy 共用同一个显式版本镜像。镜像仓库通过
 `CCFWP_IMAGE_REPOSITORY` 配置，版本通过 `CCFWP_IMAGE_TAG` 配置；镜像与应用发行包都只接受
@@ -44,7 +46,7 @@ export CCFWP_IMAGE_REPOSITORY=docker.io/$DOCKERHUB_USERNAME/ccfwp-platform
 或镜像。发布脚本拒绝脏工作区，并通过本机 Buildx 直接推送多架构清单，保证镜像 Tag 对应确定的
 Git SHA 和内置应用版本。
 
-### 4. 服务器部署与回滚
+### 4. 标准 Docker 服务器部署与回滚
 
 生产编排不再要求服务器准备源码、`Caddyfile` 或相对路径 `.platform-data`。`.env.production.example`
 只用于生成配置模板，实际文件名必须是 `.env`；`CCFWP_DATA_DIR` 应指向稳定的绝对宿主机路径：
@@ -114,9 +116,16 @@ SHA-256 和架构校验、数据库迁移 dry-run、完整 release 快照、原�
 失败不会切换 `current`；切换后健康检查失败会恢复原版本和迁移前数据库快照。可随时一键回滚到
 上一完整应用快照，回滚前也会先验证数据库兼容性。保留最近 3 个发行版本，并额外保护当前和上一版本。
 
+### 5. 1Panel 反向代理部署
+
+1Panel 不应直接使用标准 `docker-compose.yml`。请粘贴 [`docker-compose.1panel.yml`](../docker-compose.1panel.yml)，
+由 1Panel 负责证书和 HTTPS，再把控制台域名与 `*.PROJECTS_BASE_DOMAIN` 都反代到
+`127.0.0.1:38003`。完整的请求头、WebSocket、验证、升级和回滚步骤见[1Panel 反向代理部署](1panel.md)。
+
 ## 访问
-生产环境通过 Caddy 访问 `CONSOLE_HOST`（仅公开 80/443）。`http://localhost:8001` 只适用于
-`docker-compose.dev.yml` 的本机开发编排，不应作为公网入口。
+
+标准 Docker 部署通过 Caddy 访问 `CONSOLE_HOST`（公开 80/443）。1Panel 部署通过 1Panel 的 HTTPS
+站点访问，`127.0.0.1:38003` 只允许本机反向代理访问，不应直接暴露到公网。
 
 ## 💾 数据持久化
 所有项目代码、数据库和配置都会保存到 `CCFWP_DATA_DIR` 指定的宿主机目录（默认
