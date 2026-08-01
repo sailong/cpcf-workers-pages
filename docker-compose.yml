@@ -1,16 +1,18 @@
-x-platform-image: &platform-image "${CCFWP_IMAGE_REPOSITORY:-ccfwp-platform}:${CCFWP_IMAGE_TAG:-v1.0.0}"
+x-platform-image: &platform-image "${CCFWP_IMAGE_REPOSITORY:?Set CCFWP_IMAGE_REPOSITORY}:${CCFWP_IMAGE_TAG:?Set CCFWP_IMAGE_TAG (strict vX.Y.Z)}"
 
+# This file is also the paste-ready 1Panel deployment manifest. It intentionally
+# has no build context or source-tree mounts: all services use one immutable image.
 services:
   ccfwp:
-    build: .
     image: *platform-image
+    pull_policy: always
     command: ["node", "/app/updater/entrypoint.js"]
     container_name: ccfwp-container
     expose:
       - "8001"
     volumes:
       # 持久化数据卷
-      - ./.platform-data:/app/.platform-data
+      - ${CCFWP_DATA_DIR:-/opt/1panel/apps/ccfwp/data}:/app/.platform-data
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       NODE_ENV: production
@@ -25,7 +27,7 @@ services:
       BUILD_DEFAULT_REGISTRY: ${BUILD_DEFAULT_REGISTRY:-https://registry.npmmirror.com/}
       PROJECT_RUNTIME_IMAGE: *platform-image
       MANAGER_CONTAINER_ID: ccfwp-container
-      PLATFORM_DATA_HOST_DIR: ${PWD}/.platform-data
+      PLATFORM_DATA_HOST_DIR: ${CCFWP_DATA_DIR:-/opt/1panel/apps/ccfwp/data}
       AUTH_PASSWORD: ${AUTH_PASSWORD:?Set AUTH_PASSWORD in .env}
       INGRESS_PROXY_TOKEN: ${INGRESS_PROXY_TOKEN:?Set INGRESS_PROXY_TOKEN in .env}
       CONSOLE_HOSTS: ${CONSOLE_HOST:?Set CONSOLE_HOST in .env}
@@ -44,14 +46,14 @@ services:
     restart: unless-stopped
 
   ccfwp-updater:
-    build: .
     image: *platform-image
+    pull_policy: always
     container_name: ccfwp-updater
     command: ["node", "/app/updater/server.js"]
     expose:
       - "8002"
     volumes:
-      - ./.platform-data:/app/.platform-data
+      - ${CCFWP_DATA_DIR:-/opt/1panel/apps/ccfwp/data}:/app/.platform-data
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       NODE_ENV: production
@@ -72,8 +74,8 @@ services:
     restart: unless-stopped
 
   caddy:
-    build: .
     image: *platform-image
+    pull_policy: always
     command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
     ports:
       - "80:80"
@@ -87,7 +89,6 @@ services:
       PROJECTS_BASE_DOMAIN: ${PROJECTS_BASE_DOMAIN:?Set PROJECTS_BASE_DOMAIN in .env}
       INGRESS_PROXY_TOKEN: ${INGRESS_PROXY_TOKEN:?Set INGRESS_PROXY_TOKEN in .env}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

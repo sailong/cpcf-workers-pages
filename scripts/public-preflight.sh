@@ -25,8 +25,9 @@ fi
 set -a
 source .env
 set +a
+export CCFWP_DATA_DIR="${CCFWP_DATA_DIR:-/opt/1panel/apps/ccfwp/data}"
 
-required_vars=(AUTH_PASSWORD INGRESS_PROXY_TOKEN CCFWP_UPDATER_TOKEN CCFWP_GITHUB_REPOSITORY CONSOLE_HOST PROJECTS_BASE_DOMAIN ACME_EMAIL CLOUDFLARE_API_TOKEN)
+required_vars=(AUTH_PASSWORD INGRESS_PROXY_TOKEN CCFWP_UPDATER_TOKEN CCFWP_GITHUB_REPOSITORY CCFWP_IMAGE_REPOSITORY CCFWP_IMAGE_TAG CONSOLE_HOST PROJECTS_BASE_DOMAIN ACME_EMAIL CLOUDFLARE_API_TOKEN)
 for key in "${required_vars[@]}"; do
     if [[ -z "${!key:-}" ]]; then
         fail "missing required environment variable: $key"
@@ -50,6 +51,12 @@ fi
 [[ "$CCFWP_GITHUB_REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || fail "CCFWP_GITHUB_REPOSITORY must be owner/name"
 pass "signed application release configuration is present"
 
+[[ "${CCFWP_IMAGE_TAG}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] \
+    || fail "CCFWP_IMAGE_TAG must be a strict SemVer tag such as v1.2.4"
+[[ "${CCFWP_DATA_DIR}" == /* && "${CCFWP_DATA_DIR}" != "/" ]] \
+    || fail "CCFWP_DATA_DIR must be a non-root absolute host path"
+pass "remote image tag and persistent host data path are valid"
+
 if docker compose config >/dev/null 2>&1; then
     compose_config="$(docker compose config)"
 else
@@ -68,6 +75,13 @@ if echo "$compose_config" | rg -q 'published: "?9200"?|published: "?9100"?'; the
     fail "resource gateway/debug ports must not be published publicly"
 fi
 pass "compose publishes only public ingress ports"
+if echo "$compose_config" | rg -q '^    build:'; then
+    fail "production compose must pull a remote image and must not build on the server"
+fi
+if echo "$compose_config" | rg -q 'Caddyfile:ro'; then
+    fail "production compose must use the Caddyfile embedded in the image"
+fi
+pass "production compose is remote-image and source-tree independent"
 
 if [[ -f Caddyfile ]]; then
     rg -q 'reverse_proxy' Caddyfile || fail "Caddyfile is missing reverse_proxy"

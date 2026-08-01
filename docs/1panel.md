@@ -1,56 +1,55 @@
-# Public Deployment with Automatic TLS
+# 1Panel 一键部署
 
-The production Compose stack includes Caddy and does not publish the Manager's internal port. Caddy obtains one certificate for the console host and one DNS-01 wildcard certificate for project hosts.
+生产部署使用仓库根目录的 `docker-compose.yml`。这份编排已经适合直接粘贴到 1Panel：只拉取远程
+Docker Hub 镜像，不需要上传源码、创建 `Caddyfile` 或在服务器构建镜像。Manager、在线升级器和 Caddy
+使用同一个明确的 SemVer 镜像版本。
 
-## DNS
+## 部署前准备
 
-Choose two explicit names, for example:
+准备以下 DNS 记录，并确保服务器防火墙放行 TCP 80、443 和 UDP 443：
 
-- Console: `console.example.com`
-- Projects base: `apps.example.com`
+- `CONSOLE_HOST`，例如 `console.example.com`。
+- `*.PROJECTS_BASE_DOMAIN`，例如 `*.apps.example.com`。
 
-Create an `A`/`AAAA` record for `console.example.com` and a wildcard record for `*.apps.example.com`, both pointing to the server. Project URLs use exactly one label, such as `demo-worker.apps.example.com` or `site-pages.apps.example.com`.
+创建只允许目标 Zone DNS 编辑权限的 Cloudflare API Token。不要使用 Global API Key。
 
-## Cloudflare Token
+## 在 1Panel 中创建编排
 
-Create a scoped Cloudflare API token with `Zone:DNS:Edit` for only the relevant zone. Do not use the Global API Key. Caddy uses this token only for DNS-01 challenges.
+1. 打开 **容器 > 编排 > 创建编排**，编排名称填写 `ccfwp`。
+2. 将仓库根目录 `docker-compose.yml` 的完整内容粘贴到编排编辑器。
+3. 在环境变量面板填写下表。变量名必须保持不变。
+4. 保存并启动编排，等待 `ccfwp`、`ccfwp-updater` 和 `caddy` 都变为运行状态。
 
-## Configuration
+| 变量 | 示例 | 说明 |
+| --- | --- | --- |
+| `CCFWP_IMAGE_REPOSITORY` | `docker.io/simonchang/ccfwp-platform` | Docker Hub 镜像仓库 |
+| `CCFWP_IMAGE_TAG` | `v1.2.4` | 已发布的严格 SemVer；禁止 `latest` |
+| `CCFWP_DATA_DIR` | `/opt/1panel/apps/ccfwp/data` | 宿主机持久化目录，升级时保持不变 |
+| `CONSOLE_HOST` | `console.example.com` | 管理控制台域名 |
+| `PROJECTS_BASE_DOMAIN` | `apps.example.com` | 项目域名根 |
+| `AUTH_PASSWORD` | 随机强密码 | 管理员初始密码 |
+| `INGRESS_PROXY_TOKEN` | `openssl rand -hex 32` | Caddy 到 Manager 的独立凭证 |
+| `CCFWP_UPDATER_TOKEN` | `openssl rand -hex 32` | Manager 到升级器的独立凭证 |
+| `CCFWP_GITHUB_REPOSITORY` | `sailong/cpcf-workers-pages` | 公开 GitHub 仓库 |
+| `ACME_EMAIL` | `admin@example.com` | 证书通知邮箱 |
+| `CLOUDFLARE_API_TOKEN` | 受限 Token | DNS-01 证书签发 |
 
-Create the deployment environment from `.env.production.example` and replace every placeholder. Generate the ingress secret with:
+`CCFWP_IMAGE_TAG` 必须指向已经发布且内置 Caddy 配置的镜像。更新镜像时只修改这个变量并重新部署，
+不要改成 `latest`。`CCFWP_DATA_DIR` 是宿主机路径，不能改为 Docker 命名卷，因为项目运行容器需要由
+Docker Engine 直接访问该路径。
 
-```bash
-openssl rand -hex 32
-```
+## 验证与升级
 
-The `CONSOLE_HOST`, `PROJECTS_BASE_DOMAIN`, `AUTH_PASSWORD`, `INGRESS_PROXY_TOKEN`, `ACME_EMAIL`, and `CLOUDFLARE_API_TOKEN` values are mandatory. Use the Let's Encrypt staging URL in `ACME_CA` while testing DNS to avoid production rate limits:
+访问 `https://CONSOLE_HOST/api/health`，再登录控制台上传并运行一个测试项目。项目地址使用
+`<项目名>-worker.PROJECTS_BASE_DOMAIN` 或 `<项目名>-pages.PROJECTS_BASE_DOMAIN`。
 
-```text
-https://acme-staging-v02.api.letsencrypt.org/directory
-```
+应用代码版本在 **设置 > 应用版本** 中选择已签名的 GitHub Release；失败会自动阻止切换并保留回滚点。
+Node、Wrangler、Caddy 或系统依赖变化时，改用新的 Docker 镜像 SemVer。始终保留 `CCFWP_DATA_DIR`，
+否则会丢失管理员、项目、资源和发行快照数据。
 
-`.env.acme-staging.example` is the repository validation fixture. It proves Compose and Caddy variable wiring without contacting ACME or DNS. Replace its reserved example domains and placeholder token before an external staging issuance test; a successful local configuration check does not prove DNS permissions or public reachability.
+## 常见问题
 
-## Start and Verify
-
-```bash
-docker compose --env-file .env.production up -d --build --wait
-docker compose --env-file .env.production ps
-docker compose --env-file .env.production logs caddy
-```
-
-Only ports 80 and 443 should be publicly reachable. Ports 8001 and 9200 are internal; port 9100 is no longer used. Verify:
-
-```bash
-curl -I https://console.example.com/api/health
-curl -I https://demo-worker.apps.example.com/
-```
-
-For 1Panel, deploy this Compose stack directly and allow inbound TCP 80/443 plus UDP 443. Do not add another public reverse proxy in front unless it preserves `Host`, supports WebSockets, and is explicitly added to `TRUST_PROXY`. Direct access to Manager is rejected in production without the private ingress token.
-
-## Troubleshooting
-
-- Certificate errors: confirm the token can edit the correct zone and wildcard DNS resolves publicly.
-- HTTP 421: `CONSOLE_HOST` or `PROJECTS_BASE_DOMAIN` does not match the requested host.
-- HTTP 403 trusted-ingress error: traffic bypassed Caddy or the two containers use different `INGRESS_PROXY_TOKEN` values.
-- Project 404: the hostname must be `<project-name>-worker` or `<project-name>-pages`, and the project must be running.
+- 证书失败：检查 DNS 记录、Cloudflare Token 的 Zone 范围，以及 UDP 443 是否放行。
+- `403 trusted-ingress`：确认 Caddy 和 Manager 使用完全相同的 `INGRESS_PROXY_TOKEN`。
+- 项目 404：确认项目正在运行，并使用项目名、类型和 `PROJECTS_BASE_DOMAIN` 组成的完整域名。
+- 容器无法启动：确认镜像仓库可访问，且 `CCFWP_IMAGE_TAG` 是已存在的 `vX.Y.Z` 标签。

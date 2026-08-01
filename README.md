@@ -80,9 +80,12 @@ docker compose -f docker-compose.dev.yml up --build
 *   忘记已保存密码时使用下方的 `reset-admin-password.js`，不要直接修改 SQLite 或删除 `.platform-data/`。
 
 ### ⚙️ 环境配置 (Environment Configuration)
-您可以在 `docker-compose.yml` 环境变量中修改默认配置：
+本机开发使用 `docker-compose.dev.yml`。生产和 1Panel 直接粘贴 `docker-compose.yml`，只填写环境变量即可
+拉取远程镜像；不需要上传源码或创建 `Caddyfile`：
 
 *   `MANAGER_SERVICE_PORT`: 管理后台服务内部监听端口，Compose 默认 `8001`。
+*   `CCFWP_IMAGE_REPOSITORY` / `CCFWP_IMAGE_TAG`: Docker Hub 镜像和严格 SemVer 版本，禁止 `latest`。
+*   `CCFWP_DATA_DIR`: 宿主机持久化目录，默认 `/opt/1panel/apps/ccfwp/data`；升级时保持不变。
 *   `AUTH_PASSWORD`: 管理后台初始密码。生产环境必须显式设置，且不能使用默认密码 `Admin@123`。
 *   `CONSOLE_HOST`: 公网管理控制台域名。
 *   `PROJECTS_BASE_DOMAIN`: 项目子域名的根域名；项目地址为 `<项目名>-<类型>.<根域名>`。
@@ -184,14 +187,17 @@ GitHub Actions 不发布镜像，只生成并签名在线升级使用的应用�
 │
 ├── docs/                     # 文档中心
 │   ├── deployment.md         # Docker 部署指南
-│   ├── manual-run.md         # 手动运行指南
+│   ├── manual-run.md         # 手动运行指南（仅限本机调试）
 │   ├── 1panel.md             # 1Panel 部署指南
-│   └── publishing.md         # 镜像发布指南
+│   ├── publishing.md         # 镜像发布指南
+│   ├── compatibility.md      # Wrangler/Workers 本地兼容性边界
+│   ├── releases/              # 不可变版本说明
+│   └── archive/               # 历史实施计划
 │
 ├── examples/                 # 示例项目
 │   └── cfmail/               # Cloudflare 邮件路由方案
 │
-└── .platform-data/           # (自动生成) 持久化数据
+└── .platform-data/           # (自动生成) 本机开发持久化数据；生产使用 CCFWP_DATA_DIR
     ├── auth.json             # 认证凭证
     ├── projects.json         # 项目元数据
     ├── resources.json        # 资源元数据

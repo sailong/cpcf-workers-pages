@@ -21,7 +21,7 @@ docker login
 ```bash
 export DOCKERHUB_USERNAME=<你的 Docker Hub 用户名>
 export CCFWP_IMAGE_REPOSITORY=docker.io/$DOCKERHUB_USERNAME/ccfwp-platform
-./scripts/docker-release.sh publish v1.2.3
+./scripts/docker-release.sh publish v1.2.4
 ```
 
 脚本只接受 `vX.Y.Z` 严格 SemVer，不接受 `latest`、预发布版本或无 `v` 前缀版本。它会在本机调用
@@ -32,30 +32,14 @@ Buildx 构建 `linux/amd64` 与 `linux/arm64`，将 Caddy、固定运行环境�
 
 ```bash
 docker buildx imagetools inspect \
-  docker.io/<你的 Docker Hub 用户名>/ccfwp-platform:v1.2.3
+  docker.io/<你的 Docker Hub 用户名>/ccfwp-platform:v1.2.4
 ```
 
-## 服务器首次部署
+## 服务器部署
 
-服务器使用仓库中的 `docker-compose.yml` 和 `.env.production.example`。至少配置镜像仓库、镜像
-版本、管理员密码、域名、Cloudflare DNS Token、升级器独立 Token 和 GitHub 仓库：
+生产服务器使用固定版本镜像，禁止在服务器重新构建。请按[部署指南](deployment.md)配置 `.env`、
+DNS 和 `CCFWP_DATA_DIR`，然后执行远程镜像的 `pull` 与 `up --no-build`。Caddy 配置已经内置在镜像中，
+无需单独上传配置文件。该指南也包含镜像级更新、回滚和公网检查命令。
 
-```dotenv
-CCFWP_IMAGE_REPOSITORY=docker.io/<你的 Docker Hub 用户名>/ccfwp-platform
-CCFWP_IMAGE_TAG=v1.2.3
-CCFWP_GITHUB_REPOSITORY=sailong/cpcf-workers-pages
-CCFWP_UPDATER_TOKEN=<独立的 32 字节以上随机密钥>
-```
-
-```bash
-./scripts/public-preflight.sh
-docker compose --env-file .env -f docker-compose.yml pull
-docker compose --env-file .env -f docker-compose.yml up -d --no-build --wait
-```
-
-此后普通前后端代码通过已签名的 GitHub Release 应用包在线升级；只有 Node、Wrangler、Caddy、
-Cosign 或系统依赖发生变化时，才需要再次发布并部署 Docker 镜像。镜像级回滚使用：
-
-```bash
-./scripts/docker-release.sh rollback
-```
+首次部署后，普通前后端代码通过已签名的 GitHub Release 应用包在线升级；只有 Node、Wrangler、
+Caddy、Cosign 或系统依赖发生变化时，才需要重新发布并部署 Docker 镜像。

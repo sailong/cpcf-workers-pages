@@ -1,7 +1,8 @@
 
-# 手动运行说明 (Running Without Docker)
+# 手动运行说明（仅限本机调试）
 
-如果您不想使用 Docker，可以直接在主机上通过 Node.js 运行本项目。请按照以下步骤操作。
+本指南只用于本机调试和故障定位。直接在主机上运行 Node.js 不提供生产所需的项目隔离、Caddy
+自动 TLS 或公网入口；生产环境必须使用 `docker-compose.yml`。公网部署请参阅[部署指南](deployment.md)。
 
 ## 前置要求 (Prerequisites)
 
@@ -26,13 +27,13 @@
 
 ## 2. 安装依赖 (Install Dependencies)
 
-您需要分别安装后端和前端的依赖。
+您需要分别安装后端和前端的依赖。仓库包含锁文件时使用 `npm ci`，不要使用未锁定版本的 `npm install`。
 
 ### 2.1 安装后端依赖
 在 `manager` 目录下运行：
 ```bash
 cd manager
-npm install
+npm ci
 ```
 
 ### 2.2 安装前端依赖并构建
@@ -40,7 +41,7 @@ npm install
 进入前端目录并构建：
 ```bash
 cd manager/client
-npm install
+npm ci
 npm run build
 ```
 > **重要说明**：后端服务 (`server.js`) 会自动托管 `manager/client/dist` 目录中的静态文件。**必须**先执行 `npm run build` 生成此目录，否则访问首页会出现 404 错误。
@@ -106,16 +107,10 @@ $env:MANAGER_SERVICE_PORT="8001"
 node server.js
 ```
 
-### 方式 B：后台运行 (生产环境推荐)
-建议使用 `pm2` 来管理进程。
+### 不支持的用法
 
-```bash
-# 安装 pm2
-npm install -g pm2
-
-# 启动服务
-pm2 start server.js --name "cf-platform" --env MANAGER_SERVICE_PORT=8001
-```
+本文件不提供 PM2、公网反向代理或生产进程部署方案。即使使用 `RUNTIME_PROVIDER=docker`，直接
+运行 Node.js 也缺少 Compose 中的 Caddy、升级器和生产入口配置；请使用[生产部署流程](deployment.md)。
 
 ## 5. 访问应用
 

@@ -5,25 +5,27 @@
 ## 📦 目录结构
 
 - `Dockerfile`: 多阶段构建脚本，负责编译前端 React 应用、Node.js 后端和带 Cloudflare DNS 插件的 Caddy。
-- `docker-compose.yml`: 生产环境编排配置，定义了端口映射和数据持久化。
+- `docker-compose.yml`: 生产环境和 1Panel 的粘贴式编排配置，直接使用远程镜像。
 
 生产编排的管理服务、升级器、项目运行时和 Caddy 共用同一个显式版本镜像。镜像仓库通过
 `CCFWP_IMAGE_REPOSITORY` 配置，版本通过 `CCFWP_IMAGE_TAG` 配置；镜像与应用发行包都只接受
-`v1.2.3` 形式的严格 SemVer，禁止使用 `latest`。
+`v1.2.4` 形式的严格 SemVer，禁止使用 `latest`。
 
 ## 🚀 部署步骤
 
 ### 1. 确保环境
 确保本机或服务器已安装 Docker 和 Docker Compose。
 
-### 2. 本地构建并启动
+### 2. 本机开发（不用于公网）
 
-**⚠️ 重要**: 请务必在 **项目根目录** 下执行命令，而不是进入 `deploy` 目录。
+本机开发使用独立的开发编排；生产编排包含 Caddy、公开域名和必需的生产密钥，不要用它代替开发环境。
+请务必在项目根目录执行：
 
 ```bash
-# 在项目根目录执行
-docker compose up -d --build
+docker compose -f docker-compose.dev.yml up --build
 ```
+
+生产服务器使用 Docker Hub 的固定版本镜像，必须执行 `--no-build`，避免在服务器重新构建镜像。
 
 ### 3. 在本地发布到 Docker Hub
 
@@ -35,7 +37,7 @@ amd64 与 arm64：
 docker login
 export DOCKERHUB_USERNAME=<你的 Docker Hub 用户名>
 export CCFWP_IMAGE_REPOSITORY=docker.io/$DOCKERHUB_USERNAME/ccfwp-platform
-./scripts/docker-release.sh publish v1.2.3
+./scripts/docker-release.sh publish v1.2.4
 ```
 
 先在 Docker Hub 创建 `ccfwp-platform` 仓库；登录时使用 Docker Hub Access Token，不要把密码写进命令
@@ -44,17 +46,29 @@ Git SHA 和内置应用版本。
 
 ### 4. 服务器部署与回滚
 
-服务器准备好 `.env`、Caddy 数据卷和 `.platform-data` 后执行：
+生产编排不再要求服务器准备源码、`Caddyfile` 或相对路径 `.platform-data`。`.env.production.example`
+只用于生成配置模板，实际文件名必须是 `.env`；`CCFWP_DATA_DIR` 应指向稳定的绝对宿主机路径：
 
 ```bash
+cp .env.production.example .env
+# 编辑 .env，至少配置域名、密码、Cloudflare DNS Token、镜像仓库、版本、数据目录和升级器 Token
+./scripts/public-preflight.sh
+
 export CCFWP_IMAGE_REPOSITORY=docker.io/<你的 Docker Hub 用户名>/ccfwp-platform
-./scripts/docker-release.sh deploy v1.2.3
+docker compose --env-file .env -f docker-compose.yml pull
+docker compose --env-file .env -f docker-compose.yml up -d --no-build --wait --wait-timeout 180
+```
+
+也可以使用部署脚本完成拉取、启动和版本状态记录：
+
+```bash
+./scripts/docker-release.sh deploy v1.2.4
 ./scripts/docker-release.sh rollback
 ```
 
-脚本会拉取同一镜像启动 `ccfwp` 与 `caddy`，并在 `.ccfwp-image-state` 保存当前和上一版本
-Tag。该状态文件不包含密钥，已加入 Git 忽略规则。该操作用于 Node、Caddy、Wrangler 或
-系统依赖变化；日常应用代码升级不需要替换 Docker 镜像。
+脚本会启动 `ccfwp`、`ccfwp-updater` 与 `caddy`，并在 `.ccfwp-image-state` 保存当前和上一版本
+Tag。该状态文件不包含密钥，不能删除；镜像级回滚只适用于 Node、Caddy、Wrangler、Cosign 或
+系统依赖变化。日常应用代码升级不需要替换 Docker 镜像。
 
 ## 发布职责边界
 
@@ -79,7 +93,8 @@ CCFWP_MAX_RELEASE_BYTES=2147483648
 
 ```bash
 # 先提交 docs/releases/v1.2.4.md，再推送不可变版本 Tag
-git tag v1.2.4 && git push origin v1.2.4
+git tag -a v1.2.4 -m "v1.2.4"
+git push origin v1.2.4
 ```
 
 `docs/releases/vX.Y.Z.md` 必须和代码一起提交到该 Tag。工作流会在上传签名资产前校验文件存在，
@@ -99,17 +114,18 @@ SHA-256 和架构校验、数据库迁移 dry-run、完整 release 快照、原�
 失败不会切换 `current`；切换后健康检查失败会恢复原版本和迁移前数据库快照。可随时一键回滚到
 上一完整应用快照，回滚前也会先验证数据库兼容性。保留最近 3 个发行版本，并额外保护当前和上一版本。
 
-### 6. 访问
+## 访问
 生产环境通过 Caddy 访问 `CONSOLE_HOST`（仅公开 80/443）。`http://localhost:8001` 只适用于
 `docker-compose.dev.yml` 的本机开发编排，不应作为公网入口。
 
 ## 💾 数据持久化
-所有项目代码、数据库和配置都会自动保存到根目录下的 `.platform-data` 文件夹中。
-迁移服务器时，只需备份并迁移该文件夹即可保留所有数据。
+所有项目代码、数据库和配置都会保存到 `CCFWP_DATA_DIR` 指定的宿主机目录（默认
+`/opt/1panel/apps/ccfwp/data`）。迁移服务器时，先停止编排，再备份并迁移该目录即可保留所有数据。
+该目录必须是宿主机绝对路径，不能改成 Docker 命名卷，因为项目运行容器需要直接挂载其中的发行文件。
 
 ## 构建依赖信任默认值
 
-生产 Compose 默认启用更保守的构建策略：
+镜像构建阶段默认启用更保守的构建策略：
 
 - `BUILD_NETWORK_MODE=prefer-offline`：安装阶段优先使用本地缓存，脚本阶段默认无外网
 - `BUILD_REGISTRY_ALLOWLIST`：只允许访问白名单 registry

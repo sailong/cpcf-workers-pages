@@ -41,7 +41,7 @@ RUN npm run build
 # ==========================================
 FROM node:22-slim
 
-ARG CCFWP_BUILTIN_VERSION=v1.0.0
+ARG CCFWP_BUILTIN_VERSION=v1.2.4
 
 # 【Config】Env Vars
 ENV CI=true \
@@ -75,6 +75,7 @@ COPY --from=frontend-builder /app/manager/client/dist ./client/dist
 
 # The production Compose stack runs Caddy from this same image.
 COPY --from=caddy-builder /usr/bin/caddy /usr/local/bin/caddy
+COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=cosign /ko-app/cosign /usr/local/bin/cosign
 
 # The image is the stable runtime. Application releases are seeded from this
