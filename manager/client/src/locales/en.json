@@ -222,6 +222,7 @@
     "createSuccess": "Resource created",
     "movedToTrash": "Resource moved to trash",
     "create": "Create",
+    "creating": "Creating...",
     "manage": "Manage",
     "delete": "Delete",
     "loadError": "Failed to load resource inventory",

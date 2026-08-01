@@ -132,7 +132,7 @@ export default function R2Manager({ bucket, onClose }: R2ManagerProps) {
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--r2-theme-light)] text-[var(--r2-theme)]"><HardDrive size={18} /></span>
                         <div className="min-w-0"><h2 className="text-base font-semibold text-[var(--text-main)]">{t('r2Manager.title')}</h2><p className="truncate font-mono text-xs text-[var(--text-muted)]">{bucket.name}</p></div>
                     </div>
-                    <button type="button" onClick={onClose} className="console-icon-button" title={t('common.close')}><X size={17} /></button>
+                    <button type="button" onClick={onClose} className="icon-button" title={t('common.close')}><X size={17} /></button>
                 </header>
 
                 <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-color)] p-3">
@@ -140,10 +140,10 @@ export default function R2Manager({ bucket, onClose }: R2ManagerProps) {
                         <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                         <input value={prefix} onChange={event => setPrefix(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') search(); }} placeholder={t('r2Manager.searchPrefix')} className="neo-input h-9 w-full pl-8 text-sm" />
                     </div>
-                    <button type="button" onClick={search} className="console-secondary-button h-9"><Search size={15} />{t('common.confirm')}</button>
-                    <button type="button" onClick={() => void loadPage(currentCursor, activePrefix)} className="console-icon-button" title={t('common.refresh')}><RefreshCw size={15} /></button>
+                    <button type="button" onClick={search} className="console-button secondary h-9"><Search size={15} />{t('common.confirm')}</button>
+                    <button type="button" onClick={() => void loadPage(currentCursor, activePrefix)} className="icon-button" title={t('common.refresh')}><RefreshCw size={15} /></button>
                     <input ref={fileInputRef} type="file" className="hidden" onChange={uploadFile} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="console-primary-button h-9">
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="console-button primary h-9">
                         {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{uploading ? t('r2Manager.uploading') : t('r2Manager.upload')}
                     </button>
                 </div>
@@ -169,8 +169,8 @@ export default function R2Manager({ bucket, onClose }: R2ManagerProps) {
                                     <td className="px-3 py-2 font-mono text-[var(--text-muted)]">{formatSize(file.size)}</td>
                                     <td className="px-3 py-2 text-[var(--text-muted)]">{new Date(file.uploaded).toLocaleString()}</td>
                                     <td className="px-3 py-2"><div className="flex justify-end gap-1">
-                                        <a href={`/api/resources/r2/${bucket.id}/files/${encodeURIComponent(file.key)}`} className="console-icon-button" title={t('r2Manager.download')} download><Download size={15} /></a>
-                                        <button type="button" onClick={() => void deleteFile(file.key)} className="console-icon-button text-red-500" title={t('r2Manager.delete')}><Trash2 size={15} /></button>
+                                        <a href={`/api/resources/r2/${bucket.id}/files/${encodeURIComponent(file.key)}`} className="icon-button" title={t('r2Manager.download')} download><Download size={15} /></a>
+                                        <button type="button" onClick={() => void deleteFile(file.key)} className="icon-button danger" title={t('r2Manager.delete')}><Trash2 size={15} /></button>
                                     </div></td>
                                 </tr>
                             ))}
@@ -181,8 +181,8 @@ export default function R2Manager({ bucket, onClose }: R2ManagerProps) {
                 <footer className="flex min-h-12 items-center justify-between border-t border-[var(--border-color)] px-3 text-xs text-[var(--text-muted)]">
                     <span>{t('r2Manager.pageSummary', { count: files.length, size: formatSize(pageBytes) })}</span>
                     <div className="flex items-center gap-1">
-                        <button type="button" onClick={previousPage} disabled={history.length === 0} className="console-icon-button" title={t('resourceList.previous')}><ChevronLeft size={15} /></button>
-                        <button type="button" onClick={nextPage} disabled={!nextCursor} className="console-icon-button" title={t('resourceList.next')}><ChevronRight size={15} /></button>
+                        <button type="button" onClick={previousPage} disabled={history.length === 0} className="icon-button" title={t('resourceList.previous')}><ChevronLeft size={15} /></button>
+                        <button type="button" onClick={nextPage} disabled={!nextCursor} className="icon-button" title={t('resourceList.next')}><ChevronRight size={15} /></button>
                     </div>
                 </footer>
             </div>

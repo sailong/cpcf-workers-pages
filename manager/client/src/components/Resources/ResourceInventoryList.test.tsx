@@ -53,4 +53,77 @@ describe('ResourceInventoryList', () => {
         await waitFor(() => expect(screen.getByText('database-11')).toBeInTheDocument());
         expect(screen.queryByText('database-12')).not.toBeInTheDocument();
     });
+
+    it('submits a resource name once and exposes creation progress', async () => {
+        vi.spyOn(ProjectService, 'getAll').mockResolvedValue([]);
+        const loadResources = vi.fn().mockResolvedValue([]);
+        let finishCreate: (() => void) | undefined;
+        const createResource = vi.fn(() => new Promise<void>(resolve => {
+            finishCreate = resolve;
+        }));
+
+        render(
+            <FeedbackProvider>
+                <ResourceInventoryList
+                    kind="d1"
+                    title="D1 Database"
+                    emptyLabel="No databases"
+                    namePlaceholder="Database name"
+                    icon={Database}
+                    loadResources={loadResources}
+                    createResource={createResource}
+                    deleteResource={async () => {}}
+                    onManage={() => {}}
+                />
+            </FeedbackProvider>
+        );
+
+        await waitFor(() => expect(loadResources).toHaveBeenCalledTimes(1));
+        const nameInput = screen.getByLabelText('Database name');
+        const createButton = screen.getByRole('button', { name: 'Create' });
+        expect(createButton).toBeDisabled();
+        expect(createButton).toHaveClass('console-button', 'primary');
+
+        fireEvent.change(nameInput, { target: { value: '  customer-db  ' } });
+        fireEvent.click(createButton);
+
+        expect(createResource).toHaveBeenCalledTimes(1);
+        expect(createResource).toHaveBeenCalledWith('customer-db');
+        expect(screen.getByRole('button', { name: 'Creating...' })).toBeDisabled();
+        expect(nameInput).toBeDisabled();
+
+        finishCreate?.();
+        await waitFor(() => expect(loadResources).toHaveBeenCalledTimes(2));
+        expect(await screen.findByRole('status')).toHaveTextContent('Resource created');
+        expect(nameInput).toHaveValue('');
+    });
+
+    it('shows creation failures next to the resource name field', async () => {
+        vi.spyOn(ProjectService, 'getAll').mockResolvedValue([]);
+        const createResource = vi.fn().mockRejectedValue(new Error('Resource name already exists'));
+
+        render(
+            <FeedbackProvider>
+                <ResourceInventoryList
+                    kind="d1"
+                    title="D1 Database"
+                    emptyLabel="No databases"
+                    namePlaceholder="Database name"
+                    icon={Database}
+                    loadResources={async () => []}
+                    createResource={createResource}
+                    deleteResource={async () => {}}
+                    onManage={() => {}}
+                />
+            </FeedbackProvider>
+        );
+
+        const nameInput = screen.getByLabelText('Database name');
+        fireEvent.change(nameInput, { target: { value: 'duplicate-db' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+        expect(await screen.findByText('Resource name already exists', { selector: 'p' })).toHaveAttribute('role', 'alert');
+        expect(nameInput).toHaveAttribute('aria-invalid', 'true');
+        expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    });
 });

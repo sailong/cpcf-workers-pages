@@ -174,7 +174,7 @@ export default function KVManager({ namespace, onClose }: KVManagerProps) {
                         <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--kv-theme-light)] text-[var(--kv-theme)]"><Braces size={18} /></span>
                         <div className="min-w-0"><h2 className="text-base font-semibold text-[var(--text-main)]">{t('kvManager.title')}</h2><p className="truncate font-mono text-xs text-[var(--text-muted)]">{namespace.name}</p></div>
                     </div>
-                    <button type="button" onClick={onClose} className="console-icon-button" title={t('common.close')}><X size={17} /></button>
+                    <button type="button" onClick={onClose} className="icon-button" title={t('common.close')}><X size={17} /></button>
                 </header>
 
                 {error && <div className="border-b border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-400" role="alert">{error}</div>}
@@ -186,9 +186,9 @@ export default function KVManager({ namespace, onClose }: KVManagerProps) {
                                 <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                                 <input value={prefix} onChange={event => setPrefix(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') search(); }} placeholder={t('kvManager.searchPrefix')} className="neo-input h-8 w-full pl-8 text-xs" />
                             </div>
-                            <button type="button" onClick={search} className="console-icon-button" title={t('common.confirm')}><Search size={14} /></button>
-                            <button type="button" onClick={() => void loadPage(currentCursor, activePrefix)} className="console-icon-button" title={t('common.refresh')}><RefreshCw size={14} /></button>
-                            <button type="button" onClick={resetEditor} className="console-icon-button" title={t('kvManager.addKey')}><Plus size={14} /></button>
+                            <button type="button" onClick={search} className="icon-button" title={t('common.confirm')}><Search size={14} /></button>
+                            <button type="button" onClick={() => void loadPage(currentCursor, activePrefix)} className="icon-button" title={t('common.refresh')}><RefreshCw size={14} /></button>
+                            <button type="button" onClick={resetEditor} className="icon-button" title={t('kvManager.addKey')}><Plus size={14} /></button>
                         </div>
                         <div className="min-h-0 flex-1 overflow-auto">
                             {loading ? <Loader2 size={20} className="mx-auto mt-16 animate-spin text-[var(--text-muted)]" /> : keys.length === 0 ? (
@@ -199,15 +199,15 @@ export default function KVManager({ namespace, onClose }: KVManagerProps) {
                                         <div className="truncate font-mono text-xs text-[var(--text-main)]">{key.name}</div>
                                         <div className="text-[10px] text-[var(--text-muted)]">{key.expiration ? new Date(key.expiration * 1000).toLocaleString() : t('kvManager.noExpiration')}</div>
                                     </button>
-                                    <button type="button" onClick={() => void deleteKey(key.name)} className="console-icon-button text-red-500" title={t('common.delete')}><Trash2 size={14} /></button>
+                                    <button type="button" onClick={() => void deleteKey(key.name)} className="icon-button danger" title={t('common.delete')}><Trash2 size={14} /></button>
                                 </div>
                             ))}
                         </div>
                         <footer className="flex min-h-11 items-center justify-between border-t border-[var(--border-color)] px-3 text-xs text-[var(--text-muted)]">
                             <span>{t('kvManager.resultCount', { count: keys.length })}</span>
                             <div className="flex items-center gap-1">
-                                <button type="button" onClick={previousPage} disabled={history.length === 0} className="console-icon-button" title={t('resourceList.previous')}><ChevronLeft size={14} /></button>
-                                <button type="button" onClick={nextPage} disabled={!nextCursor} className="console-icon-button" title={t('resourceList.next')}><ChevronRight size={14} /></button>
+                                <button type="button" onClick={previousPage} disabled={history.length === 0} className="icon-button" title={t('resourceList.previous')}><ChevronLeft size={14} /></button>
+                                <button type="button" onClick={nextPage} disabled={!nextCursor} className="icon-button" title={t('resourceList.next')}><ChevronRight size={14} /></button>
                             </div>
                         </footer>
                     </section>
@@ -228,8 +228,8 @@ export default function KVManager({ namespace, onClose }: KVManagerProps) {
                             <label className="flex min-h-0 flex-col text-xs text-[var(--text-muted)]"><span className="mb-1 block">{t('kvManager.value')}</span><textarea value={value} onChange={event => setValue(event.target.value)} placeholder={t('kvManager.valuePlaceholder')} spellCheck={false} className="min-h-40 flex-1 resize-none rounded-sm border border-[var(--border-color)] bg-[var(--bg-input)] p-3 font-mono text-sm text-[var(--text-main)] outline-none focus:border-[var(--kv-theme)]" /></label>
                         </div>
                         <footer className="flex min-h-14 items-center justify-end gap-2 border-t border-[var(--border-color)] px-4">
-                            <button type="button" onClick={resetEditor} className="console-secondary-button">{t('common.cancel')}</button>
-                            <button type="button" onClick={saveKey} disabled={saving || !keyName.trim()} className="console-primary-button">
+                            <button type="button" onClick={resetEditor} className="console-button secondary">{t('common.cancel')}</button>
+                            <button type="button" onClick={saveKey} disabled={saving || !keyName.trim()} className="console-button primary">
                                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}{saving ? t('common.saving') : t('common.save')}
                             </button>
                         </footer>

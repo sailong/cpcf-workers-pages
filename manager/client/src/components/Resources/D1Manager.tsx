@@ -213,7 +213,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                             <p className="truncate font-mono text-xs text-[var(--text-muted)]">{dbName}</p>
                         </div>
                     </div>
-                    <button type="button" onClick={onClose} className="console-icon-button" title={t('d1Manager.close')}>
+                    <button type="button" onClick={onClose} className="icon-button" title={t('d1Manager.close')}>
                         <X size={17} />
                     </button>
                 </header>
@@ -247,14 +247,14 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                     {activeTab === 'console' && (
                         <div className="flex h-full min-h-[460px] flex-col">
                             <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-color)] px-4 py-2">
-                                <button type="button" onClick={() => setSqlInput('SELECT * FROM ')} className="console-secondary-button text-xs">SELECT</button>
-                                <button type="button" onClick={() => setSqlInput('INSERT INTO ')} className="console-secondary-button text-xs">INSERT</button>
-                                <button type="button" onClick={() => setSqlInput('CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL\n);')} className="console-secondary-button text-xs">CREATE TABLE</button>
+                                <button type="button" onClick={() => setSqlInput('SELECT * FROM ')} className="console-button secondary text-xs">SELECT</button>
+                                <button type="button" onClick={() => setSqlInput('INSERT INTO ')} className="console-button secondary text-xs">INSERT</button>
+                                <button type="button" onClick={() => setSqlInput('CREATE TABLE users (\n  id INTEGER PRIMARY KEY,\n  name TEXT NOT NULL\n);')} className="console-button secondary text-xs">CREATE TABLE</button>
                                 <button
                                     type="button"
                                     onClick={executeSQL}
                                     disabled={loading || !sqlInput.trim()}
-                                    className="console-primary-button ml-auto"
+                                    className="console-button primary ml-auto"
                                 >
                                     {loading ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
                                     {loading ? t('d1Manager.executing') : t('d1Manager.execute')}
@@ -278,7 +278,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                             <aside className="border-b border-[var(--border-color)] md:border-b-0 md:border-r">
                                 <div className="flex h-11 items-center justify-between border-b border-[var(--border-color)] px-3">
                                     <span className="text-xs font-semibold uppercase text-[var(--text-muted)]">{t('d1Manager.tableList')}</span>
-                                    <button type="button" onClick={() => void fetchTables()} className="console-icon-button" title={t('common.refresh')}>
+                                    <button type="button" onClick={() => void fetchTables()} className="icon-button" title={t('common.refresh')}>
                                         <RefreshCw size={14} />
                                     </button>
                                 </div>
@@ -290,7 +290,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                                             <button type="button" onClick={() => void loadTable(table.name, 'data')} className="min-w-0 flex-1 truncate px-2 py-2 text-left font-mono text-xs text-[var(--text-main)]">
                                                 {table.name}
                                             </button>
-                                            <button type="button" onClick={() => void loadTable(table.name, 'structure')} className="console-icon-button mr-1" title={t('d1Manager.viewStructure')}>
+                                            <button type="button" onClick={() => void loadTable(table.name, 'structure')} className="icon-button mr-1" title={t('d1Manager.viewStructure')}>
                                                 <Info size={14} />
                                             </button>
                                         </div>
@@ -325,11 +325,11 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                             <section className="border-b border-[var(--border-color)] md:border-b-0 md:border-r">
                                 <div className="flex min-h-12 items-center gap-2 border-b border-[var(--border-color)] px-3">
                                     <input ref={migrationInput} type="file" accept=".sql" multiple className="hidden" onChange={event => void selectMigrationFiles(event.target.files)} />
-                                    <button type="button" onClick={() => migrationInput.current?.click()} className="console-secondary-button">
+                                    <button type="button" onClick={() => migrationInput.current?.click()} className="console-button secondary">
                                         <Upload size={15} />
                                         {t('d1Manager.selectMigrations')}
                                     </button>
-                                    <button type="button" onClick={applyMigrations} disabled={migrationLoading || migrationFiles.length === 0} className="console-primary-button ml-auto">
+                                    <button type="button" onClick={applyMigrations} disabled={migrationLoading || migrationFiles.length === 0} className="console-button primary ml-auto">
                                         {migrationLoading ? <Loader2 size={15} className="animate-spin" /> : <Play size={15} />}
                                         {t('d1Manager.apply')}
                                     </button>
@@ -339,7 +339,7 @@ export function D1Manager({ dbId, dbName, onClose }: D1ManagerProps) {
                             <section>
                                 <div className="flex h-12 items-center justify-between border-b border-[var(--border-color)] px-3">
                                     <span className="text-xs font-semibold uppercase text-[var(--text-muted)]">{t('d1Manager.appliedMigrations')}</span>
-                                    <button type="button" onClick={() => void fetchMigrations()} className="console-icon-button" title={t('common.refresh')}><RefreshCw size={14} /></button>
+                                    <button type="button" onClick={() => void fetchMigrations()} className="icon-button" title={t('common.refresh')}><RefreshCw size={14} /></button>
                                 </div>
                                 {appliedMigrations.length === 0 ? (
                                     <p className="px-4 py-12 text-center text-xs text-[var(--text-muted)]">{t('d1Manager.noAppliedMigrations')}</p>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ChevronLeft, ChevronRight, Loader2, Plus, Search, Settings2, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -58,6 +58,8 @@ export function ResourceInventoryList<T extends Resource>({
     const [resources, setResources] = useState<T[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(false);
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState('');
     const [newName, setNewName] = useState('');
     const [query, setQuery] = useState('');
     const [page, setPage] = useState(1);
@@ -94,16 +96,23 @@ export function ResourceInventoryList<T extends Resource>({
     useEffect(() => { setPage(1); }, [normalizedQuery]);
     useEffect(() => { if (page > pageCount) setPage(pageCount); }, [page, pageCount]);
 
-    const handleCreate = async () => {
+    const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         const name = newName.trim();
-        if (!name) return;
+        if (!name || creating) return;
+        setCreating(true);
+        setCreateError('');
         try {
             await createResource(name);
             setNewName('');
             await load();
             notify(t('resourceList.createSuccess'), 'success');
         } catch (error) {
-            notify(getErrorMessage(error, t('resourceList.createError')), 'error');
+            const message = getErrorMessage(error, t('resourceList.createError'));
+            setCreateError(message);
+            notify(message, 'error');
+        } finally {
+            setCreating(false);
         }
     };
 
@@ -138,16 +147,38 @@ export function ResourceInventoryList<T extends Resource>({
                         <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                         <input value={query} onChange={event => setQuery(event.target.value)} placeholder={t('resourceList.search')} className="neo-input h-9 w-full pl-8 text-sm" />
                     </div>
-                    <input
-                        value={newName}
-                        onChange={event => setNewName(event.target.value)}
-                        onKeyDown={event => { if (event.key === 'Enter') void handleCreate(); }}
-                        placeholder={namePlaceholder}
-                        className="neo-input h-9 min-w-0 flex-1 text-sm sm:w-44 sm:flex-none"
-                    />
-                    <button type="button" onClick={handleCreate} disabled={!newName.trim()} className="console-primary-button h-9 shrink-0">
-                        <Plus size={15} /> {t('resourceList.create')}
-                    </button>
+                    <div className="min-w-0 basis-full sm:basis-auto">
+                        <form className="flex min-w-0 items-center gap-2" onSubmit={handleCreate}>
+                            <label htmlFor={`resource-${kind}-name`} className="sr-only">{namePlaceholder}</label>
+                            <input
+                                id={`resource-${kind}-name`}
+                                value={newName}
+                                onChange={event => {
+                                    setNewName(event.target.value);
+                                    if (createError) setCreateError('');
+                                }}
+                                placeholder={namePlaceholder}
+                                disabled={creating}
+                                aria-invalid={Boolean(createError)}
+                                aria-describedby={createError ? `resource-${kind}-create-error` : undefined}
+                                className="neo-input h-9 min-w-0 flex-1 text-sm sm:w-44 sm:flex-none"
+                            />
+                            <button
+                                type="submit"
+                                disabled={creating || !newName.trim()}
+                                aria-busy={creating}
+                                className="console-button primary h-9 min-w-24 shrink-0 whitespace-nowrap"
+                            >
+                                {creating ? <Loader2 size={15} className="animate-spin" aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}
+                                {creating ? t('resourceList.creating') : t('resourceList.create')}
+                            </button>
+                        </form>
+                        {createError && (
+                            <p id={`resource-${kind}-create-error`} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                {createError}
+                            </p>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -194,8 +225,8 @@ export function ResourceInventoryList<T extends Resource>({
                                     <td className="px-3 py-2 text-[var(--text-muted)]">{new Date(resource.created).toLocaleString()}</td>
                                     <td className="px-3 py-2">
                                         <div className="flex justify-end gap-1">
-                                            <button type="button" onClick={() => onManage(resource)} className="console-icon-button" title={t('resourceList.manage')}><Settings2 size={15} /></button>
-                                            <button type="button" onClick={() => void handleDelete(resource)} className="console-icon-button text-red-500" title={t('resourceList.delete')}><Trash2 size={15} /></button>
+                                            <button type="button" onClick={() => onManage(resource)} className="icon-button" title={t('resourceList.manage')}><Settings2 size={15} /></button>
+                                            <button type="button" onClick={() => void handleDelete(resource)} className="icon-button danger" title={t('resourceList.delete')}><Trash2 size={15} /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -211,9 +242,9 @@ export function ResourceInventoryList<T extends Resource>({
             <div className="flex min-h-11 items-center justify-between border-t border-[var(--border-color)] px-3 text-xs text-[var(--text-muted)]">
                 <span>{t('resourceList.resultCount', { count: filtered.length })}</span>
                 <div className="flex items-center gap-2">
-                    <button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={page === 1} className="console-icon-button" title={t('resourceList.previous')}><ChevronLeft size={15} /></button>
+                    <button type="button" onClick={() => setPage(current => Math.max(1, current - 1))} disabled={page === 1} className="icon-button" title={t('resourceList.previous')}><ChevronLeft size={15} /></button>
                     <span className="w-20 text-center">{t('resourceList.page', { page, count: pageCount })}</span>
-                    <button type="button" onClick={() => setPage(current => Math.min(pageCount, current + 1))} disabled={page === pageCount} className="console-icon-button" title={t('resourceList.next')}><ChevronRight size={15} /></button>
+                    <button type="button" onClick={() => setPage(current => Math.min(pageCount, current + 1))} disabled={page === pageCount} className="icon-button" title={t('resourceList.next')}><ChevronRight size={15} /></button>
                 </div>
             </div>
         </div>
