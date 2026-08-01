@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ChevronLeft, ChevronRight, Loader2, Plus, Search, Settings2, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -63,6 +63,7 @@ export function ResourceInventoryList<T extends Resource>({
     const [newName, setNewName] = useState('');
     const [query, setQuery] = useState('');
     const [page, setPage] = useState(1);
+    const nameInputRef = useRef<HTMLInputElement>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -99,7 +100,12 @@ export function ResourceInventoryList<T extends Resource>({
     const handleCreate = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const name = newName.trim();
-        if (!name || creating) return;
+        if (creating) return;
+        if (!name) {
+            setCreateError(t('resourceList.nameRequired'));
+            nameInputRef.current?.focus();
+            return;
+        }
         setCreating(true);
         setCreateError('');
         try {
@@ -151,6 +157,7 @@ export function ResourceInventoryList<T extends Resource>({
                         <form className="flex min-w-0 items-center gap-2" onSubmit={handleCreate}>
                             <label htmlFor={`resource-${kind}-name`} className="sr-only">{namePlaceholder}</label>
                             <input
+                                ref={nameInputRef}
                                 id={`resource-${kind}-name`}
                                 value={newName}
                                 onChange={event => {
@@ -165,7 +172,7 @@ export function ResourceInventoryList<T extends Resource>({
                             />
                             <button
                                 type="submit"
-                                disabled={creating || !newName.trim()}
+                                disabled={creating}
                                 aria-busy={creating}
                                 className="console-button primary h-9 min-w-24 shrink-0 whitespace-nowrap"
                             >

@@ -81,8 +81,13 @@ describe('ResourceInventoryList', () => {
         await waitFor(() => expect(loadResources).toHaveBeenCalledTimes(1));
         const nameInput = screen.getByLabelText('Database name');
         const createButton = screen.getByRole('button', { name: 'Create' });
-        expect(createButton).toBeDisabled();
+        expect(createButton).toBeEnabled();
         expect(createButton).toHaveClass('console-button', 'primary');
+
+        fireEvent.click(createButton);
+        expect(createResource).not.toHaveBeenCalled();
+        expect(await screen.findByText('Enter a resource name')).toHaveAttribute('role', 'alert');
+        expect(nameInput).toHaveFocus();
 
         fireEvent.change(nameInput, { target: { value: '  customer-db  ' } });
         fireEvent.click(createButton);

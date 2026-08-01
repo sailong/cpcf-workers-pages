@@ -201,7 +201,7 @@
   }
 
   .console-brand-mark {
-    @apply flex h-7 w-7 items-center justify-center rounded-md bg-orange-700 text-[10px] font-bold text-white;
+    @apply block h-8 w-8 shrink-0 rounded-md border border-[var(--border-color)] bg-white object-cover;
   }
 
   .console-nav {

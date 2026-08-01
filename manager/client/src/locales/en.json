@@ -223,6 +223,7 @@
     "movedToTrash": "Resource moved to trash",
     "create": "Create",
     "creating": "Creating...",
+    "nameRequired": "Enter a resource name",
     "manage": "Manage",
     "delete": "Delete",
     "loadError": "Failed to load resource inventory",

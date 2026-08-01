@@ -88,7 +88,7 @@ const Login = ({ onLogin }: LoginProps) => {
         <div className="min-h-[100dvh] bg-[var(--bg-base)] text-[var(--text-main)]">
             <header className="flex h-14 items-center border-b border-[var(--border-color)] bg-[var(--bg-card)] px-4 sm:px-6">
                 <div className="flex items-center gap-2 text-sm font-semibold">
-                    <span className="console-brand-mark">CF</span>
+                    <img src="/brand/ccfwp-mark.png" alt="" width="32" height="32" className="console-brand-mark" />
                     <span>Workers Console</span>
                 </div>
                 <div className="ml-auto flex items-center gap-2">

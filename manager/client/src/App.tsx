@@ -61,7 +61,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     <div className="min-h-screen bg-[var(--bg-base)] font-sans text-[var(--text-main)]">
       <header className="console-topbar">
         <button type="button" className="console-brand" onClick={() => navigate('/')}>
-          <span className="console-brand-mark">CF</span>
+          <img src="/brand/ccfwp-mark.png" alt="CCFWP" width="32" height="32" className="console-brand-mark" />
           <span className="hidden sm:inline">Workers Console</span>
         </button>
         <nav className="console-nav" aria-label="Primary">
