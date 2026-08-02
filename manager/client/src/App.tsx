@@ -62,7 +62,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       <header className="console-topbar">
         <button type="button" className="console-brand" onClick={() => navigate('/')}>
           <img src="/brand/ccfwp-mark.png" alt="CCFWP" width="32" height="32" className="console-brand-mark" />
-          <span className="hidden sm:inline">Workers Console</span>
+          <span className="hidden sm:inline">CCFWP</span>
         </button>
         <nav className="console-nav" aria-label="Primary">
           {navItems.map(({ path, label, icon: Icon }) => (
