@@ -35,7 +35,7 @@ services:
       PROJECTS_BASE_DOMAIN: ${PROJECTS_BASE_DOMAIN:?Set PROJECTS_BASE_DOMAIN in .env}
       TRUST_PROXY: linklocal,uniquelocal
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8001/api/health',{headers:{host:process.env.CONSOLE_HOSTS}}).then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      test: ["CMD", "node", "-e", "const http=require('node:http');const host=(process.env.CONSOLE_HOSTS||'').split(',')[0].trim();const request=http.get({host:'127.0.0.1',port:8001,path:'/api/health',headers:{Host:host,'x-ccfwp-ingress-token':process.env.INGRESS_PROXY_TOKEN||''}},response=>{let body='';response.on('data',chunk=>body+=chunk);response.on('end',()=>{if(response.statusCode<200||response.statusCode>=300){console.error('Manager health check failed ('+response.statusCode+'): '+body.slice(0,500));process.exit(1)}})});request.setTimeout(4000,()=>request.destroy(new Error('Manager health check timed out')));request.on('error',error=>{console.error(error.message);process.exit(1)})"]
       interval: 10s
       timeout: 5s
       retries: 12

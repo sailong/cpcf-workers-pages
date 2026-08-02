@@ -336,6 +336,70 @@ test('Docker cleanup refuses containers not owned by the broker', async () => {
     );
 });
 
+test('Docker cleanup skips disconnect when the recreated manager is not attached to a stale network', async () => {
+    const events = [];
+    const engine = {
+        async inspectNetwork() {
+            return { Id: 'stale-network', Labels: { [OWNER_LABEL]: 'true' }, Containers: {} };
+        },
+        async disconnectNetwork() { events.push('disconnect'); },
+        async removeNetwork() { events.push('remove'); }
+    };
+    const provider = new DockerRuntimeProvider({ engine, resources: {}, managerContainerId: 'manager' });
+
+    await provider.cleanupIdentifiers({ networkId: 'stale-network' });
+
+    assert.deepEqual(events, ['remove']);
+});
+
+test('Docker cleanup treats a concurrent already-disconnected response as idempotent', async () => {
+    const events = [];
+    const engine = {
+        async inspectNetwork() {
+            return {
+                Id: 'runtime-network',
+                Labels: { [OWNER_LABEL]: 'true' },
+                Containers: { manager: { Name: 'manager' } }
+            };
+        },
+        async disconnectNetwork() {
+            events.push('disconnect');
+            throw new DockerEngineError(
+                'container manager is not connected to network runtime-network',
+                500,
+                '{"message":"container manager is not connected to network runtime-network"}'
+            );
+        },
+        async removeNetwork() { events.push('remove'); }
+    };
+    const provider = new DockerRuntimeProvider({ engine, resources: {}, managerContainerId: 'manager' });
+
+    await provider.cleanupIdentifiers({ networkId: 'runtime-network' });
+
+    assert.deepEqual(events, ['disconnect', 'remove']);
+});
+
+test('Docker cleanup still reports unexpected network disconnect failures', async () => {
+    const engine = {
+        async inspectNetwork() {
+            return {
+                Id: 'runtime-network',
+                Labels: { [OWNER_LABEL]: 'true' },
+                Containers: { manager: { Name: 'manager' } }
+            };
+        },
+        async disconnectNetwork() {
+            throw new DockerEngineError('Docker daemon failure', 500, '{"message":"daemon failure"}');
+        }
+    };
+    const provider = new DockerRuntimeProvider({ engine, resources: {}, managerContainerId: 'manager' });
+
+    await assert.rejects(
+        provider.cleanupIdentifiers({ networkId: 'runtime-network' }),
+        /Docker daemon failure/
+    );
+});
+
 test('aborting a Docker build stops its container and removes its network', async () => {
     const controller = new AbortController();
     const removed = [];

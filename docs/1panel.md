@@ -110,6 +110,9 @@ https://<项目名>-pages.example.com
   注入 `X-CCFWP-Ingress-Token`，并确认它与 Manager 环境变量的 `INGRESS_PROXY_TOKEN` 完全一致；不要只在
   浏览器中添加请求头。
 - `Cross-origin requests are not allowed`：检查 `Host`、`X-Forwarded-Proto` 和可信 token。
+- Docker 健康检查返回 `421 Host is not allowed`：确认使用最新版 `docker-compose.1panel.yml`。新版探针通过
+  Node 原生 HTTP 客户端发送 `CONSOLE_HOSTS` 中的第一个域名，避免 `fetch()` 忽略自定义 `Host` 请求头；更新编排后
+  必须重新创建 `ccfwp` 容器，仅重启旧容器不会更新健康检查配置。
 - HTTPS 重定向循环：确认 1Panel 方案没有启动 Caddy，且上游使用 HTTP 连接到 `127.0.0.1:38003`。
 - `Manager did not become healthy: starting`：先确认 `ccfwp` 容器日志和 Docker 健康检查输出；默认等待窗口为 3 分钟，
   可在环境变量中增加 `CCFWP_MANAGER_HEALTH_TIMEOUT_MS`。若升级和回滚都失败，先重启 `ccfwp-updater` 清理中断任务，

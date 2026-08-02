@@ -17,6 +17,22 @@ function isNotFound(error) {
     return error instanceof DockerEngineError && error.statusCode === 404;
 }
 
+function isAlreadyDisconnected(error) {
+    if (!(error instanceof DockerEngineError) || error.statusCode !== 500) return false;
+    return /\bis not connected to (?:the )?network\b/i.test(`${error.message || ''}\n${error.body || ''}`);
+}
+
+function networkContainsContainer(network, containerId) {
+    const containers = network?.Containers;
+    if (!containers || typeof containers !== 'object') return true;
+    const target = String(containerId || '').replace(/^\/+/, '');
+    return Object.entries(containers).some(([id, endpoint]) => (
+        id === target
+        || id.startsWith(target)
+        || String(endpoint?.Name || '').replace(/^\/+/, '') === target
+    ));
+}
+
 function decodeDockerLogs(buffer) {
     if (!Buffer.isBuffer(buffer)) return String(buffer || '');
     const output = [];
@@ -225,9 +241,9 @@ class DockerRuntimeProvider {
                 if (network.Labels?.[OWNER_LABEL] !== 'true') {
                     throw new Error(`Refusing to remove non-broker network ${networkId}`);
                 }
-                if (disconnectManager) {
+                if (disconnectManager && networkContainsContainer(network, this.managerContainerId)) {
                     try { await this.engine.disconnectNetwork(network.Id, this.managerContainerId); } catch (error) {
-                        if (!isNotFound(error) && error.statusCode !== 403) throw error;
+                        if (!isNotFound(error) && error.statusCode !== 403 && !isAlreadyDisconnected(error)) throw error;
                     }
                 }
                 await this.engine.removeNetwork(network.Id);
