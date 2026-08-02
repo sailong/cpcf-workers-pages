@@ -144,7 +144,16 @@ class DockerRuntimeProvider {
         try {
             const network = await this.engine.createNetwork(spec.networkConfiguration);
             networkId = network.Id;
-            await this.engine.connectNetwork(networkId, this.managerContainerId, [`ccfwp-manager-${safeRuntimeSuffix(runtimeKey)}`]);
+            // Project networks are data-plane links only. They must never replace
+            // the Manager's Compose/ingress network as its default route, because
+            // doing so can reset the control-plane HTTP request that started or
+            // stopped this runtime and surface as a reverse-proxy 502.
+            await this.engine.connectNetwork(
+                networkId,
+                this.managerContainerId,
+                [`ccfwp-manager-${safeRuntimeSuffix(runtimeKey)}`],
+                { gatewayPriority: -1 }
+            );
             const container = await this.engine.createContainer(spec.containerName, spec.containerConfiguration);
             containerId = container.Id;
             this.processes.set(runtimeKey, {

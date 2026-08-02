@@ -441,11 +441,22 @@ test('Docker Engine client uses the Unix socket API and reports daemon errors', 
     const socketPath = path.join('/tmp', `ccfwp-docker-${process.pid}.sock`);
     fs.rmSync(socketPath, { force: true });
     const seen = [];
+    const bodies = [];
     const server = http.createServer((request, response) => {
         seen.push(request.url);
         if (request.url === '/_ping') {
             response.writeHead(200);
             response.end('OK');
+            return;
+        }
+        if (request.method === 'POST' && request.url === '/v1.41/networks/runtime-network/connect') {
+            const chunks = [];
+            request.on('data', chunk => chunks.push(chunk));
+            request.on('end', () => {
+                bodies.push(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+                response.writeHead(200);
+                response.end();
+            });
             return;
         }
         response.writeHead(404, { 'Content-Type': 'application/json' });
@@ -458,11 +469,20 @@ test('Docker Engine client uses the Unix socket API and reports daemon errors', 
     try {
         const client = new DockerEngineClient({ socketPath, apiVersion: 'v1.41' });
         assert.equal(await client.ping(), 'OK');
+        await client.connectNetwork('runtime-network', 'manager', ['manager-alias'], { gatewayPriority: -1 });
         await assert.rejects(
             client.inspectContainer('absent'),
             error => error instanceof DockerEngineError && error.statusCode === 404 && /missing/.test(error.message)
         );
-        assert.deepEqual(seen, ['/_ping', '/v1.41/containers/absent/json']);
+        assert.deepEqual(seen, [
+            '/_ping',
+            '/v1.41/networks/runtime-network/connect',
+            '/v1.41/containers/absent/json'
+        ]);
+        assert.deepEqual(bodies, [{
+            Container: 'manager',
+            EndpointConfig: { Aliases: ['manager-alias'], GwPriority: -1 }
+        }]);
     } finally {
         await new Promise(resolve => server.close(resolve));
         fs.rmSync(socketPath, { force: true });

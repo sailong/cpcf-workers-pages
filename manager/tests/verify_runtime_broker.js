@@ -112,9 +112,10 @@ async function main() {
 
         const runtimeA = provider.processes.get(projectA.id);
         const runtimeB = provider.processes.get(projectB.id);
-        const [inspectA, inspectB, responseB] = await Promise.all([
+        const [inspectA, inspectB, inspectManager, responseB] = await Promise.all([
             provider.engine.inspectContainer(runtimeA.containerId),
             provider.engine.inspectContainer(runtimeB.containerId),
+            provider.engine.inspectContainer(provider.managerContainerId),
             runtimeFetch(provider.getTarget(projectB.id)).then(response => response.json())
         ]);
 
@@ -132,6 +133,8 @@ async function main() {
         assert.match(await pagesIndex.text(), /Pages static fallback/);
         assert.equal(pagesSource.status, 404);
         assert.notEqual(runtimeA.networkId, runtimeB.networkId);
+        assert.equal(inspectManager.NetworkSettings.Networks[runtimeA.networkName].GwPriority, -1);
+        assert.equal(inspectManager.NetworkSettings.Networks[runtimeB.networkName].GwPriority, -1);
         for (const [inspection, project] of [[inspectA, projectA], [inspectB, projectB]]) {
             assert.equal(inspection.Config.User, '10001:10001');
             assert.equal(inspection.HostConfig.ReadonlyRootfs, true);

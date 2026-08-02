@@ -86,9 +86,13 @@ class DockerEngineClient {
         return this.request('GET', `/networks/${encodeURIComponent(idOrName)}`, { expected: [200] });
     }
 
-    connectNetwork(idOrName, container, aliases = []) {
+    connectNetwork(idOrName, container, aliases = [], options = {}) {
+        const endpointConfiguration = { Aliases: aliases };
+        if (Number.isInteger(options.gatewayPriority)) {
+            endpointConfiguration.GwPriority = options.gatewayPriority;
+        }
         return this.request('POST', `/networks/${encodeURIComponent(idOrName)}/connect`, {
-            body: { Container: container, EndpointConfig: { Aliases: aliases } },
+            body: { Container: container, EndpointConfig: endpointConfiguration },
             expected: [200]
         });
     }
