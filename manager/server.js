@@ -18,6 +18,47 @@ const {
 } = require('./middleware/security');
 
 const MANAGER_SERVICE_PORT = Number.parseInt(process.env.MANAGER_SERVICE_PORT || '3000', 10);
+const SHUTDOWN_TIMEOUT_MS = Number.parseInt(process.env.SHUTDOWN_TIMEOUT_MS || '10000', 10);
+
+function waitForClose(server, timeoutMs = SHUTDOWN_TIMEOUT_MS) {
+    if (!server?.listening) return Promise.resolve();
+    return new Promise(resolve => {
+        let settled = false;
+        const finish = () => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+        };
+        const timer = setTimeout(() => {
+            console.warn(`[Shutdown] HTTP server did not close within ${timeoutMs}ms; continuing`);
+            finish();
+        }, timeoutMs);
+        server.close(finish);
+        // A long-lived SSE or keep-alive connection must not block a container
+        // restart indefinitely. The manager is restarted as one unit, so these
+        // connections are expected to reconnect after the health check passes.
+        server.closeIdleConnections?.();
+        server.closeAllConnections?.();
+    });
+}
+
+async function stopWithTimeout(operation, label, timeoutMs = SHUTDOWN_TIMEOUT_MS) {
+    let timer;
+    try {
+        await Promise.race([
+            operation,
+            new Promise(resolve => {
+                timer = setTimeout(() => {
+                    console.warn(`[Shutdown] ${label} did not finish within ${timeoutMs}ms; continuing`);
+                    resolve();
+                }, timeoutMs);
+            })
+        ]);
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 function assertProductionPasswordConfigured(service = authService, environment = process.env) {
     if (environment.NODE_ENV === 'production' && service.isDefaultPassword()) {
@@ -140,11 +181,9 @@ async function startServer() {
 }
 
 async function stopServer(server) {
-    if (server?.listening) {
-        await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-    }
+    await waitForClose(server);
     const runtimeService = require('./services/runtime-service');
-    await runtimeService.stopAll();
+    await stopWithTimeout(runtimeService.stopAll(), 'Runtime cleanup');
     require('./services/build-artifact-service').stopScheduler();
 }
 
@@ -168,4 +207,12 @@ if (require.main === module) {
     });
 }
 
-module.exports = { assertProductionPasswordConfigured, bootstrap, createApp, startServer, stopServer };
+module.exports = {
+    assertProductionPasswordConfigured,
+    bootstrap,
+    createApp,
+    startServer,
+    stopServer,
+    stopWithTimeout,
+    waitForClose
+};

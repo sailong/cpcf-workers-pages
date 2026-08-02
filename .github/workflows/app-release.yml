@@ -9,13 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
-    permissions:
-      contents: read
-
   release:
-    needs: ci
     permissions:
       contents: write
       id-token: write

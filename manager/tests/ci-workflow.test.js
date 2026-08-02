@@ -41,16 +41,17 @@ test('CI workflow keeps cleanup-safe defaults and invokes the credential generat
     assert.doesNotMatch(workflow, /node -e \\"/);
 });
 
-test('GitHub Actions only runs on SemVer tag pushes and gates release on CI', () => {
+test('GitHub Actions keeps CI and release workflows independent', () => {
     const ciWorkflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
     const releaseWorkflow = fs.readFileSync(path.join(ROOT, '.github/workflows/app-release.yml'), 'utf8');
 
-    assert.match(ciWorkflow, /^on:\n {2}workflow_call:[ \t]*$/m);
-    assert.doesNotMatch(ciWorkflow, /^ {2}(?:push|pull_request|workflow_dispatch):/m);
+    assert.match(ciWorkflow, /^on:\n {2}workflow_dispatch:[ \t]*$/m);
+    assert.doesNotMatch(ciWorkflow, /^ {2}(?:push|pull_request|workflow_call):/m);
     assert.match(releaseWorkflow, /^on:\n {2}push:\n {4}tags:\n {6}- 'v\[0-9\]\+\.\[0-9\]\+\.\[0-9\]\+'$/m);
     assert.doesNotMatch(releaseWorkflow, /^ {2}(?:pull_request|workflow_dispatch):/m);
-    assert.match(releaseWorkflow, /^ {2}ci:\n {4}uses: \.\/\.github\/workflows\/ci\.yml$/m);
-    assert.match(releaseWorkflow, /^ {2}release:\n {4}needs: ci\n {4}permissions:\n {6}contents: write\n {6}id-token: write$/m);
+    assert.doesNotMatch(releaseWorkflow, /^ {2}ci:/m);
+    assert.doesNotMatch(releaseWorkflow, /^ {4}needs: ci$/m);
+    assert.match(releaseWorkflow, /^ {2}release:\n {4}permissions:\n {6}contents: write\n {6}id-token: write$/m);
     assert.doesNotMatch(releaseWorkflow, /^ {2}id-token: write$/m);
 });
 

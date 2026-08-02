@@ -16,6 +16,7 @@ const {
 const { normalizeVersion } = require('../services/application-version-service');
 const { compareVersions, signerIdentityForRelease } = require('../../updater/release-client');
 const { atomicSymlink, ensureInitialRelease, readCurrentVersion, versionDirectory } = require('../../updater/release-layout');
+const { stopWithTimeout, waitForClose } = require('../server');
 
 test('application versions require strict v-prefixed SemVer and compare numerically', () => {
     assert.equal(normalizeVersion('v1.2.3'), 'v1.2.3');
@@ -97,4 +98,29 @@ test('release layout seeds and atomically switches complete application snapshot
     fs.symlinkSync(os.tmpdir(), path.join(releases, 'current'), 'dir');
     assert.throws(() => readCurrentVersion(releases), /escapes the managed versions directory/);
     fs.rmSync(root, { recursive: true, force: true });
+});
+
+test('manager shutdown force-closes long-lived connections before restart', async () => {
+    const calls = [];
+    let closeCallback;
+    const server = {
+        listening: true,
+        close(callback) { calls.push('close'); closeCallback = callback; },
+        closeIdleConnections() { calls.push('closeIdleConnections'); },
+        closeAllConnections() { calls.push('closeAllConnections'); closeCallback(); }
+    };
+    await waitForClose(server, 20);
+    assert.deepEqual(calls, ['close', 'closeIdleConnections', 'closeAllConnections']);
+});
+
+test('manager shutdown does not wait indefinitely for runtime cleanup', async () => {
+    const startedAt = Date.now();
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+        await stopWithTimeout(new Promise(() => {}), 'test runtime cleanup', 20);
+    } finally {
+        console.warn = originalWarn;
+    }
+    assert.ok(Date.now() - startedAt < 500);
 });

@@ -75,7 +75,7 @@ Tag。该状态文件不包含密钥，不能删除；镜像级回滚只适用�
 ## 发布职责边界
 
 - Docker Hub 镜像：只运行本机 `scripts/docker-release.sh publish vX.Y.Z` 构建并上传。
-- GitHub Actions：`ci.yml` 仅由 `app-release.yml` 调用；CI 全部通过后才生成并签名在线升级所需的应用程序包。
+- GitHub Actions：`ci.yml` 仅可在 Actions 页面手动运行；`app-release.yml` 在严格 SemVer Tag 上独立生成并签名在线升级所需的应用程序包。
 - Docker 镜像包含固定运行环境、系统依赖、Caddy 和初始应用快照；日常代码更新由 GitHub Release 完成。
 
 ## 在线应用升级
@@ -88,10 +88,12 @@ CCFWP_RELEASE_SIGNER_ISSUER=https://token.actions.githubusercontent.com
 CCFWP_UPDATER_TOKEN=<openssl rand -hex 32 的独立结果>
 CCFWP_RELEASE_RETENTION=3
 CCFWP_MAX_RELEASE_BYTES=2147483648
+CCFWP_MANAGER_HEALTH_TIMEOUT_MS=180000
 ```
 
-发布应用版本的唯一入口是推送严格 SemVer Tag。普通分支推送、Pull Request 和手动操作都不会
-启动工作流；应用程序包打包和签名由 GitHub Actions 完成，不会构建或推送 Docker 镜像：
+发布应用版本的唯一入口是推送严格 SemVer Tag。普通分支推送和 Pull Request 不会启动 CI 或发布工作流；
+CI 也可以在 Actions 页面手动运行，但手动运行 CI 不会发布应用程序包。应用程序包打包和签名由 GitHub Actions
+完成，不会构建或推送 Docker 镜像：
 
 ```bash
 # 先提交 docs/releases/v1.2.4.md，再推送不可变版本 Tag
@@ -102,7 +104,7 @@ git push origin v1.2.4
 `docs/releases/vX.Y.Z.md` 必须和代码一起提交到该 Tag。工作流会在上传签名资产前校验文件存在，
 并将其作为 GitHub Release 的正式介绍；缺少文件会阻止发布。
 
-工作流先执行后端、前端、运行时隔离和 E2E 测试；任何 CI 作业失败都会阻止发布。通过后再为
+发布工作流不会自动执行 CI；请在发布前按需手动运行 `CI` 并确认通过。发布工作流随后为
 amd64、arm64 分别生成包含生产 `node_modules` 和前端 `dist` 的 `tar.gz`，并使用 Cosign GitHub
 OIDC 对 `manifest.json` 无密钥签名。已存在的 GitHub Release 不允许覆盖。
 升级器会根据仓库、固定工作流路径和目标 Tag 自动生成唯一证书身份，不接受可放宽的身份正则配置。
@@ -115,6 +117,14 @@ OIDC 对 `manifest.json` 无密钥签名。已存在的 GitHub Release 不允许
 SHA-256 和架构校验、数据库迁移 dry-run、完整 release 快照、原子切换、重启及健康检查。dry-run
 失败不会切换 `current`；切换后健康检查失败会恢复原版本和迁移前数据库快照。可随时一键回滚到
 上一完整应用快照，回滚前也会先验证数据库兼容性。保留最近 3 个发行版本，并额外保护当前和上一版本。
+
+`CCFWP_MANAGER_HEALTH_TIMEOUT_MS` 默认是 180000（3 分钟），用于等待管理容器恢复健康；如果项目较多、
+运行时恢复较慢，可适当增加。超时错误会包含最近一次 Docker 健康检查输出，便于判断是启动失败、域名配置
+还是反向代理探针问题。
+
+本次健康等待修复位于固定镜像中的 `/app/updater/server.js`。服务器如果仍在运行旧镜像，单独发布
+GitHub 应用包不会更新升级器；请先在维护者本机发布并部署一次新 Docker 镜像。完成后，后续应用版本
+继续只通过 GitHub Release 在线更新，无需重复替换镜像。
 
 ### 5. 1Panel 反向代理部署
 

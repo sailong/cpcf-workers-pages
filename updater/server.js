@@ -22,6 +22,7 @@ const {
 } = require('./release-layout');
 
 const PORT = Number.parseInt(process.env.UPDATER_PORT || '8002', 10);
+const MANAGER_HEALTH_TIMEOUT_MS = Number.parseInt(process.env.CCFWP_MANAGER_HEALTH_TIMEOUT_MS || '180000', 10);
 const ROOT = config.APP_RELEASE_ROOT;
 const STATE_FILE = path.join(ROOT, 'state.json');
 const LOCK_FILE = path.join(ROOT, '.upgrade.lock');
@@ -103,7 +104,20 @@ async function runDryRun(candidateRoot) {
     return result.stdout.trim();
 }
 
-async function waitForHealthy(timeoutMs = 90_000) {
+function healthStateDetails(inspected) {
+    const state = inspected?.State || {};
+    const health = state.Health || {};
+    const latest = Array.isArray(health.Log) ? health.Log.at(-1) : null;
+    const output = String(latest?.Output || '').trim().replace(/\s+/g, ' ').slice(-600);
+    return [
+        health.Status || state.Status || 'starting',
+        state.Restarting ? 'container restarting' : '',
+        state.Error || '',
+        output
+    ].filter(Boolean).join('; ');
+}
+
+async function waitForHealthy(timeoutMs = MANAGER_HEALTH_TIMEOUT_MS) {
     const deadline = Date.now() + timeoutMs;
     let last;
     while (Date.now() < deadline) {
@@ -111,7 +125,7 @@ async function waitForHealthy(timeoutMs = 90_000) {
             const inspected = await docker.inspectContainer(CONTAINER_ID);
             const health = inspected.State?.Health?.Status;
             if (inspected.State?.Running && (!health || health === 'healthy')) return inspected;
-            last = health || inspected.State?.Status || 'starting';
+            last = healthStateDetails(inspected);
         } catch (error) { last = error.message; }
         await new Promise(resolve => setTimeout(resolve, 2000));
     }

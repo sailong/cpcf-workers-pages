@@ -40,6 +40,7 @@
 | `AUTH_PASSWORD` | 随机强密码 | 管理员初始密码 |
 | `INGRESS_PROXY_TOKEN` | `openssl rand -hex 32` | 反代可信请求凭证 |
 | `CCFWP_UPDATER_TOKEN` | `openssl rand -hex 32` | 独立的升级器凭证 |
+| `CCFWP_MANAGER_HEALTH_TIMEOUT_MS` | `180000` | 升级重启后的管理容器健康检查等待时间（毫秒） |
 | `CCFWP_GITHUB_REPOSITORY` | `sailong/cpcf-workers-pages` | GitHub Release 仓库 |
 
 生成两个不同的 token：
@@ -110,5 +111,9 @@ https://<项目名>-pages.example.com
   浏览器中添加请求头。
 - `Cross-origin requests are not allowed`：检查 `Host`、`X-Forwarded-Proto` 和可信 token。
 - HTTPS 重定向循环：确认 1Panel 方案没有启动 Caddy，且上游使用 HTTP 连接到 `127.0.0.1:38003`。
+- `Manager did not become healthy: starting`：先确认 `ccfwp` 容器日志和 Docker 健康检查输出；默认等待窗口为 3 分钟，
+  可在环境变量中增加 `CCFWP_MANAGER_HEALTH_TIMEOUT_MS`。若升级和回滚都失败，先重启 `ccfwp-updater` 清理中断任务，
+  再检查当前版本并执行回滚。本修复位于升级器镜像中，需先重新部署一次包含修复的新镜像；之后应用版本仍可只通过
+  GitHub Release 更新。
 - `client version 1.41 is too old`：确认编排中 `ccfwp` 和 `ccfwp-updater` 都使用
   `DOCKER_API_VERSION=v1.44`，然后重新创建容器；不要删除持久化数据目录。
